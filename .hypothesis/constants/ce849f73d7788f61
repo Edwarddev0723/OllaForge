@@ -1,0 +1,4 @@
+# file: /Users/edwardhuang/Documents/GitHub/OllaForge/ollaforge/processor.py
+# hypothesis_version: 6.141.1
+
+['"\\1":', "'([^']*)':", ',\\s*([}\\]])', ': "\\1"', ":\\s*'([^']*)'", 'Here is the JSON:', "Here's the JSON:", 'JSON:', 'Output:', 'Response:', 'Result:', '\\1', '\\{.*\\}', 'input', 'instruction', 'output']
