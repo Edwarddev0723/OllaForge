@@ -29,7 +29,7 @@ import concurrent.futures
 from typing import Dict, Any, Optional, List, Callable
 from rich.console import Console
 
-from .models import DataEntry, DatasetType
+from .models import DataEntry, DatasetType, OutputLanguage
 
 console = Console()
 
@@ -48,7 +48,8 @@ class OllamaGenerationError(Exception):
 
 
 def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int, 
-                    dataset_type: DatasetType = DatasetType.SFT) -> Dict[str, Any]:
+                    dataset_type: DatasetType = DatasetType.SFT,
+                    language: OutputLanguage = OutputLanguage.EN) -> Dict[str, Any]:
     """
     Generate a batch of entries in a single API call.
     
@@ -56,8 +57,8 @@ def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int,
         Dict with 'raw_content' (JSON array string) or 'error'
     """
     try:
-        system_prompt = _create_system_prompt_batch(topic, batch_size, dataset_type)
-        user_prompt = _create_user_prompt_batch(topic, batch_size, batch_number, dataset_type)
+        system_prompt = _create_system_prompt_batch(topic, batch_size, dataset_type, language)
+        user_prompt = _create_user_prompt_batch(topic, batch_size, batch_number, dataset_type, language)
         
         response = ollama.chat(
             model=model,
@@ -86,11 +87,12 @@ def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int,
 
 
 def _generate_single_entry(topic: str, model: str, entry_number: int,
-                           dataset_type: DatasetType = DatasetType.SFT) -> Dict[str, Any]:
+                           dataset_type: DatasetType = DatasetType.SFT,
+                           language: OutputLanguage = OutputLanguage.EN) -> Dict[str, Any]:
     """Generate a single data entry."""
     try:
-        system_prompt = _create_system_prompt_single(topic, dataset_type)
-        user_prompt = _create_user_prompt(topic, entry_number, dataset_type)
+        system_prompt = _create_system_prompt_single(topic, dataset_type, language)
+        user_prompt = _create_user_prompt(topic, entry_number, dataset_type, language)
         
         response = ollama.chat(
             model=model,
@@ -118,7 +120,8 @@ def _generate_single_entry(topic: str, model: str, entry_number: int,
 
 
 def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: int,
-                        dataset_type: DatasetType = DatasetType.SFT) -> List[Dict[str, Any]]:
+                        dataset_type: DatasetType = DatasetType.SFT,
+                        language: OutputLanguage = OutputLanguage.EN) -> List[Dict[str, Any]]:
     """
     Generate multiple entries in a single API call (batch mode).
     
@@ -128,11 +131,12 @@ def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: i
         batch_size: Number of entries to generate in this batch
         batch_number: Batch identifier for the prompt
         dataset_type: Type of dataset to generate
+        language: Output language for generated content
         
     Returns:
         List of dicts with 'raw_content' for each entry
     """
-    result = _generate_batch(topic, model, batch_size, batch_number, dataset_type)
+    result = _generate_batch(topic, model, batch_size, batch_number, dataset_type, language)
     
     if 'error' in result:
         error_msg = result['error'].lower()
@@ -146,7 +150,8 @@ def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: i
 
 def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1, 
                   concurrency: int = DEFAULT_CONCURRENCY,
-                  dataset_type: DatasetType = DatasetType.SFT) -> List[Dict[str, Any]]:
+                  dataset_type: DatasetType = DatasetType.SFT,
+                  language: OutputLanguage = OutputLanguage.EN) -> List[Dict[str, Any]]:
     """
     Generate structured data entries using Ollama API.
     Uses batch generation for efficiency.
@@ -157,6 +162,7 @@ def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
         count: Number of entries to generate
         concurrency: Number of concurrent requests (for fallback single mode)
         dataset_type: Type of dataset to generate (SFT, PRETRAIN, SFT_CONVERSATION, DPO)
+        language: Output language for generated content (EN, ZH_TW)
         
     Returns:
         List[Dict[str, Any]]: List of generated data entries
@@ -168,14 +174,14 @@ def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
         if count <= 3:
             generated_entries = []
             for i in range(count):
-                result = _generate_single_entry(topic, model, i + 1, dataset_type)
+                result = _generate_single_entry(topic, model, i + 1, dataset_type, language)
                 if 'raw_content' in result:
                     generated_entries.append(result)
             return generated_entries
         
         # For larger counts, use batch generation
         # Each API call generates multiple entries
-        return generate_data_batch(topic, model, count, 1, dataset_type)
+        return generate_data_batch(topic, model, count, 1, dataset_type, language)
         
     except OllamaGenerationError:
         raise
@@ -220,8 +226,18 @@ def _test_ollama_connection() -> None:
             raise OllamaConnectionError(f"Ollama API test failed: {str(e)}")
 
 
-def _create_system_prompt_single(topic: str, dataset_type: DatasetType = DatasetType.SFT) -> str:
+def _get_language_instruction(language: OutputLanguage) -> str:
+    """Get language-specific instruction for prompts."""
+    if language == OutputLanguage.ZH_TW:
+        return "\n\n重要：所有生成的內容必須使用繁體中文（台灣用語）撰寫。"
+    return ""
+
+
+def _create_system_prompt_single(topic: str, dataset_type: DatasetType = DatasetType.SFT,
+                                  language: OutputLanguage = OutputLanguage.EN) -> str:
     """Create system prompt for single JSON output based on dataset type."""
+    
+    lang_instruction = _get_language_instruction(language)
     
     if dataset_type == DatasetType.SFT:
         return f"""You are a data generator. Generate training data for: {topic}
@@ -229,7 +245,7 @@ def _create_system_prompt_single(topic: str, dataset_type: DatasetType = Dataset
 Output ONLY valid JSON (Alpaca/SFT format):
 {{"instruction": "task description", "input": "input context", "output": "expected output"}}
 
-No markdown, no explanation, just JSON."""
+No markdown, no explanation, just JSON.{lang_instruction}"""
 
     elif dataset_type == DatasetType.PRETRAIN:
         return f"""You are a data generator. Generate pre-training text data for: {topic}
@@ -238,7 +254,7 @@ Output ONLY valid JSON:
 {{"text": "A complete, coherent paragraph or document about the topic..."}}
 
 The text should be informative, well-written, and suitable for language model pre-training.
-No markdown, no explanation, just JSON."""
+No markdown, no explanation, just JSON.{lang_instruction}"""
 
     elif dataset_type == DatasetType.SFT_CONVERSATION:
         return f"""You are a data generator. Generate multi-turn conversation data for: {topic}
@@ -253,7 +269,7 @@ Output ONLY valid JSON (ShareGPT/ChatML format):
 ]}}
 
 Generate realistic multi-turn dialogues with 2-4 turns.
-No markdown, no explanation, just JSON."""
+No markdown, no explanation, just JSON.{lang_instruction}"""
 
     elif dataset_type == DatasetType.DPO:
         return f"""You are a data generator. Generate preference data for DPO training on: {topic}
@@ -263,14 +279,17 @@ Output ONLY valid JSON (DPO format):
 
 The "chosen" response should be clearly better than "rejected" in terms of:
 - Accuracy, helpfulness, safety, or quality
-No markdown, no explanation, just JSON."""
+No markdown, no explanation, just JSON.{lang_instruction}"""
 
-    return _create_system_prompt_single(topic, DatasetType.SFT)
+    return _create_system_prompt_single(topic, DatasetType.SFT, language)
 
 
 def _create_system_prompt_batch(topic: str, batch_size: int, 
-                                 dataset_type: DatasetType = DatasetType.SFT) -> str:
+                                 dataset_type: DatasetType = DatasetType.SFT,
+                                 language: OutputLanguage = OutputLanguage.EN) -> str:
     """Create system prompt for batch JSON output based on dataset type."""
+    
+    lang_instruction = _get_language_instruction(language)
     
     if dataset_type == DatasetType.SFT:
         return f"""You are a data generator. Generate {batch_size} DIFFERENT training examples for: {topic}
@@ -287,7 +306,7 @@ Example format:
 IMPORTANT:
 - Output ONLY the JSON array, no markdown, no explanation
 - Each example must be UNIQUE and DIFFERENT
-- Generate exactly {batch_size} examples"""
+- Generate exactly {batch_size} examples{lang_instruction}"""
 
     elif dataset_type == DatasetType.PRETRAIN:
         return f"""You are a data generator. Generate {batch_size} DIFFERENT pre-training text samples for: {topic}
@@ -304,7 +323,7 @@ Example format:
 IMPORTANT:
 - Output ONLY the JSON array, no markdown, no explanation
 - Each text must be UNIQUE, informative, and well-written
-- Generate exactly {batch_size} examples"""
+- Generate exactly {batch_size} examples{lang_instruction}"""
 
     elif dataset_type == DatasetType.SFT_CONVERSATION:
         return f"""You are a data generator. Generate {batch_size} DIFFERENT multi-turn conversations for: {topic}
@@ -328,7 +347,7 @@ Example format:
 IMPORTANT:
 - Output ONLY the JSON array, no markdown, no explanation
 - Each conversation must be UNIQUE with 2-4 turns
-- Generate exactly {batch_size} examples"""
+- Generate exactly {batch_size} examples{lang_instruction}"""
 
     elif dataset_type == DatasetType.DPO:
         return f"""You are a data generator. Generate {batch_size} DIFFERENT preference pairs for DPO training on: {topic}
@@ -345,13 +364,14 @@ Example format:
 IMPORTANT:
 - Output ONLY the JSON array, no markdown, no explanation
 - "chosen" must be clearly BETTER than "rejected"
-- Generate exactly {batch_size} examples"""
+- Generate exactly {batch_size} examples{lang_instruction}"""
 
-    return _create_system_prompt_batch(topic, batch_size, DatasetType.SFT)
+    return _create_system_prompt_batch(topic, batch_size, DatasetType.SFT, language)
 
 
 def _create_user_prompt(topic: str, entry_number: int, 
-                        dataset_type: DatasetType = DatasetType.SFT) -> str:
+                        dataset_type: DatasetType = DatasetType.SFT,
+                        language: OutputLanguage = OutputLanguage.EN) -> str:
     """Create user prompt for single entry generation."""
     type_hint = {
         DatasetType.SFT: "instruction/input/output",
@@ -360,11 +380,13 @@ def _create_user_prompt(topic: str, entry_number: int,
         DatasetType.DPO: "prompt/chosen/rejected"
     }.get(dataset_type, "")
     
-    return f"Generate {type_hint} example #{entry_number} for: {topic}. JSON only."
+    lang_hint = " 請用繁體中文（台灣用語）回答。" if language == OutputLanguage.ZH_TW else ""
+    return f"Generate {type_hint} example #{entry_number} for: {topic}. JSON only.{lang_hint}"
 
 
 def _create_user_prompt_batch(topic: str, batch_size: int, batch_number: int,
-                               dataset_type: DatasetType = DatasetType.SFT) -> str:
+                               dataset_type: DatasetType = DatasetType.SFT,
+                               language: OutputLanguage = OutputLanguage.EN) -> str:
     """Create user prompt for batch generation."""
     type_hint = {
         DatasetType.SFT: "instruction/input/output",
@@ -373,7 +395,8 @@ def _create_user_prompt_batch(topic: str, batch_size: int, batch_number: int,
         DatasetType.DPO: "prompt/chosen/rejected"
     }.get(dataset_type, "")
     
-    return f"Generate {batch_size} unique {type_hint} examples (batch {batch_number}) for: {topic}. JSON array only."
+    lang_hint = " 請用繁體中文（台灣用語）回答。" if language == OutputLanguage.ZH_TW else ""
+    return f"Generate {batch_size} unique {type_hint} examples (batch {batch_number}) for: {topic}. JSON array only.{lang_hint}"
 
 
 def get_available_models() -> List[str]:

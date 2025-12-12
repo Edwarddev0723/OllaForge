@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Optional
 from pydantic import ValidationError
 
-from ollaforge.models import GenerationConfig, GenerationResult, DatasetType
+from ollaforge.models import GenerationConfig, GenerationResult, DatasetType, OutputLanguage
 from ollaforge.progress import ProgressTracker
 
 # Initialize Rich console for beautiful output
@@ -54,6 +54,7 @@ app = typer.Typer(
 
 def validate_parameters(topic: str, count: int, model: str, output: str, 
                         dataset_type: DatasetType = DatasetType.SFT,
+                        language: OutputLanguage = OutputLanguage.EN,
                         raise_on_error: bool = True) -> GenerationConfig:
     """
     Validate CLI parameters using Pydantic models.
@@ -64,6 +65,7 @@ def validate_parameters(topic: str, count: int, model: str, output: str,
         model: Ollama model name
         output: Output filename
         dataset_type: Type of dataset to generate
+        language: Output language for generated content
         raise_on_error: Whether to raise typer.Exit on validation errors (default: True)
         
     Returns:
@@ -79,7 +81,8 @@ def validate_parameters(topic: str, count: int, model: str, output: str,
             count=count,
             model=model,
             output=output,
-            dataset_type=dataset_type
+            dataset_type=dataset_type,
+            language=language
         )
         return config
     except ValidationError as e:
@@ -200,6 +203,24 @@ DATASET_TYPE_HELP = """Dataset type to generate:
 • sft_conv: SFT Conversation (ShareGPT/ChatML multi-turn format)
 • dpo: Direct Preference Optimization (prompt/chosen/rejected)"""
 
+# Language descriptions for help text
+LANGUAGE_HELP = """Output language for generated content:
+• en: English (default)
+• zh-tw: 繁體中文（台灣用語）"""
+
+
+def validate_language(value: str) -> OutputLanguage:
+    """
+    Validate and convert language string to enum.
+    """
+    try:
+        return OutputLanguage(value.lower())
+    except ValueError:
+        valid_langs = [l.value for l in OutputLanguage]
+        raise typer.BadParameter(
+            f"Invalid language '{value}'. Valid options: {', '.join(valid_langs)}"
+        )
+
 
 @app.command()
 def generate(
@@ -240,6 +261,13 @@ def generate(
         "-t",
         help=DATASET_TYPE_HELP,
         callback=lambda ctx, param, value: validate_dataset_type(value) if value is not None else value
+    ),
+    language: str = typer.Option(
+        "en",
+        "--lang",
+        "-l",
+        help=LANGUAGE_HELP,
+        callback=lambda ctx, param, value: validate_language(value) if value is not None else value
     ),
     interactive: bool = typer.Option(
         False,
@@ -290,12 +318,13 @@ def generate(
             model = config.model
             output = config.output
             dataset_type = config.dataset_type
+            language = config.language
             
             # Show generation start
             display_generation_start(config)
         else:
             # Validate all parameters using Pydantic
-            config = validate_parameters(topic, count, model, output, dataset_type)
+            config = validate_parameters(topic, count, model, output, dataset_type, language)
             
             # Dataset type display names
             type_display = {
@@ -303,6 +332,12 @@ def generate(
                 DatasetType.PRETRAIN: "Pre-training (text)",
                 DatasetType.SFT_CONVERSATION: "SFT Conversation (ShareGPT)",
                 DatasetType.DPO: "DPO (Preference pairs)"
+            }
+            
+            # Language display names
+            lang_display = {
+                OutputLanguage.EN: "English",
+                OutputLanguage.ZH_TW: "繁體中文（台灣）"
             }
             
             # Display welcome message
@@ -316,6 +351,7 @@ def generate(
             console.print(f"🤖 Model: {config.model}")
             console.print(f"📄 Output: {config.output}")
             console.print(f"📊 Type: {type_display.get(config.dataset_type, config.dataset_type.value)}")
+            console.print(f"🌐 Language: {lang_display.get(config.language, config.language.value)}")
             console.print(f"⚡ Concurrency: {concurrency}")
             console.print()
         
@@ -379,7 +415,8 @@ def generate(
                         model=config.model,
                         count=current_batch_size,
                         concurrency=concurrency,
-                        dataset_type=config.dataset_type
+                        dataset_type=config.dataset_type,
+                        language=config.language
                     )
                     
                     # Process responses (may contain batch JSON array)

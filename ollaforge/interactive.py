@@ -20,7 +20,7 @@ from rich.live import Live
 from rich.layout import Layout
 from rich.markdown import Markdown
 
-from .models import DatasetType, GenerationConfig
+from .models import DatasetType, GenerationConfig, OutputLanguage
 
 
 console = Console()
@@ -206,6 +206,60 @@ def display_model_selection() -> str:
 
 
 # ============================================================================
+# Language Selection
+# ============================================================================
+
+LANGUAGE_INFO = {
+    OutputLanguage.EN: {
+        "name": "🇺🇸 English",
+        "description": "Generate content in English",
+        "color": "blue",
+    },
+    OutputLanguage.ZH_TW: {
+        "name": "🇹🇼 繁體中文（台灣）",
+        "description": "使用繁體中文（台灣用語）生成內容",
+        "color": "red",
+    },
+}
+
+
+def display_language_selection() -> OutputLanguage:
+    """Display language selection menu."""
+    console.print("[bold cyan]🌐 Select Output Language[/bold cyan]\n")
+    
+    table = Table(
+        show_header=True,
+        header_style="bold white on dark_blue",
+        box=ROUNDED,
+        border_style="blue",
+    )
+    
+    table.add_column("#", style="bold cyan", justify="center", width=3)
+    table.add_column("Language", style="bold", width=25)
+    table.add_column("Description", style="dim", width=40)
+    
+    lang_list = list(OutputLanguage)
+    for i, lang in enumerate(lang_list, 1):
+        info = LANGUAGE_INFO[lang]
+        table.add_row(
+            str(i),
+            f"[{info['color']}]{info['name']}[/{info['color']}]",
+            info["description"],
+        )
+    
+    console.print(table)
+    console.print()
+    
+    choice = Prompt.ask(
+        "[bold]Enter your choice[/bold]",
+        choices=[str(i) for i in range(1, len(lang_list) + 1)],
+        default="1",
+    )
+    
+    return lang_list[int(choice) - 1]
+
+
+# ============================================================================
 # Configuration Summary & Confirmation
 # ============================================================================
 
@@ -217,6 +271,7 @@ def display_config_summary(config: GenerationConfig, concurrency: int = 5) -> bo
         bool: True if user confirms, False otherwise
     """
     info = DATASET_TYPE_INFO[config.dataset_type]
+    lang_info = LANGUAGE_INFO[config.language]
     
     table = Table(
         show_header=False,
@@ -230,6 +285,7 @@ def display_config_summary(config: GenerationConfig, concurrency: int = 5) -> bo
     
     table.add_row("📝 Topic", f"[bold]{config.topic}[/bold]")
     table.add_row("📊 Dataset Type", f"[{info['color']}]{info['name']}[/{info['color']}]")
+    table.add_row("🌐 Language", f"[{lang_info['color']}]{lang_info['name']}[/{lang_info['color']}]")
     table.add_row("🔢 Count", f"[bold yellow]{config.count}[/bold yellow] entries")
     table.add_row("🤖 Model", f"[bold green]{config.model}[/bold green]")
     table.add_row("📄 Output", f"[bold]{config.output}[/bold]")
@@ -265,7 +321,7 @@ def run_interactive_wizard() -> Optional[Tuple[GenerationConfig, int]]:
         display_banner()
         
         # Step 1: Topic
-        console.print("[bold cyan]📝 Step 1/5: Dataset Topic[/bold cyan]")
+        console.print("[bold cyan]📝 Step 1/6: Dataset Topic[/bold cyan]")
         console.print("[dim]Describe what kind of data you want to generate[/dim]\n")
         
         topic = Prompt.ask(
@@ -275,12 +331,17 @@ def run_interactive_wizard() -> Optional[Tuple[GenerationConfig, int]]:
         console.print()
         
         # Step 2: Dataset Type
-        console.print("[bold cyan]📊 Step 2/5: Dataset Type[/bold cyan]\n")
+        console.print("[bold cyan]📊 Step 2/6: Dataset Type[/bold cyan]\n")
         dataset_type = display_dataset_type_menu()
         console.print()
         
-        # Step 3: Count
-        console.print("[bold cyan]🔢 Step 3/5: Number of Entries[/bold cyan]")
+        # Step 3: Language
+        console.print("[bold cyan]🌐 Step 3/6: Output Language[/bold cyan]\n")
+        language = display_language_selection()
+        console.print()
+        
+        # Step 4: Count
+        console.print("[bold cyan]🔢 Step 4/6: Number of Entries[/bold cyan]")
         console.print("[dim]How many data entries to generate (1-10,000)[/dim]\n")
         
         count = IntPrompt.ask(
@@ -290,12 +351,12 @@ def run_interactive_wizard() -> Optional[Tuple[GenerationConfig, int]]:
         count = max(1, min(10000, count))  # Clamp to valid range
         console.print()
         
-        # Step 4: Model
+        # Step 5: Model
         model = display_model_selection()
         console.print()
         
-        # Step 5: Output & Advanced
-        console.print("[bold cyan]📄 Step 5/5: Output Settings[/bold cyan]\n")
+        # Step 6: Output & Advanced
+        console.print("[bold cyan]📄 Step 6/6: Output Settings[/bold cyan]\n")
         
         default_output = f"{dataset_type.value}_dataset.jsonl"
         output = Prompt.ask(
@@ -322,6 +383,7 @@ def run_interactive_wizard() -> Optional[Tuple[GenerationConfig, int]]:
             model=model,
             output=output,
             dataset_type=dataset_type,
+            language=language,
         )
         
         # Show summary and confirm
@@ -426,6 +488,7 @@ python main.py "topic" -c 100 -m gpt-oss:20b -t sft -o output.jsonl
 - `-c, --count`: Number of entries (1-10,000)
 - `-m, --model`: Ollama model name
 - `-t, --type`: Dataset type (sft/pretrain/sft_conv/dpo)
+- `-l, --lang`: Output language (en/zh-tw)
 - `-o, --output`: Output filename
 - `-j, --concurrency`: Parallel requests (1-20)
 
@@ -462,6 +525,7 @@ python main.py "code review" -t dpo -c 50
 def display_generation_start(config: GenerationConfig) -> None:
     """Display a nice header when generation starts."""
     info = DATASET_TYPE_INFO[config.dataset_type]
+    lang_info = LANGUAGE_INFO[config.language]
     
     content = Text()
     content.append("🚀 Starting Generation\n\n", style="bold white")
@@ -469,6 +533,8 @@ def display_generation_start(config: GenerationConfig) -> None:
     content.append(f"{config.topic}\n", style="bold")
     content.append(f"Type: ", style="dim")
     content.append(f"{info['name']}\n", style=info['color'])
+    content.append(f"Language: ", style="dim")
+    content.append(f"{lang_info['name']}\n", style=lang_info['color'])
     content.append(f"Target: ", style="dim")
     content.append(f"{config.count} entries", style="bold yellow")
     

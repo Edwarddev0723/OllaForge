@@ -43,6 +43,14 @@ class DatasetType(str, Enum):
     DPO = "dpo"                      # Preference Stage (DPO)
 
 
+class OutputLanguage(str, Enum):
+    """
+    Supported output languages for generated datasets.
+    """
+    EN = "en"           # English
+    ZH_TW = "zh-tw"     # 繁體中文（台灣用語）
+
+
 class GenerationConfig(BaseModel):
     """Configuration for dataset generation."""
     topic: str = Field(..., description="Description of the dataset content to generate")
@@ -50,6 +58,7 @@ class GenerationConfig(BaseModel):
     model: str = Field("gpt-oss:20b", description="Ollama model to use")
     output: str = Field("dataset.jsonl", description="Output filename")
     dataset_type: DatasetType = Field(DatasetType.SFT, description="Type of dataset to generate")
+    language: OutputLanguage = Field(OutputLanguage.EN, description="Output language for generated content")
     
     @validator('topic')
     def topic_must_not_be_empty(cls, v):
