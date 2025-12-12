@@ -35,7 +35,7 @@ python main.py "customer service conversations about refunds"
 
 With custom parameters:
 ```bash
-python main.py "technical documentation examples" --count 50 --model mistral --output tech_docs.jsonl
+python main.py "technical documentation examples" --count 50 --model gpt-oss:20b --output tech_docs.jsonl
 ```
 
 ### Parameters
