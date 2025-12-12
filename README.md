@@ -108,6 +108,8 @@ python main.py <topic> [options]
 | `--output` | `-o` | dataset.jsonl | Output filename |
 | `--type` | `-t` | sft | Dataset type (sft/pretrain/sft_conv/dpo) |
 | `--lang` | `-l` | en | Output language (en/zh-tw) |
+| `--qc/--no-qc` | - | --qc | Enable/disable Taiwan Chinese QC |
+| `--qc-confidence` | - | 0.9 | QC confidence threshold (0.0-1.0) |
 | `--concurrency` | `-j` | 5 | Parallel requests (1-20) |
 | `--interactive` | `-i` | - | Launch interactive mode |
 
@@ -194,6 +196,40 @@ Preference pairs for RLHF training:
 |------|----------|---------|
 | `en` | English | `--lang en` |
 | `zh-tw` | 繁體中文（台灣） | `--lang zh-tw` |
+
+## 🔍 Quality Control (QC) for Traditional Chinese
+
+When generating datasets in Traditional Chinese (`--lang zh-tw`), OllaForge includes an optional **Quality Control** system that automatically filters out Mainland Chinese expressions.
+
+### How It Works
+
+- Uses a BERT-based classifier ([renhehuang/bert-traditional-chinese-classifier](https://huggingface.co/renhehuang/bert-traditional-chinese-classifier))
+- Classifies text as "Taiwan Traditional" or "Mainland Traditional"
+- Entries with Mainland expressions are automatically regenerated
+- Default confidence threshold: 90%
+
+### Usage
+
+```bash
+# Enable QC (default when using zh-tw)
+python main.py "客服對話" --lang zh-tw --qc
+
+# Disable QC
+python main.py "客服對話" --lang zh-tw --no-qc
+
+# Adjust confidence threshold (stricter)
+python main.py "客服對話" --lang zh-tw --qc-confidence 0.95
+```
+
+### Examples of Filtered Expressions
+
+| Mainland (Filtered) | Taiwan (Accepted) |
+|---------------------|-------------------|
+| 軟件 | 軟體 |
+| 程序 | 程式 |
+| 計算機 | 電腦 |
+| 網絡 | 網路 |
+| 界面 | 介面 |
 
 ## 🤖 Recommended Models
 

@@ -108,6 +108,8 @@ python main.py <主題> [選項]
 | `--output` | `-o` | dataset.jsonl | 輸出檔案名稱 |
 | `--type` | `-t` | sft | 資料集類型 (sft/pretrain/sft_conv/dpo) |
 | `--lang` | `-l` | en | 輸出語言 (en/zh-tw) |
+| `--qc/--no-qc` | - | --qc | 啟用/停用台灣用語品質管控 |
+| `--qc-confidence` | - | 0.9 | QC 信心度門檻 (0.0-1.0) |
 | `--concurrency` | `-j` | 5 | 並行請求數 (1-20) |
 | `--interactive` | `-i` | - | 啟動互動模式 |
 
@@ -191,6 +193,40 @@ Alpaca 風格格式，用於指令微調：
 |------|------|------|
 | `en` | English | `--lang en` |
 | `zh-tw` | 繁體中文（台灣） | `--lang zh-tw` |
+
+## 🔍 繁體中文品質管控 (QC)
+
+當生成繁體中文資料集時（`--lang zh-tw`），OllaForge 內建**品質管控系統**，自動過濾中國大陸用語。
+
+### 運作原理
+
+- 使用 BERT 分類器（[renhehuang/bert-traditional-chinese-classifier](https://huggingface.co/renhehuang/bert-traditional-chinese-classifier)）
+- 將文字分類為「台灣繁體」或「大陸繁體」
+- 含有大陸用語的資料會自動重新生成
+- 預設信心度門檻：90%
+
+### 使用方式
+
+```bash
+# 啟用 QC（使用 zh-tw 時預設啟用）
+python main.py "客服對話" --lang zh-tw --qc
+
+# 停用 QC
+python main.py "客服對話" --lang zh-tw --no-qc
+
+# 調整信心度門檻（更嚴格）
+python main.py "客服對話" --lang zh-tw --qc-confidence 0.95
+```
+
+### 過濾用語範例
+
+| 大陸用語（過濾） | 台灣用語（接受） |
+|------------------|------------------|
+| 軟件 | 軟體 |
+| 程序 | 程式 |
+| 計算機 | 電腦 |
+| 網絡 | 網路 |
+| 界面 | 介面 |
 
 ## 🤖 推薦模型
 

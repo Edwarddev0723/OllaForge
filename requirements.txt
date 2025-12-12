@@ -4,3 +4,7 @@ ollama>=0.1.7
 pydantic>=2.5.0
 hypothesis>=6.90.0
 pytest>=7.4.0
+
+# QC module for Traditional Chinese (Taiwan) validation
+transformers>=4.36.0
+torch>=2.0.0

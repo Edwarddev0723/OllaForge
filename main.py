@@ -269,6 +269,16 @@ def generate(
         help=LANGUAGE_HELP,
         callback=lambda ctx, param, value: validate_language(value) if value is not None else value
     ),
+    qc_enabled: bool = typer.Option(
+        True,
+        "--qc/--no-qc",
+        help="Enable/disable QC for Traditional Chinese (Taiwan) - filters out Mainland expressions"
+    ),
+    qc_confidence: float = typer.Option(
+        0.9,
+        "--qc-confidence",
+        help="QC confidence threshold (0.0-1.0) for Taiwan Chinese classification",
+    ),
     interactive: bool = typer.Option(
         False,
         "--interactive",
@@ -319,12 +329,17 @@ def generate(
             output = config.output
             dataset_type = config.dataset_type
             language = config.language
+            qc_enabled = config.qc_enabled
+            qc_confidence = config.qc_confidence
             
             # Show generation start
             display_generation_start(config)
         else:
             # Validate all parameters using Pydantic
             config = validate_parameters(topic, count, model, output, dataset_type, language)
+            # Add QC settings to config
+            config.qc_enabled = qc_enabled
+            config.qc_confidence = qc_confidence
             
             # Dataset type display names
             type_display = {
@@ -352,6 +367,8 @@ def generate(
             console.print(f"📄 Output: {config.output}")
             console.print(f"📊 Type: {type_display.get(config.dataset_type, config.dataset_type.value)}")
             console.print(f"🌐 Language: {lang_display.get(config.language, config.language.value)}")
+            if config.language == OutputLanguage.ZH_TW and config.qc_enabled:
+                console.print(f"🔍 QC: Enabled (confidence ≥ {config.qc_confidence:.0%})")
             console.print(f"⚡ Concurrency: {concurrency}")
             console.print()
         
@@ -390,14 +407,27 @@ def generate(
             console.print("[yellow]💡 Free up disk space and try again[/yellow]")
             raise typer.Exit(1)
         
+        # Initialize QC if needed for Traditional Chinese
+        qc_controller = None
+        if config.language == OutputLanguage.ZH_TW and config.qc_enabled:
+            from ollaforge.qc import QualityController
+            qc_controller = QualityController(
+                enabled=True,
+                confidence_threshold=config.qc_confidence,
+                max_retries=3
+            )
+            console.print("[dim]🔍 QC model loading for Taiwan Chinese validation...[/dim]")
+        
         try:
             # Use batch generation: each API call generates multiple entries
             # This dramatically reduces the number of API calls needed
             # For 50 entries with batch_size=10, we only need 5 API calls instead of 50
             BATCH_SIZE = 10  # Number of entries per API call
+            MAX_QC_RETRIES = 3  # Maximum retries for QC failures
             
             remaining_count = config.count
             batch_number = 0
+            qc_retry_count = 0
             
             while remaining_count > 0 and len(generated_entries) < config.count:
                 if is_interrupted():
@@ -430,8 +460,31 @@ def generate(
                             )
                             
                             for entry in processed_entries:
-                                if len(generated_entries) < config.count:
-                                    generated_entries.append(entry)
+                                if len(generated_entries) >= config.count:
+                                    break
+                                
+                                # Apply QC check for Traditional Chinese
+                                if qc_controller is not None:
+                                    entry_dict = entry.model_dump()
+                                    passed, failed_fields = qc_controller.check_entry(entry_dict)
+                                    
+                                    if not passed:
+                                        qc_retry_count += 1
+                                        if qc_retry_count <= MAX_QC_RETRIES * config.count:
+                                            progress_tracker.display_error(
+                                                f"QC failed (Mainland Chinese detected in {', '.join(failed_fields)}), regenerating...",
+                                                show_immediately=False
+                                            )
+                                            # Don't add this entry, will regenerate
+                                            continue
+                                        else:
+                                            progress_tracker.display_error(
+                                                f"QC retry limit reached, skipping entry",
+                                                show_immediately=False
+                                            )
+                                            continue
+                                
+                                generated_entries.append(entry)
                             
                             if not processed_entries:
                                 progress_tracker.display_error("Failed to parse batch response", show_immediately=False)

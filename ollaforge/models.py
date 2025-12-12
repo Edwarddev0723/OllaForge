@@ -59,6 +59,8 @@ class GenerationConfig(BaseModel):
     output: str = Field("dataset.jsonl", description="Output filename")
     dataset_type: DatasetType = Field(DatasetType.SFT, description="Type of dataset to generate")
     language: OutputLanguage = Field(OutputLanguage.EN, description="Output language for generated content")
+    qc_enabled: bool = Field(True, description="Enable QC for Traditional Chinese (Taiwan)")
+    qc_confidence: float = Field(0.9, ge=0.0, le=1.0, description="QC confidence threshold for Taiwan Chinese")
     
     @validator('topic')
     def topic_must_not_be_empty(cls, v):

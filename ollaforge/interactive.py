@@ -286,6 +286,14 @@ def display_config_summary(config: GenerationConfig, concurrency: int = 5) -> bo
     table.add_row("📝 Topic", f"[bold]{config.topic}[/bold]")
     table.add_row("📊 Dataset Type", f"[{info['color']}]{info['name']}[/{info['color']}]")
     table.add_row("🌐 Language", f"[{lang_info['color']}]{lang_info['name']}[/{lang_info['color']}]")
+    
+    # Show QC settings for Traditional Chinese
+    if config.language == OutputLanguage.ZH_TW:
+        if config.qc_enabled:
+            table.add_row("🔍 QC", f"[bold green]Enabled[/bold green] (confidence ≥ {config.qc_confidence:.0%})")
+        else:
+            table.add_row("🔍 QC", "[dim]Disabled[/dim]")
+    
     table.add_row("🔢 Count", f"[bold yellow]{config.count}[/bold yellow] entries")
     table.add_row("🤖 Model", f"[bold green]{config.model}[/bold green]")
     table.add_row("📄 Output", f"[bold]{config.output}[/bold]")
@@ -364,6 +372,24 @@ def run_interactive_wizard() -> Optional[Tuple[GenerationConfig, int]]:
             default=default_output,
         )
         
+        # QC settings for Traditional Chinese
+        qc_enabled = False
+        qc_confidence = 0.9
+        if language == OutputLanguage.ZH_TW:
+            console.print("\n[bold cyan]🔍 Quality Control Settings[/bold cyan]")
+            console.print("[dim]QC uses a BERT model to filter out Mainland Chinese expressions[/dim]\n")
+            qc_enabled = Confirm.ask(
+                "[bold]Enable Taiwan Chinese QC?[/bold]",
+                default=True,
+            )
+            if qc_enabled:
+                console.print("[dim]Higher confidence = stricter filtering (0.9 recommended)[/dim]")
+                qc_confidence = float(Prompt.ask(
+                    "[bold]QC confidence threshold (0.0-1.0)[/bold]",
+                    default="0.9",
+                ))
+                qc_confidence = max(0.0, min(1.0, qc_confidence))
+        
         # Advanced settings
         if Confirm.ask("\n[dim]Configure advanced settings?[/dim]", default=False):
             concurrency = IntPrompt.ask(
@@ -384,6 +410,8 @@ def run_interactive_wizard() -> Optional[Tuple[GenerationConfig, int]]:
             output=output,
             dataset_type=dataset_type,
             language=language,
+            qc_enabled=qc_enabled,
+            qc_confidence=qc_confidence,
         )
         
         # Show summary and confirm
@@ -535,6 +563,15 @@ def display_generation_start(config: GenerationConfig) -> None:
     content.append(f"{info['name']}\n", style=info['color'])
     content.append(f"Language: ", style="dim")
     content.append(f"{lang_info['name']}\n", style=lang_info['color'])
+    
+    # Show QC status for Traditional Chinese
+    if config.language == OutputLanguage.ZH_TW:
+        content.append(f"QC: ", style="dim")
+        if config.qc_enabled:
+            content.append(f"Enabled (≥{config.qc_confidence:.0%})\n", style="green")
+        else:
+            content.append(f"Disabled\n", style="dim")
+    
     content.append(f"Target: ", style="dim")
     content.append(f"{config.count} entries", style="bold yellow")
     
