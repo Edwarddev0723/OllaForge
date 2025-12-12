@@ -29,6 +29,22 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Interactive Mode (Recommended)
+
+Launch the interactive wizard for a guided experience:
+```bash
+python main.py -i
+```
+
+The interactive mode provides:
+- 🎨 Beautiful ASCII art banner
+- 📋 Step-by-step configuration wizard
+- 📊 Visual dataset type selection menu
+- 🤖 Model selection with popular options
+- ✅ Configuration summary before generation
+
+### Command Line Mode
+
 Basic usage:
 ```bash
 python main.py "customer service conversations about refunds"
@@ -41,11 +57,13 @@ python main.py "technical documentation examples" --count 50 --model gpt-oss:20b
 
 ### Parameters
 
-- `topic` (required): Description of the dataset content to generate
+- `topic`: Description of the dataset content to generate
 - `--count, -c`: Number of data entries to generate (default: 10)
-- `--model, -m`: Ollama model to use (default: llama3)
+- `--model, -m`: Ollama model to use (default: gpt-oss:20b)
 - `--output, -o`: Output filename (default: dataset.jsonl)
 - `--type, -t`: Dataset type to generate (default: sft)
+- `--interactive, -i`: Launch interactive mode with step-by-step wizard
+- `--concurrency, -j`: Number of parallel requests (default: 5)
 
 ### Dataset Types
 

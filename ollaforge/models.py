@@ -47,7 +47,7 @@ class GenerationConfig(BaseModel):
     """Configuration for dataset generation."""
     topic: str = Field(..., description="Description of the dataset content to generate")
     count: int = Field(10, ge=1, le=10000, description="Number of data entries to generate")
-    model: str = Field("llama3", description="Ollama model to use")
+    model: str = Field("gpt-oss:20b", description="Ollama model to use")
     output: str = Field("dataset.jsonl", description="Output filename")
     dataset_type: DatasetType = Field(DatasetType.SFT, description="Type of dataset to generate")
     

@@ -161,12 +161,11 @@ def display_model_selection() -> str:
     
     # Show popular models
     popular_models = [
-        ("llama3", "Meta's Llama 3 - Great all-around performance"),
-        ("llama3:70b", "Llama 3 70B - Higher quality, slower"),
-        ("mistral", "Mistral 7B - Fast and efficient"),
-        ("mixtral", "Mixtral 8x7B - MoE architecture"),
-        ("qwen2", "Qwen 2 - Strong multilingual support"),
-        ("phi3", "Phi-3 - Microsoft's compact model"),
+        ("gpt-oss:20b", "GPT-OSS 20B - Default model, great performance"),
+        ("deepseek-r1:14b", "DeepSeek-R1 - Open reasoning model, O3/Gemini 2.5 Pro level"),
+        ("qwen3:14b", "Qwen3 - Latest gen with dense and MoE models"),
+        ("ministral-3:14b", "Ministral 3 - Designed for edge deployment"),
+        ("gemma3:12b", "Gemma3 - Most capable model on single GPU"),
     ]
     
     table = Table(
@@ -177,8 +176,8 @@ def display_model_selection() -> str:
     )
     
     table.add_column("#", style="bold cyan", justify="center", width=3)
-    table.add_column("Model", style="bold green", width=15)
-    table.add_column("Description", style="dim", width=40)
+    table.add_column("Model", style="bold green", width=18)
+    table.add_column("Description", style="dim", width=50)
     
     for i, (model, desc) in enumerate(popular_models, 1):
         table.add_row(str(i), model, desc)
@@ -189,7 +188,7 @@ def display_model_selection() -> str:
     console.print()
     
     choice = Prompt.ask(
-        "[bold]Enter choice (1-6) or 'C' for custom[/bold]",
+        "[bold]Enter choice (1-5) or 'C' for custom[/bold]",
         default="1",
     )
     
@@ -203,7 +202,7 @@ def display_model_selection() -> str:
     except ValueError:
         pass
     
-    return "llama3"  # Default fallback
+    return "gpt-oss:20b"  # Default fallback
 
 
 # ============================================================================
@@ -410,7 +409,7 @@ def display_help() -> None:
 python main.py "your topic" --count 50
 
 # With all options
-python main.py "topic" -c 100 -m llama3 -t sft -o output.jsonl
+python main.py "topic" -c 100 -m gpt-oss:20b -t sft -o output.jsonl
 ```
 
 ### Dataset Types

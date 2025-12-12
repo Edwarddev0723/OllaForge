@@ -48,6 +48,7 @@ app = typer.Typer(
     name="ollaforge",
     help="Generate datasets using local Ollama models",
     add_completion=False,
+    invoke_without_command=True,
 )
 
 
@@ -201,9 +202,9 @@ DATASET_TYPE_HELP = """Dataset type to generate:
 
 
 @app.command()
-def main(
+def generate(
     topic: str = typer.Argument(
-        ..., 
+        None, 
         help="Description of the dataset content to generate (e.g., 'customer service conversations')"
     ),
     count: int = typer.Option(
@@ -214,7 +215,7 @@ def main(
         callback=lambda ctx, param, value: validate_count_range(value) if value is not None else value
     ),
     model: str = typer.Option(
-        "llama3", 
+        "gpt-oss:20b", 
         "--model", 
         "-m", 
         help="Ollama model to use for generation"
@@ -240,6 +241,12 @@ def main(
         help=DATASET_TYPE_HELP,
         callback=lambda ctx, param, value: validate_dataset_type(value) if value is not None else value
     ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Launch interactive mode with step-by-step wizard"
+    ),
 ) -> None:
     """
     Generate a structured dataset using local Ollama models.
@@ -250,6 +257,9 @@ def main(
     
     Examples:
     
+        # Launch interactive mode
+        ollaforge -i
+        
         # Generate 50 SFT examples (default)
         ollaforge "customer service conversations" --count 50
         
@@ -266,30 +276,48 @@ def main(
         ollaforge "code documentation" --model mistral --output docs.jsonl
     """
     try:
-        # Validate all parameters using Pydantic
-        config = validate_parameters(topic, count, model, output, dataset_type)
-        
-        # Dataset type display names
-        type_display = {
-            DatasetType.SFT: "SFT (Alpaca format)",
-            DatasetType.PRETRAIN: "Pre-training (text)",
-            DatasetType.SFT_CONVERSATION: "SFT Conversation (ShareGPT)",
-            DatasetType.DPO: "DPO (Preference pairs)"
-        }
-        
-        # Display welcome message
-        console.print(Panel.fit(
-            Text("🔥 OllaForge Dataset Generator", style="bold magenta"),
-            border_style="bright_blue"
-        ))
-        
-        console.print(f"📝 Topic: {config.topic}")
-        console.print(f"🔢 Count: {config.count}")
-        console.print(f"🤖 Model: {config.model}")
-        console.print(f"📄 Output: {config.output}")
-        console.print(f"📊 Type: {type_display.get(config.dataset_type, config.dataset_type.value)}")
-        console.print(f"⚡ Concurrency: {concurrency}")
-        console.print()
+        # Check if interactive mode or no topic provided
+        if interactive or topic is None:
+            from ollaforge.interactive import main_interactive, display_generation_start
+            
+            result = main_interactive()
+            if result is None:
+                raise typer.Exit(0)
+            
+            config, concurrency = result
+            topic = config.topic
+            count = config.count
+            model = config.model
+            output = config.output
+            dataset_type = config.dataset_type
+            
+            # Show generation start
+            display_generation_start(config)
+        else:
+            # Validate all parameters using Pydantic
+            config = validate_parameters(topic, count, model, output, dataset_type)
+            
+            # Dataset type display names
+            type_display = {
+                DatasetType.SFT: "SFT (Alpaca format)",
+                DatasetType.PRETRAIN: "Pre-training (text)",
+                DatasetType.SFT_CONVERSATION: "SFT Conversation (ShareGPT)",
+                DatasetType.DPO: "DPO (Preference pairs)"
+            }
+            
+            # Display welcome message
+            console.print(Panel.fit(
+                Text("🔥 OllaForge Dataset Generator", style="bold magenta"),
+                border_style="bright_blue"
+            ))
+            
+            console.print(f"📝 Topic: {config.topic}")
+            console.print(f"🔢 Count: {config.count}")
+            console.print(f"🤖 Model: {config.model}")
+            console.print(f"📄 Output: {config.output}")
+            console.print(f"📊 Type: {type_display.get(config.dataset_type, config.dataset_type.value)}")
+            console.print(f"⚡ Concurrency: {concurrency}")
+            console.print()
         
         # Initialize progress tracker
         progress_tracker = ProgressTracker(console)

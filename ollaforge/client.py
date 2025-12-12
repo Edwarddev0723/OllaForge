@@ -144,7 +144,7 @@ def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: i
     return [result]
 
 
-def generate_data(topic: str, model: str = "llama3", count: int = 1, 
+def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1, 
                   concurrency: int = DEFAULT_CONCURRENCY,
                   dataset_type: DatasetType = DatasetType.SFT) -> List[Dict[str, Any]]:
     """
