@@ -10,6 +10,7 @@ A Python-based CLI application that leverages local Ollama models (Llama 3, Mist
 - 🔧 **Data Validation**: Automatic JSON validation and cleaning
 - 📁 **JSONL Output**: Industry-standard format for machine learning datasets
 - 🎨 **Rich CLI**: Modern, colorful command-line interface
+- 📚 **Multiple Dataset Types**: Support for SFT, Pre-training, Conversation, and DPO formats
 
 ## Installation
 
@@ -44,6 +45,40 @@ python main.py "technical documentation examples" --count 50 --model gpt-oss:20b
 - `--count, -c`: Number of data entries to generate (default: 10)
 - `--model, -m`: Ollama model to use (default: llama3)
 - `--output, -o`: Output filename (default: dataset.jsonl)
+- `--type, -t`: Dataset type to generate (default: sft)
+
+### Dataset Types
+
+OllaForge supports multiple dataset formats compatible with HuggingFace and LLaMA-Factory:
+
+| Type | Description | Format |
+|------|-------------|--------|
+| `sft` | Supervised Fine-tuning (Alpaca) | `{"instruction": "...", "input": "...", "output": "..."}` |
+| `pretrain` | Pre-training | `{"text": "..."}` |
+| `sft_conv` | SFT Conversation (ShareGPT/ChatML) | `{"conversations": [{"role": "user", "content": "..."}, ...]}` |
+| `dpo` | Direct Preference Optimization | `{"prompt": "...", "chosen": "...", "rejected": "..."}` |
+
+### Examples
+
+Generate SFT data (default):
+```bash
+python main.py "customer service conversations" --count 50
+```
+
+Generate pre-training data:
+```bash
+python main.py "machine learning concepts" --type pretrain --count 100
+```
+
+Generate multi-turn conversation data:
+```bash
+python main.py "technical support dialogues" --type sft_conv --output conversations.jsonl
+```
+
+Generate DPO preference pairs:
+```bash
+python main.py "code review feedback" --type dpo --count 50 --output dpo_data.jsonl
+```
 
 ## Development
 

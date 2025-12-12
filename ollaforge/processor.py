@@ -21,65 +21,90 @@ Requirements satisfied:
 
 import json
 import re
-from typing import Optional, Dict, Any, List
-from ollaforge.models import DataEntry
+from typing import Optional, Dict, Any, List, Union
+from ollaforge.models import (
+    DataEntry, PretrainEntry, SFTConversationEntry, DPOEntry, 
+    ConversationMessage, DatasetType, DatasetEntry
+)
+
+
+def _clean_response(response: str) -> str:
+    """Remove markdown and common prefixes from response."""
+    if not response:
+        return ""
+    
+    cleaned = response.strip()
+    
+    # Remove markdown code blocks
+    cleaned = re.sub(r'```(?:json)?\s*\n?(.*?)\n?```', r'\1', cleaned, flags=re.DOTALL | re.MULTILINE)
+    cleaned = cleaned.strip()
+    
+    # Remove common prefixes
+    for prefix in ["Here's the JSON:", "Here is the JSON:", "JSON:", "Response:", "Output:", "Result:"]:
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix):].strip()
+    
+    return cleaned
 
 
 def clean_json(response: str) -> Optional[Dict[str, Any]]:
     """
-    Extract valid JSON from model responses that may contain markdown or noise.
+    Extract valid JSON object from model response.
     
-    Args:
-        response: Raw response from the AI model
-        
     Returns:
         Parsed JSON dictionary if valid JSON found, None otherwise
     """
     if not response or not response.strip():
         return None
     
-    # Remove common markdown code block markers
-    cleaned = response.strip()
+    cleaned = _clean_response(response)
     
-    # Remove markdown code blocks (```json ... ``` or ``` ... ```)
-    cleaned = re.sub(r'```(?:json)?\s*\n?(.*?)\n?```', r'\1', cleaned, flags=re.DOTALL | re.MULTILINE)
-    
-    # Remove any leading/trailing whitespace and common prefixes
-    cleaned = cleaned.strip()
-    
-    # Remove common prefixes that models might add
-    prefixes_to_remove = [
-        "Here's the JSON:",
-        "Here is the JSON:",
-        "JSON:",
-        "Response:",
-        "Output:",
-        "Result:",
-    ]
-    
-    for prefix in prefixes_to_remove:
-        if cleaned.startswith(prefix):
-            cleaned = cleaned[len(prefix):].strip()
-    
-    # Try to find JSON object in the text
-    # Look for content between { and }
+    # Try to find JSON object
     json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
     if json_match:
         json_str = json_match.group(0)
     else:
         json_str = cleaned
     
-    # Try to parse the JSON
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        try:
+            return json.loads(_fix_common_json_issues(json_str))
+        except json.JSONDecodeError:
+            return None
+
+
+def clean_json_array(response: str) -> Optional[List[Dict[str, Any]]]:
+    """
+    Extract valid JSON array from model response (for batch generation).
+    
+    Returns:
+        List of parsed JSON dictionaries, or None if parsing fails
+    """
+    if not response or not response.strip():
+        return None
+    
+    cleaned = _clean_response(response)
+    
+    # Try to find JSON array
+    array_match = re.search(r'\[.*\]', cleaned, re.DOTALL)
+    if array_match:
+        json_str = array_match.group(0)
+    else:
+        json_str = cleaned
+    
     try:
         parsed = json.loads(json_str)
-        return parsed
-    except json.JSONDecodeError:
-        # If direct parsing fails, try to fix common issues
-        try:
-            # Fix common JSON issues like trailing commas, single quotes, etc.
-            fixed_json = _fix_common_json_issues(json_str)
-            parsed = json.loads(fixed_json)
+        if isinstance(parsed, list):
             return parsed
+        return None
+    except json.JSONDecodeError:
+        try:
+            parsed = json.loads(_fix_common_json_issues(json_str))
+            if isinstance(parsed, list):
+                return parsed
+            return None
         except json.JSONDecodeError:
             return None
 
@@ -105,69 +130,125 @@ def _fix_common_json_issues(json_str: str) -> str:
     return fixed
 
 
-def validate_entry(data: Dict[str, Any]) -> Optional[DataEntry]:
+def validate_entry(data: Dict[str, Any], dataset_type: DatasetType = DatasetType.SFT) -> Optional[DatasetEntry]:
     """
-    Validate and convert a dictionary to a DataEntry model.
+    Validate and convert a dictionary to the appropriate entry model based on dataset type.
     
     Args:
-        data: Dictionary containing potential DataEntry fields
+        data: Dictionary containing potential entry fields
+        dataset_type: Type of dataset being generated
         
     Returns:
-        DataEntry instance if validation succeeds, None otherwise
+        Validated entry instance if validation succeeds, None otherwise
     """
     try:
-        # Check if required fields exist
-        if not all(key in data for key in ['instruction', 'input', 'output']):
-            return None
+        if dataset_type == DatasetType.SFT:
+            # Alpaca/SFT format: instruction, input, output
+            if not all(key in data for key in ['instruction', 'input', 'output']):
+                return None
+            return DataEntry(
+                instruction=str(data['instruction']),
+                input=str(data['input']),
+                output=str(data['output'])
+            )
         
-        # Create and validate DataEntry
-        entry = DataEntry(
-            instruction=str(data['instruction']),
-            input=str(data['input']),
-            output=str(data['output'])
-        )
-        return entry
+        elif dataset_type == DatasetType.PRETRAIN:
+            # Pre-training format: text
+            if 'text' not in data:
+                return None
+            return PretrainEntry(text=str(data['text']))
+        
+        elif dataset_type == DatasetType.SFT_CONVERSATION:
+            # Conversation format: conversations array
+            if 'conversations' not in data or not isinstance(data['conversations'], list):
+                return None
+            
+            messages = []
+            for msg in data['conversations']:
+                if isinstance(msg, dict) and 'role' in msg and 'content' in msg:
+                    role = msg['role']
+                    if role in ['system', 'user', 'assistant']:
+                        messages.append(ConversationMessage(
+                            role=role,
+                            content=str(msg['content'])
+                        ))
+            
+            if not messages:
+                return None
+            return SFTConversationEntry(conversations=messages)
+        
+        elif dataset_type == DatasetType.DPO:
+            # DPO format: prompt, chosen, rejected
+            if not all(key in data for key in ['prompt', 'chosen', 'rejected']):
+                return None
+            return DPOEntry(
+                prompt=str(data['prompt']),
+                chosen=str(data['chosen']),
+                rejected=str(data['rejected'])
+            )
+        
+        return None
     except Exception:
         return None
 
 
-def process_model_response(response: str) -> Optional[DataEntry]:
+def process_model_response(response: str, is_batch: bool = False, 
+                           dataset_type: DatasetType = DatasetType.SFT) -> List[DatasetEntry]:
     """
-    Process a raw model response into a validated DataEntry.
-    
-    This function combines JSON extraction, cleaning, and validation.
+    Process a raw model response into validated entry objects.
     
     Args:
         response: Raw response from the AI model
+        is_batch: If True, expect JSON array; if False, expect single JSON object
+        dataset_type: Type of dataset being generated
         
     Returns:
-        DataEntry instance if processing succeeds, None otherwise
+        List of validated entry instances (empty list if processing fails)
     """
-    # Extract JSON from response
-    json_data = clean_json(response)
-    if json_data is None:
-        return None
-    
-    # Validate and convert to DataEntry
-    entry = validate_entry(json_data)
-    return entry
+    if is_batch:
+        # Parse as JSON array
+        json_array = clean_json_array(response)
+        if json_array is None:
+            # Fallback: try parsing as single object
+            json_data = clean_json(response)
+            if json_data:
+                entry = validate_entry(json_data, dataset_type)
+                return [entry] if entry else []
+            return []
+        
+        # Validate each entry in the array
+        valid_entries = []
+        for item in json_array:
+            if isinstance(item, dict):
+                entry = validate_entry(item, dataset_type)
+                if entry:
+                    valid_entries.append(entry)
+        return valid_entries
+    else:
+        # Parse as single JSON object
+        json_data = clean_json(response)
+        if json_data is None:
+            return []
+        entry = validate_entry(json_data, dataset_type)
+        return [entry] if entry else []
 
 
-def process_responses(responses: List[str]) -> List[DataEntry]:
+def process_responses(responses: List[str], 
+                      dataset_type: DatasetType = DatasetType.SFT) -> List[DatasetEntry]:
     """
     Process multiple model responses, skipping invalid entries.
     
     Args:
         responses: List of raw responses from the AI model
+        dataset_type: Type of dataset being generated
         
     Returns:
-        List of valid DataEntry instances
+        List of valid entry instances
     """
     valid_entries = []
     
     for response in responses:
-        entry = process_model_response(response)
-        if entry is not None:
-            valid_entries.append(entry)
+        entries = process_model_response(response, dataset_type=dataset_type)
+        valid_entries.extend(entries)
     
     return valid_entries

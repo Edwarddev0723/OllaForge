@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Optional
 from pydantic import ValidationError
 
-from ollaforge.models import GenerationConfig, GenerationResult
+from ollaforge.models import GenerationConfig, GenerationResult, DatasetType
 from ollaforge.progress import ProgressTracker
 
 # Initialize Rich console for beautiful output
@@ -51,7 +51,9 @@ app = typer.Typer(
 )
 
 
-def validate_parameters(topic: str, count: int, model: str, output: str, raise_on_error: bool = True) -> GenerationConfig:
+def validate_parameters(topic: str, count: int, model: str, output: str, 
+                        dataset_type: DatasetType = DatasetType.SFT,
+                        raise_on_error: bool = True) -> GenerationConfig:
     """
     Validate CLI parameters using Pydantic models.
     
@@ -60,6 +62,7 @@ def validate_parameters(topic: str, count: int, model: str, output: str, raise_o
         count: Number of entries to generate
         model: Ollama model name
         output: Output filename
+        dataset_type: Type of dataset to generate
         raise_on_error: Whether to raise typer.Exit on validation errors (default: True)
         
     Returns:
@@ -74,7 +77,8 @@ def validate_parameters(topic: str, count: int, model: str, output: str, raise_o
             topic=topic,
             count=count,
             model=model,
-            output=output
+            output=output,
+            dataset_type=dataset_type
         )
         return config
     except ValidationError as e:
@@ -146,6 +150,56 @@ def validate_output_path(value: str) -> str:
     return value.strip()
 
 
+def validate_concurrency(value: int) -> int:
+    """
+    Validate concurrency parameter is within acceptable range.
+    
+    Args:
+        value: Concurrency value to validate
+        
+    Returns:
+        int: Validated concurrency value
+        
+    Raises:
+        typer.BadParameter: If concurrency is out of range
+    """
+    if value < 1:
+        raise typer.BadParameter("Concurrency must be at least 1")
+    if value > 20:
+        raise typer.BadParameter("Concurrency cannot exceed 20 (to avoid overloading Ollama)")
+    return value
+
+
+def validate_dataset_type(value: str) -> DatasetType:
+    """
+    Validate and convert dataset type string to enum.
+    
+    Args:
+        value: Dataset type string
+        
+    Returns:
+        DatasetType: Validated dataset type enum
+        
+    Raises:
+        typer.BadParameter: If dataset type is invalid
+    """
+    try:
+        return DatasetType(value.lower())
+    except ValueError:
+        valid_types = [t.value for t in DatasetType]
+        raise typer.BadParameter(
+            f"Invalid dataset type '{value}'. Valid options: {', '.join(valid_types)}"
+        )
+
+
+# Dataset type descriptions for help text
+DATASET_TYPE_HELP = """Dataset type to generate:
+• sft: Supervised Fine-tuning (Alpaca format: instruction/input/output)
+• pretrain: Pre-training (raw text format)
+• sft_conv: SFT Conversation (ShareGPT/ChatML multi-turn format)
+• dpo: Direct Preference Optimization (prompt/chosen/rejected)"""
+
+
 @app.command()
 def main(
     topic: str = typer.Argument(
@@ -172,28 +226,56 @@ def main(
         help="Output filename (will be created if it doesn't exist)",
         callback=lambda ctx, param, value: validate_output_path(value) if value is not None else value
     ),
+    concurrency: int = typer.Option(
+        5,
+        "--concurrency",
+        "-j",
+        help="Number of parallel requests (1-20, higher = faster but more resource intensive)",
+        callback=lambda ctx, param, value: validate_concurrency(value) if value is not None else value
+    ),
+    dataset_type: str = typer.Option(
+        "sft",
+        "--type",
+        "-t",
+        help=DATASET_TYPE_HELP,
+        callback=lambda ctx, param, value: validate_dataset_type(value) if value is not None else value
+    ),
 ) -> None:
     """
     Generate a structured dataset using local Ollama models.
     
     OllaForge connects to your local Ollama instance to generate topic-specific
-    datasets in JSONL format. Each entry contains instruction, input, and output
-    fields suitable for training or fine-tuning language models.
+    datasets in JSONL format. Supports multiple dataset formats for different
+    training stages (SFT, Pre-training, Conversation, DPO).
     
     Examples:
     
-        # Generate 50 customer service examples
+        # Generate 50 SFT examples (default)
         ollaforge "customer service conversations" --count 50
         
-        # Use a specific model and output file
-        ollaforge "code documentation" --model mistral --output docs.jsonl
+        # Generate pre-training data
+        ollaforge "machine learning concepts" --type pretrain --count 100
         
-        # Generate a large dataset
-        ollaforge "creative writing prompts" --count 1000 --output creative.jsonl
+        # Generate multi-turn conversation data
+        ollaforge "technical support" --type sft_conv --output conversations.jsonl
+        
+        # Generate DPO preference pairs
+        ollaforge "code review feedback" --type dpo --count 50 --output dpo_data.jsonl
+        
+        # Use a specific model
+        ollaforge "code documentation" --model mistral --output docs.jsonl
     """
     try:
         # Validate all parameters using Pydantic
-        config = validate_parameters(topic, count, model, output)
+        config = validate_parameters(topic, count, model, output, dataset_type)
+        
+        # Dataset type display names
+        type_display = {
+            DatasetType.SFT: "SFT (Alpaca format)",
+            DatasetType.PRETRAIN: "Pre-training (text)",
+            DatasetType.SFT_CONVERSATION: "SFT Conversation (ShareGPT)",
+            DatasetType.DPO: "DPO (Preference pairs)"
+        }
         
         # Display welcome message
         console.print(Panel.fit(
@@ -205,6 +287,8 @@ def main(
         console.print(f"🔢 Count: {config.count}")
         console.print(f"🤖 Model: {config.model}")
         console.print(f"📄 Output: {config.output}")
+        console.print(f"📊 Type: {type_display.get(config.dataset_type, config.dataset_type.value)}")
+        console.print(f"⚡ Concurrency: {concurrency}")
         console.print()
         
         # Initialize progress tracker
@@ -243,82 +327,72 @@ def main(
             raise typer.Exit(1)
         
         try:
-            # Generate data in optimized batches to prevent context window overflow
-            # Adaptive batch sizing based on total count for better performance
-            if config.count <= 10:
-                batch_size = 1  # Small datasets: process individually for better quality
-            elif config.count <= 100:
-                batch_size = 3  # Medium datasets: small batches for balance
-            else:
-                batch_size = 5  # Large datasets: larger batches for efficiency
+            # Use batch generation: each API call generates multiple entries
+            # This dramatically reduces the number of API calls needed
+            # For 50 entries with batch_size=10, we only need 5 API calls instead of 50
+            BATCH_SIZE = 10  # Number of entries per API call
             
             remaining_count = config.count
+            batch_number = 0
             
-            while remaining_count > 0:
-                # Performance optimization: Check for interruption early to avoid unnecessary work
+            while remaining_count > 0 and len(generated_entries) < config.count:
                 if is_interrupted():
                     break
-                    
-                # Adaptive batch sizing: Use smaller batches for remaining entries
-                # This prevents over-generation and improves memory efficiency
-                current_batch_size = min(batch_size, remaining_count)
+                
+                # Calculate how many entries to request in this batch
+                entries_needed = config.count - len(generated_entries)
+                current_batch_size = min(BATCH_SIZE, entries_needed)
+                batch_number += 1
                 
                 try:
-                    # Generate batch of raw responses from Ollama
+                    # Generate batch - single API call for multiple entries
                     raw_responses = generate_data(
                         topic=config.topic,
                         model=config.model,
-                        count=current_batch_size
+                        count=current_batch_size,
+                        concurrency=concurrency,
+                        dataset_type=config.dataset_type
                     )
                     
-                    # Process each response in the batch
+                    # Process responses (may contain batch JSON array)
                     for raw_response in raw_responses:
                         if 'raw_content' in raw_response:
-                            # Process the raw response into a structured entry
-                            processed_entry = process_model_response(raw_response['raw_content'])
+                            is_batch = raw_response.get('is_batch', False)
+                            processed_entries = process_model_response(
+                                raw_response['raw_content'], 
+                                is_batch=is_batch,
+                                dataset_type=config.dataset_type
+                            )
                             
-                            if processed_entry is not None:
-                                generated_entries.append(processed_entry)
-                                progress_tracker.update_progress(1, f"Generated {len(generated_entries)}/{config.count} entries")
-                            else:
-                                # Failed to process response
-                                progress_tracker.display_error(f"Failed to process response: invalid JSON format", show_immediately=False)
-                                progress_tracker.update_progress(1, f"Processed {len(generated_entries) + len(progress_tracker.errors)}/{config.count} entries")
+                            for entry in processed_entries:
+                                if len(generated_entries) < config.count:
+                                    generated_entries.append(entry)
+                            
+                            if not processed_entries:
+                                progress_tracker.display_error("Failed to parse batch response", show_immediately=False)
                         else:
-                            # Invalid response format
-                            progress_tracker.display_error(f"Invalid response format from model", show_immediately=False)
-                            progress_tracker.update_progress(1, f"Processed {len(generated_entries) + len(progress_tracker.errors)}/{config.count} entries")
+                            progress_tracker.display_error("Invalid response format", show_immediately=False)
                     
-                    remaining_count -= current_batch_size
+                    # Update progress
+                    progress_tracker.update_progress(
+                        min(current_batch_size, len(generated_entries) - (batch_number - 1) * BATCH_SIZE + BATCH_SIZE),
+                        f"Generated {len(generated_entries)}/{config.count} entries"
+                    )
+                    remaining_count = config.count - len(generated_entries)
                     
                 except OllamaConnectionError as e:
-                    # Connection errors are critical - we can't continue without API access
                     progress_tracker.stop_progress()
-                    console.print(f"[red]❌ Generation failed: {str(e)}[/red]")
-                    console.print("[yellow]💡 Make sure Ollama is running locally on port 11434[/yellow]")
-                    console.print("[yellow]💡 You can start Ollama with: ollama serve[/yellow]")
+                    console.print(f"[red]❌ Connection failed: {str(e)}[/red]")
+                    console.print("[yellow]💡 Make sure Ollama is running: ollama serve[/yellow]")
                     raise typer.Exit(1)
                     
                 except OllamaGenerationError as e:
-                    # Generation errors can be recovered from - continue processing
                     progress_tracker.display_error(f"Generation error: {str(e)}", show_immediately=False)
-                    # Skip this batch and continue - resilient error handling
                     remaining_count -= current_batch_size
-                    progress_tracker.update_progress(current_batch_size, f"Processed {len(generated_entries) + len(progress_tracker.errors)}/{config.count} entries")
-                    
-                except (RuntimeError, MemoryError, SystemError) as e:
-                    # Critical system errors - we should exit immediately
-                    progress_tracker.stop_progress()
-                    console.print(f"[red]❌ Unexpected error during generation: {str(e)}[/red]")
-                    console.print("[yellow]💡 Please report this issue if it persists[/yellow]")
-                    raise typer.Exit(1)
                     
                 except Exception as e:
-                    # Handle other unexpected errors - log and continue for maximum resilience
-                    # This satisfies requirement 6.4: Continue processing remaining entries on malformed responses
-                    progress_tracker.display_error(f"Unexpected error: {str(e)}", show_immediately=False)
+                    progress_tracker.display_error(f"Error: {str(e)}", show_immediately=False)
                     remaining_count -= current_batch_size
-                    progress_tracker.update_progress(current_batch_size, f"Processed {len(generated_entries) + len(progress_tracker.errors)}/{config.count} entries")
             
             # Stop progress tracking
             elapsed_time = progress_tracker.stop_progress()
