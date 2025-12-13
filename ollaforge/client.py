@@ -35,6 +35,8 @@ console = Console()
 
 # Default concurrency level for parallel requests
 DEFAULT_CONCURRENCY = 5
+# Maximum concurrent batch requests
+MAX_CONCURRENT_BATCHES = 10
 
 
 class OllamaConnectionError(Exception):
@@ -197,6 +199,84 @@ def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
             raise OllamaGenerationError(f"Generation failed: {str(e)}")
 
 
+def generate_data_concurrent(
+    topic: str, 
+    model: str, 
+    total_count: int,
+    batch_size: int = 10,
+    max_concurrent: int = MAX_CONCURRENT_BATCHES,
+    dataset_type: DatasetType = DatasetType.SFT,
+    language: OutputLanguage = OutputLanguage.EN,
+    progress_callback: Optional[Callable[[int, int], None]] = None
+) -> List[Dict[str, Any]]:
+    """
+    Generate data using concurrent batch requests (funnel architecture).
+    
+    Sends multiple batch requests in parallel to maximize GPU utilization.
+    This is the core of the "funnel" approach - over-request and filter.
+    
+    Args:
+        topic: Topic description for dataset generation
+        model: Ollama model name to use
+        total_count: Total number of entries to generate
+        batch_size: Number of entries per batch request
+        max_concurrent: Maximum number of concurrent batch requests
+        dataset_type: Type of dataset to generate
+        language: Output language for generated content
+        progress_callback: Optional callback(completed_batches, total_batches)
+        
+    Returns:
+        List of raw response dicts with 'raw_content'
+    """
+    _test_ollama_connection()
+    
+    # Calculate number of batches needed
+    num_batches = (total_count + batch_size - 1) // batch_size
+    
+    # Limit concurrent requests
+    actual_concurrent = min(max_concurrent, num_batches)
+    
+    all_responses = []
+    completed_batches = 0
+    
+    def generate_batch_wrapper(batch_num: int) -> Dict[str, Any]:
+        """Wrapper for batch generation with batch number."""
+        # Calculate entries for this batch
+        start_idx = batch_num * batch_size
+        remaining = total_count - start_idx
+        current_batch_size = min(batch_size, remaining)
+        
+        return _generate_batch(
+            topic, model, current_batch_size, batch_num + 1, 
+            dataset_type, language
+        )
+    
+    # Use ThreadPoolExecutor for concurrent requests
+    with concurrent.futures.ThreadPoolExecutor(max_workers=actual_concurrent) as executor:
+        # Submit all batch requests
+        future_to_batch = {
+            executor.submit(generate_batch_wrapper, i): i 
+            for i in range(num_batches)
+        }
+        
+        # Collect results as they complete
+        for future in concurrent.futures.as_completed(future_to_batch):
+            batch_num = future_to_batch[future]
+            try:
+                result = future.result()
+                if 'raw_content' in result:
+                    all_responses.append(result)
+            except Exception as e:
+                # Log error but continue with other batches
+                console.print(f"[dim]Batch {batch_num + 1} failed: {e}[/dim]")
+            
+            completed_batches += 1
+            if progress_callback:
+                progress_callback(completed_batches, num_batches)
+    
+    return all_responses
+
+
 def _test_ollama_connection() -> None:
     """
     Test connection to Ollama API on localhost:11434.
@@ -229,7 +309,14 @@ def _test_ollama_connection() -> None:
 def _get_language_instruction(language: OutputLanguage) -> str:
     """Get language-specific instruction for prompts."""
     if language == OutputLanguage.ZH_TW:
-        return "\n\n重要：所有生成的內容必須使用繁體中文（台灣用語）撰寫。"
+        return """
+
+【語言規範】使用台灣繁體中文，禁止大陸用語：
+視頻→影片、軟件→軟體、交互→互動、質量→品質、信息→資訊、數據→資料、網絡→網路、程序→程式、服務器→伺服器、用戶→使用者、優化→最佳化、默認→預設
+
+【正確範例】
+❌「這個軟件的質量很好」→ ✅「這個軟體的品質很好」
+❌「用戶可以通過網絡下載」→ ✅「使用者可以透過網路下載」"""
     return ""
 
 

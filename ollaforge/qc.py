@@ -239,13 +239,22 @@ def validate_entry_chinese(
 class QualityController:
     """
     Quality Controller for managing Chinese language validation.
+    
+    Uses a "funnel" architecture: no retries, just over-request and filter.
     """
+    
+    # Default pass rate assumption for buffer calculation
+    DEFAULT_PASS_RATE = 0.7
+    # Minimum buffer ratio to ensure we get enough entries
+    MIN_BUFFER_RATIO = 1.2
+    # Maximum buffer ratio to avoid excessive requests
+    MAX_BUFFER_RATIO = 3.0
     
     def __init__(
         self, 
         enabled: bool = True,
         confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
-        max_retries: int = 3
+        estimated_pass_rate: float = DEFAULT_PASS_RATE
     ):
         """
         Initialize the Quality Controller.
@@ -253,21 +262,47 @@ class QualityController:
         Args:
             enabled: Whether QC is enabled
             confidence_threshold: Minimum confidence for Taiwan classification
-            max_retries: Maximum retries for failed entries
+            estimated_pass_rate: Estimated pass rate for buffer calculation (0.0-1.0)
         """
         self.enabled = enabled
         self.confidence_threshold = confidence_threshold
-        self.max_retries = max_retries
+        self.estimated_pass_rate = max(0.1, min(1.0, estimated_pass_rate))
         self.stats = {
             "total_checked": 0,
             "passed": 0,
             "failed": 0,
-            "retried": 0,
+            "discarded": 0,
         }
+    
+    def calculate_request_count(self, target_count: int) -> int:
+        """
+        Calculate how many entries to request to achieve target count after QC filtering.
+        
+        Uses buffer_ratio = 1 / estimated_pass_rate, clamped to reasonable bounds.
+        
+        Args:
+            target_count: Desired number of valid entries
+            
+        Returns:
+            Number of entries to request (over-request amount)
+        """
+        if not self.enabled:
+            return target_count
+        
+        # Calculate buffer ratio based on estimated pass rate
+        buffer_ratio = 1.0 / self.estimated_pass_rate
+        
+        # Clamp to reasonable bounds
+        buffer_ratio = max(self.MIN_BUFFER_RATIO, min(self.MAX_BUFFER_RATIO, buffer_ratio))
+        
+        # Calculate request count and round up
+        request_count = int(target_count * buffer_ratio + 0.5)
+        
+        return request_count
     
     def check_entry(self, entry_dict: Dict[str, Any]) -> Tuple[bool, List[str]]:
         """
-        Check if an entry passes QC.
+        Check if an entry passes QC. No retries - just pass/fail.
         
         Args:
             entry_dict: Entry to check
@@ -289,8 +324,22 @@ class QualityController:
             self.stats["passed"] += 1
         else:
             self.stats["failed"] += 1
+            self.stats["discarded"] += 1
         
         return passed, failed_fields
+    
+    def update_pass_rate(self) -> float:
+        """
+        Update estimated pass rate based on actual results.
+        
+        Returns:
+            Updated pass rate
+        """
+        if self.stats["total_checked"] > 0:
+            actual_rate = self.stats["passed"] / self.stats["total_checked"]
+            # Blend with previous estimate (exponential moving average)
+            self.estimated_pass_rate = 0.7 * actual_rate + 0.3 * self.estimated_pass_rate
+        return self.estimated_pass_rate
     
     def get_stats(self) -> Dict[str, Any]:
         """Get QC statistics."""
@@ -298,6 +347,7 @@ class QualityController:
         return {
             **self.stats,
             "pass_rate": (self.stats["passed"] / total * 100) if total > 0 else 0,
+            "estimated_pass_rate": self.estimated_pass_rate * 100,
         }
     
     def reset_stats(self):
@@ -306,7 +356,7 @@ class QualityController:
             "total_checked": 0,
             "passed": 0,
             "failed": 0,
-            "retried": 0,
+            "discarded": 0,
         }
 
 

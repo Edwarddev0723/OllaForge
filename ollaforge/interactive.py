@@ -287,10 +287,15 @@ def display_config_summary(config: GenerationConfig, concurrency: int = 5) -> bo
     table.add_row("📊 Dataset Type", f"[{info['color']}]{info['name']}[/{info['color']}]")
     table.add_row("🌐 Language", f"[{lang_info['color']}]{lang_info['name']}[/{lang_info['color']}]")
     
-    # Show QC settings for Traditional Chinese
+    # Show QC settings for Traditional Chinese with funnel mode info
     if config.language == OutputLanguage.ZH_TW:
         if config.qc_enabled:
+            # Calculate over-request amount
+            from ollaforge.qc import QualityController
+            qc = QualityController(enabled=True, estimated_pass_rate=0.7)
+            request_count = qc.calculate_request_count(config.count)
             table.add_row("🔍 QC", f"[bold green]Enabled[/bold green] (confidence ≥ {config.qc_confidence:.0%})")
+            table.add_row("🔄 Funnel Mode", f"[dim]Will request ~{request_count} entries to get {config.count} valid[/dim]")
         else:
             table.add_row("🔍 QC", "[dim]Disabled[/dim]")
     

@@ -272,7 +272,7 @@ def generate(
     qc_enabled: bool = typer.Option(
         True,
         "--qc/--no-qc",
-        help="Enable/disable QC for Traditional Chinese (Taiwan) - filters out Mainland expressions"
+        help="Enable/disable QC for Traditional Chinese (Taiwan) - uses funnel mode: over-request and filter"
     ),
     qc_confidence: float = typer.Option(
         0.9,
@@ -375,8 +375,8 @@ def generate(
         # Initialize progress tracker
         progress_tracker = ProgressTracker(console)
         
-        # Start progress tracking
-        progress_tracker.start_progress(config.count, f"Generating {config.count} entries")
+        # Note: We'll start progress tracking after calculating request_count
+        # to show the correct total for funnel mode
         
         # Import required modules for generation
         # Performance optimization: Import modules only when needed to reduce startup time
@@ -409,108 +409,133 @@ def generate(
         
         # Initialize QC if needed for Traditional Chinese
         qc_controller = None
+        request_count = config.count  # Default: request exactly what we need
+        
         if config.language == OutputLanguage.ZH_TW and config.qc_enabled:
             from ollaforge.qc import QualityController
             qc_controller = QualityController(
                 enabled=True,
                 confidence_threshold=config.qc_confidence,
-                max_retries=3
+                estimated_pass_rate=0.7  # Initial estimate, will adapt
             )
+            # Calculate over-request amount based on estimated pass rate
+            request_count = qc_controller.calculate_request_count(config.count)
             console.print("[dim]🔍 QC model loading for Taiwan Chinese validation...[/dim]")
+            console.print(f"[dim]📊 Funnel mode: requesting {request_count} entries to get {config.count} valid ones[/dim]")
+        
+        # Start progress tracking with the actual request count
+        if qc_controller is not None:
+            progress_tracker.start_progress(request_count, f"Generating {request_count} entries (target: {config.count})")
+        else:
+            progress_tracker.start_progress(config.count, f"Generating {config.count} entries")
         
         try:
-            # Use batch generation: each API call generates multiple entries
-            # This dramatically reduces the number of API calls needed
-            # For 50 entries with batch_size=10, we only need 5 API calls instead of 50
+            # ============================================================
+            # FUNNEL ARCHITECTURE: Over-request → Filter → Keep valid
+            # ============================================================
+            # Instead of: generate 1 → check → retry if fail → write
+            # We do: generate N (over-request) → filter all → keep first M valid
+            # This maximizes GPU utilization by avoiding sequential retries
+            # ============================================================
+            
             BATCH_SIZE = 10  # Number of entries per API call
-            MAX_QC_RETRIES = 3  # Maximum retries for QC failures
+            MAX_CONCURRENT = min(concurrency, 10)  # Concurrent batch requests
             
-            remaining_count = config.count
-            batch_number = 0
-            qc_retry_count = 0
+            # Import concurrent generation function
+            from ollaforge.client import generate_data_concurrent
             
-            while remaining_count > 0 and len(generated_entries) < config.count:
-                if is_interrupted():
-                    break
+            # Track batch progress
+            last_completed = [0]  # Use list to allow modification in closure
+            
+            def on_batch_progress(completed: int, total: int):
+                """Callback for batch completion progress."""
+                # Calculate incremental advance
+                advance = (completed - last_completed[0]) * BATCH_SIZE
+                last_completed[0] = completed
+                progress_tracker.update_progress(
+                    advance,
+                    f"⚡ Generating batches: {completed}/{total}"
+                )
+            
+            try:
+                # Phase 1: Concurrent batch generation (fire all requests at once)
+                console.print(f"[dim]⚡ Sending {(request_count + BATCH_SIZE - 1) // BATCH_SIZE} concurrent batch requests...[/dim]")
                 
-                # Calculate how many entries to request in this batch
-                entries_needed = config.count - len(generated_entries)
-                current_batch_size = min(BATCH_SIZE, entries_needed)
-                batch_number += 1
+                raw_responses = generate_data_concurrent(
+                    topic=config.topic,
+                    model=config.model,
+                    total_count=request_count,
+                    batch_size=BATCH_SIZE,
+                    max_concurrent=MAX_CONCURRENT,
+                    dataset_type=config.dataset_type,
+                    language=config.language,
+                    progress_callback=on_batch_progress
+                )
                 
-                try:
-                    # Generate batch - single API call for multiple entries
-                    raw_responses = generate_data(
-                        topic=config.topic,
-                        model=config.model,
-                        count=current_batch_size,
-                        concurrency=concurrency,
-                        dataset_type=config.dataset_type,
-                        language=config.language
+                # Phase 2: Process all responses and filter through QC
+                console.print(f"[dim]🔍 Processing {len(raw_responses)} batch responses...[/dim]")
+                
+                all_entries = []
+                for raw_response in raw_responses:
+                    if is_interrupted():
+                        break
+                    
+                    if 'raw_content' in raw_response:
+                        is_batch = raw_response.get('is_batch', False)
+                        processed_entries = process_model_response(
+                            raw_response['raw_content'], 
+                            is_batch=is_batch,
+                            dataset_type=config.dataset_type
+                        )
+                        all_entries.extend(processed_entries)
+                
+                console.print(f"[dim]📝 Parsed {len(all_entries)} entries from responses[/dim]")
+                
+                # Phase 3: QC filtering (no retries - just filter)
+                for entry in all_entries:
+                    if is_interrupted():
+                        break
+                    
+                    if len(generated_entries) >= config.count:
+                        break  # We have enough valid entries
+                    
+                    # Apply QC check for Traditional Chinese
+                    if qc_controller is not None:
+                        entry_dict = entry.model_dump()
+                        passed, failed_fields = qc_controller.check_entry(entry_dict)
+                        
+                        if not passed:
+                            # Funnel mode: just discard, no retry
+                            continue
+                    
+                    generated_entries.append(entry)
+                
+                # Update QC pass rate estimate for future runs
+                if qc_controller is not None:
+                    qc_controller.update_pass_rate()
+                    qc_stats = qc_controller.get_stats()
+                    console.print(
+                        f"[dim]📊 QC stats: {qc_stats['passed']}/{qc_stats['total_checked']} passed "
+                        f"({qc_stats['pass_rate']:.1f}%), {qc_stats['discarded']} discarded[/dim]"
                     )
+                
+                # Update final progress
+                progress_tracker.update_progress(
+                    len(generated_entries),
+                    f"Filtered {len(generated_entries)}/{config.count} valid entries"
+                )
                     
-                    # Process responses (may contain batch JSON array)
-                    for raw_response in raw_responses:
-                        if 'raw_content' in raw_response:
-                            is_batch = raw_response.get('is_batch', False)
-                            processed_entries = process_model_response(
-                                raw_response['raw_content'], 
-                                is_batch=is_batch,
-                                dataset_type=config.dataset_type
-                            )
-                            
-                            for entry in processed_entries:
-                                if len(generated_entries) >= config.count:
-                                    break
-                                
-                                # Apply QC check for Traditional Chinese
-                                if qc_controller is not None:
-                                    entry_dict = entry.model_dump()
-                                    passed, failed_fields = qc_controller.check_entry(entry_dict)
-                                    
-                                    if not passed:
-                                        qc_retry_count += 1
-                                        if qc_retry_count <= MAX_QC_RETRIES * config.count:
-                                            progress_tracker.display_error(
-                                                f"QC failed (Mainland Chinese detected in {', '.join(failed_fields)}), regenerating...",
-                                                show_immediately=False
-                                            )
-                                            # Don't add this entry, will regenerate
-                                            continue
-                                        else:
-                                            progress_tracker.display_error(
-                                                f"QC retry limit reached, skipping entry",
-                                                show_immediately=False
-                                            )
-                                            continue
-                                
-                                generated_entries.append(entry)
-                            
-                            if not processed_entries:
-                                progress_tracker.display_error("Failed to parse batch response", show_immediately=False)
-                        else:
-                            progress_tracker.display_error("Invalid response format", show_immediately=False)
-                    
-                    # Update progress
-                    progress_tracker.update_progress(
-                        min(current_batch_size, len(generated_entries) - (batch_number - 1) * BATCH_SIZE + BATCH_SIZE),
-                        f"Generated {len(generated_entries)}/{config.count} entries"
-                    )
-                    remaining_count = config.count - len(generated_entries)
-                    
-                except OllamaConnectionError as e:
-                    progress_tracker.stop_progress()
-                    console.print(f"[red]❌ Connection failed: {str(e)}[/red]")
-                    console.print("[yellow]💡 Make sure Ollama is running: ollama serve[/yellow]")
-                    raise typer.Exit(1)
-                    
-                except OllamaGenerationError as e:
-                    progress_tracker.display_error(f"Generation error: {str(e)}", show_immediately=False)
-                    remaining_count -= current_batch_size
-                    
-                except Exception as e:
-                    progress_tracker.display_error(f"Error: {str(e)}", show_immediately=False)
-                    remaining_count -= current_batch_size
+            except OllamaConnectionError as e:
+                progress_tracker.stop_progress()
+                console.print(f"[red]❌ Connection failed: {str(e)}[/red]")
+                console.print("[yellow]💡 Make sure Ollama is running: ollama serve[/yellow]")
+                raise typer.Exit(1)
+                
+            except OllamaGenerationError as e:
+                progress_tracker.display_error(f"Generation error: {str(e)}", show_immediately=False)
+                
+            except Exception as e:
+                progress_tracker.display_error(f"Error: {str(e)}", show_immediately=False)
             
             # Stop progress tracking
             elapsed_time = progress_tracker.stop_progress()
