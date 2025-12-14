@@ -344,18 +344,27 @@ The text should be informative, well-written, and suitable for language model pr
 No markdown, no explanation, just JSON.{lang_instruction}"""
 
     elif dataset_type == DatasetType.SFT_CONVERSATION:
-        return f"""You are a data generator. Generate multi-turn conversation data for: {topic}
+        return f"""You are a data generator creating DIVERSE multi-turn conversations for: {topic}
 
 Output ONLY valid JSON (ShareGPT/ChatML format):
 {{"conversations": [
   {{"role": "system", "content": "system prompt"}},
   {{"role": "user", "content": "user message"}},
-  {{"role": "assistant", "content": "assistant response"}},
-  {{"role": "user", "content": "follow-up question"}},
-  {{"role": "assistant", "content": "follow-up response"}}
+  {{"role": "assistant", "content": "assistant response"}}
 ]}}
 
-Generate realistic multi-turn dialogues with 2-4 turns.
+【CRITICAL REQUIREMENTS】
+1. DIVERSITY: Each conversation must use DIFFERENT sentence patterns, vocabulary, and scenarios
+2. CONSISTENT SYSTEM PROMPT: Use the SAME system prompt for all conversations in this batch
+3. REALISTIC DIALOGUE: Users speak naturally with typos, incomplete sentences, or casual tone
+4. MULTI-TURN DEPTH (2-4 turns): Include scenarios like:
+   - Clarification questions (user is vague, assistant asks for details)
+   - Error handling (item unavailable, invalid request)
+   - Modifications (user changes mind mid-conversation)
+   - Edge cases (unusual requests, boundary conditions)
+5. LOGICAL ACCURACY: Assistant responses must be mathematically and logically correct
+6. NO ARTIFACTS: Do not include any XML tags, source markers, or metadata in content
+
 No markdown, no explanation, just JSON.{lang_instruction}"""
 
     elif dataset_type == DatasetType.DPO:
@@ -413,28 +422,49 @@ IMPORTANT:
 - Generate exactly {batch_size} examples{lang_instruction}"""
 
     elif dataset_type == DatasetType.SFT_CONVERSATION:
-        return f"""You are a data generator. Generate {batch_size} DIFFERENT multi-turn conversations for: {topic}
+        return f"""You are a data generator. Generate {batch_size} DIVERSE multi-turn conversations for: {topic}
 
 Output a JSON array with {batch_size} objects (ShareGPT/ChatML format).
-Each object has: conversations (array of role/content pairs).
+
+【CRITICAL REQUIREMENTS - READ CAREFULLY】
+
+1. UNIFIED SYSTEM PROMPT: Use this EXACT system prompt for ALL conversations:
+   "你是一位專業的助理，負責協助使用者完成「{topic}」相關的任務。請用自然、友善的語氣回應。"
+
+2. SENTENCE DIVERSITY: Each user input must use DIFFERENT patterns:
+   ✗ AVOID: "我要一杯...", "請給我..." (repeating same pattern)
+   ✓ USE VARIED PATTERNS: "來杯...", "幫我弄個...", "可以給我...", "想要...", "有沒有...", "欸，那個..."
+
+3. REALISTIC USER BEHAVIOR: Users are NOT perfect:
+   - Casual/incomplete: "呃...那個拿鐵" instead of "請給我一杯拿鐵"
+   - Typos/colloquial: "ㄋㄟㄋㄟ" (milk), "冰ㄉ" (iced)
+   - Vague requests: "我要咖啡" (assistant should ask: 美式還是拿鐵？)
+
+4. MULTI-TURN SCENARIOS (distribute across {batch_size} examples):
+   - 30% Clarification: User is vague → Assistant asks for details
+   - 20% Modification: User changes order mid-conversation
+   - 20% Error handling: Item unavailable, invalid combo
+   - 20% Complex orders: Multiple items, special requests
+   - 10% Edge cases: Cancel, complaints, unusual requests
+
+5. LOGICAL ACCURACY: 
+   ✗ WRONG: User orders 1 item → Assistant says "總共兩杯"
+   ✓ CORRECT: Quantities must match exactly
+
+6. NO ARTIFACTS: Never include <source>, XML tags, or metadata in JSON content
 
 Example format:
 [
   {{"conversations": [
-    {{"role": "system", "content": "You are a helpful assistant."}},
-    {{"role": "user", "content": "Hello"}},
-    {{"role": "assistant", "content": "Hi! How can I help?"}}
-  ]}},
-  {{"conversations": [
-    {{"role": "user", "content": "Question"}},
-    {{"role": "assistant", "content": "Answer"}}
+    {{"role": "system", "content": "你是一位專業的助理..."}},
+    {{"role": "user", "content": "欸，有賣咖啡嗎"}},
+    {{"role": "assistant", "content": "有的！我們有美式和拿鐵，請問您想要哪一種呢？"}},
+    {{"role": "user", "content": "拿鐵好了，冰的"}},
+    {{"role": "assistant", "content": "好的，一杯冰拿鐵，還需要其他的嗎？"}}
   ]}}
 ]
 
-IMPORTANT:
-- Output ONLY the JSON array, no markdown, no explanation
-- Each conversation must be UNIQUE with 2-4 turns
-- Generate exactly {batch_size} examples{lang_instruction}"""
+Output ONLY the JSON array. Generate exactly {batch_size} UNIQUE examples.{lang_instruction}"""
 
     elif dataset_type == DatasetType.DPO:
         return f"""You are a data generator. Generate {batch_size} DIFFERENT preference pairs for DPO training on: {topic}
