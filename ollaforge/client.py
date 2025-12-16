@@ -37,6 +37,97 @@ console = Console()
 DEFAULT_CONCURRENCY = 5
 # Maximum concurrent batch requests
 MAX_CONCURRENT_BATCHES = 10
+# Optimized batch size for Mac (smaller = better quality, less attention decay)
+# With prompt caching, smaller batches don't hurt throughput much
+DEFAULT_BATCH_SIZE = 5
+
+
+# ============================================================================
+# JSON Schema Definitions for Structured Output (Ollama format parameter)
+# Forces model to output valid JSON, eliminating parsing errors
+# ============================================================================
+
+def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) -> dict:
+    """
+    Get JSON schema for structured output based on dataset type.
+    
+    Using Ollama's 'format' parameter with JSON schema forces the model
+    to only output valid JSON tokens, achieving 0% format error rate.
+    
+    Args:
+        dataset_type: Type of dataset being generated
+        batch_size: Number of items (for array schema)
+        
+    Returns:
+        JSON schema dict for Ollama format parameter
+    """
+    from .models import DatasetType
+    
+    # Base schemas for each entry type
+    sft_entry_schema = {
+        "type": "object",
+        "properties": {
+            "instruction": {"type": "string"},
+            "input": {"type": "string"},
+            "output": {"type": "string"}
+        },
+        "required": ["instruction", "input", "output"]
+    }
+    
+    pretrain_entry_schema = {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string"}
+        },
+        "required": ["text"]
+    }
+    
+    conversation_message_schema = {
+        "type": "object",
+        "properties": {
+            "role": {"type": "string", "enum": ["system", "user", "assistant"]},
+            "content": {"type": "string"}
+        },
+        "required": ["role", "content"]
+    }
+    
+    sft_conversation_entry_schema = {
+        "type": "object",
+        "properties": {
+            "conversations": {
+                "type": "array",
+                "items": conversation_message_schema
+            }
+        },
+        "required": ["conversations"]
+    }
+    
+    dpo_entry_schema = {
+        "type": "object",
+        "properties": {
+            "prompt": {"type": "string"},
+            "chosen": {"type": "string"},
+            "rejected": {"type": "string"}
+        },
+        "required": ["prompt", "chosen", "rejected"]
+    }
+    
+    # Select schema based on dataset type
+    entry_schema = {
+        DatasetType.SFT: sft_entry_schema,
+        DatasetType.PRETRAIN: pretrain_entry_schema,
+        DatasetType.SFT_CONVERSATION: sft_conversation_entry_schema,
+        DatasetType.DPO: dpo_entry_schema
+    }.get(dataset_type, sft_entry_schema)
+    
+    # For batch generation, wrap in array
+    if batch_size > 1:
+        return {
+            "type": "array",
+            "items": entry_schema
+        }
+    
+    return entry_schema
 
 
 class OllamaConnectionError(Exception):
@@ -51,9 +142,19 @@ class OllamaGenerationError(Exception):
 
 def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int, 
                     dataset_type: DatasetType = DatasetType.SFT,
-                    language: OutputLanguage = OutputLanguage.EN) -> Dict[str, Any]:
+                    language: OutputLanguage = OutputLanguage.EN,
+                    use_structured_output: bool = True) -> Dict[str, Any]:
     """
     Generate a batch of entries in a single API call.
+    
+    Args:
+        topic: Topic for generation
+        model: Ollama model name
+        batch_size: Number of entries per batch
+        batch_number: Batch identifier
+        dataset_type: Type of dataset
+        language: Output language
+        use_structured_output: Use JSON schema to force valid output (recommended)
     
     Returns:
         Dict with 'raw_content' (JSON array string) or 'error'
@@ -62,17 +163,26 @@ def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int,
         system_prompt = _create_system_prompt_batch(topic, batch_size, dataset_type, language)
         user_prompt = _create_user_prompt_batch(topic, batch_size, batch_number, dataset_type, language)
         
-        response = ollama.chat(
-            model=model,
-            messages=[
+        # Build request parameters
+        chat_params = {
+            'model': model,
+            'messages': [
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_prompt}
             ],
-            options={
+            'options': {
                 'temperature': 0.8,  # Slightly higher for diversity
                 'top_p': 0.9,
             }
-        )
+        }
+        
+        # Add structured output (JSON schema) if enabled
+        # This forces the model to only output valid JSON tokens
+        if use_structured_output:
+            json_schema = _get_json_schema_for_type(dataset_type, batch_size)
+            chat_params['format'] = json_schema
+        
+        response = ollama.chat(**chat_params)
         
         if 'message' in response and 'content' in response['message']:
             return {
@@ -203,11 +313,12 @@ def generate_data_concurrent(
     topic: str, 
     model: str, 
     total_count: int,
-    batch_size: int = 10,
+    batch_size: int = DEFAULT_BATCH_SIZE,  # Optimized: 5 instead of 10
     max_concurrent: int = MAX_CONCURRENT_BATCHES,
     dataset_type: DatasetType = DatasetType.SFT,
     language: OutputLanguage = OutputLanguage.EN,
-    progress_callback: Optional[Callable[[int, int], None]] = None
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    use_structured_output: bool = True
 ) -> List[Dict[str, Any]]:
     """
     Generate data using concurrent batch requests (funnel architecture).
@@ -215,15 +326,21 @@ def generate_data_concurrent(
     Sends multiple batch requests in parallel to maximize GPU utilization.
     This is the core of the "funnel" approach - over-request and filter.
     
+    Performance optimizations for Mac:
+    - Smaller batch_size (5) reduces attention decay, improves quality
+    - JSON schema structured output eliminates format errors (0% error rate)
+    - BERT QC runs on CPU to keep MPS free for LLM
+    
     Args:
         topic: Topic description for dataset generation
         model: Ollama model name to use
         total_count: Total number of entries to generate
-        batch_size: Number of entries per batch request
+        batch_size: Number of entries per batch (default 5 for quality)
         max_concurrent: Maximum number of concurrent batch requests
         dataset_type: Type of dataset to generate
         language: Output language for generated content
         progress_callback: Optional callback(completed_batches, total_batches)
+        use_structured_output: Use JSON schema for guaranteed valid output
         
     Returns:
         List of raw response dicts with 'raw_content'
@@ -248,7 +365,7 @@ def generate_data_concurrent(
         
         return _generate_batch(
             topic, model, current_batch_size, batch_num + 1, 
-            dataset_type, language
+            dataset_type, language, use_structured_output
         )
     
     # Use ThreadPoolExecutor for concurrent requests
@@ -426,41 +543,59 @@ IMPORTANT:
 
 Output a JSON array with {batch_size} objects (ShareGPT/ChatML format).
 
-【CRITICAL REQUIREMENTS - READ CAREFULLY】
+【CRITICAL REQUIREMENTS】
 
 1. UNIFIED SYSTEM PROMPT: Use this EXACT system prompt for ALL conversations:
    "你是一位專業的助理，負責協助使用者完成「{topic}」相關的任務。請用自然、友善的語氣回應。"
 
-2. SENTENCE DIVERSITY: Each user input must use DIFFERENT patterns:
-   ✗ AVOID: "我要一杯...", "請給我..." (repeating same pattern)
-   ✓ USE VARIED PATTERNS: "來杯...", "幫我弄個...", "可以給我...", "想要...", "有沒有...", "欸，那個..."
+2. USER INPUT DIVERSITY: Each user must speak DIFFERENTLY:
+   ✗ AVOID repeating: "我要一杯...", "請給我..."
+   ✓ VARY patterns: "來杯...", "幫我弄個...", "欸那個...", "有沒有...", "想點..."
 
-3. REALISTIC USER BEHAVIOR: Users are NOT perfect:
-   - Casual/incomplete: "呃...那個拿鐵" instead of "請給我一杯拿鐵"
-   - Typos/colloquial: "ㄋㄟㄋㄟ" (milk), "冰ㄉ" (iced)
-   - Vague requests: "我要咖啡" (assistant should ask: 美式還是拿鐵？)
+3. 【ASSISTANT RESPONSE DIVERSITY - CRITICAL】
+   Assistant must NOT always use the same confirmation pattern!
+   
+   ✗ ROBOTIC (avoid): "好的，已為您準備一杯冰拿鐵。" (every time)
+   
+   ✓ NATURAL VARIATIONS (mix these styles):
+   - Casual: "沒問題～" / "OK！" / "好喔～"
+   - Friendly: "馬上來！" / "稍等一下喔～"
+   - Efficient: "冰拿鐵一杯。" (short, no fluff)
+   - Playful: "冰拿鐵 get！還要什麼嗎？"
+   - Professional: "為您準備冰拿鐵，請稍候。"
+   
+   ✗ VERBOSE (avoid): "好的，您點的是一杯冰的拿鐵咖啡，不加濃縮咖啡，總共一杯，請問還需要其他的嗎？"
+   ✓ CONCISE: "冰拿鐵～還要別的嗎？"
 
-4. MULTI-TURN SCENARIOS (distribute across {batch_size} examples):
-   - 30% Clarification: User is vague → Assistant asks for details
-   - 20% Modification: User changes order mid-conversation
-   - 20% Error handling: Item unavailable, invalid combo
-   - 20% Complex orders: Multiple items, special requests
-   - 10% Edge cases: Cancel, complaints, unusual requests
+4. FLEXIBLE RULES: The system should handle creative requests gracefully:
+   - Unknown items: "抱歉我們沒有這個，要不要試試...？"
+   - Special requests: Accept reasonable customizations, politely decline impossible ones
+   - Don't rigidly reject - offer alternatives
 
-5. LOGICAL ACCURACY: 
-   ✗ WRONG: User orders 1 item → Assistant says "總共兩杯"
-   ✓ CORRECT: Quantities must match exactly
+5. MULTI-TURN SCENARIOS (distribute across {batch_size} examples):
+   - 30% Clarification: User vague → Assistant asks briefly
+   - 20% Modification: User changes mind
+   - 20% Error/alternatives: Item unavailable → suggest similar
+   - 20% Complex: Multiple items, combos
+   - 10% Edge: Cancel, complaints, chitchat
 
-6. NO ARTIFACTS: Never include <source>, XML tags, or metadata in JSON content
+6. LOGICAL ACCURACY: Quantities must match. No hallucinated items.
 
-Example format:
+7. NO ARTIFACTS: Never include XML tags or metadata in content.
+
+Example (note the VARIED assistant responses):
 [
   {{"conversations": [
     {{"role": "system", "content": "你是一位專業的助理..."}},
-    {{"role": "user", "content": "欸，有賣咖啡嗎"}},
-    {{"role": "assistant", "content": "有的！我們有美式和拿鐵，請問您想要哪一種呢？"}},
-    {{"role": "user", "content": "拿鐵好了，冰的"}},
-    {{"role": "assistant", "content": "好的，一杯冰拿鐵，還需要其他的嗎？"}}
+    {{"role": "user", "content": "欸有賣咖啡嗎"}},
+    {{"role": "assistant", "content": "有喔！美式跟拿鐵，要哪個？"}},
+    {{"role": "user", "content": "拿鐵 冰的"}},
+    {{"role": "assistant", "content": "冰拿鐵～還要嗎？"}}
+  ]}},
+  {{"conversations": [
+    {{"role": "system", "content": "你是一位專業的助理..."}},
+    {{"role": "user", "content": "一杯熱美式"}},
+    {{"role": "assistant", "content": "熱美式 get！"}}
   ]}}
 ]
 

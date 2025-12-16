@@ -27,8 +27,19 @@ _tokenizer = None
 _device = None
 
 
-def get_device() -> str:
-    """Get the best available device."""
+def get_device(force_cpu: bool = True) -> str:
+    """
+    Get the device for QC model.
+    
+    Args:
+        force_cpu: Force CPU usage to avoid competing with LLM for GPU/MPS memory.
+                   Default True for Mac optimization - keeps MPS free for Ollama.
+    
+    Returns:
+        Device string: "cpu", "mps", or "cuda"
+    """
+    if force_cpu:
+        return "cpu"
     if torch.backends.mps.is_available():
         return "mps"
     elif torch.cuda.is_available():
@@ -54,9 +65,10 @@ def load_qc_model(force_reload: bool = False) -> Tuple[Any, Any, str]:
     try:
         from transformers import AutoTokenizer, AutoModelForSequenceClassification
         
-        _device = get_device()
+        # Force CPU for BERT to keep MPS/GPU free for LLM generation
+        _device = get_device(force_cpu=True)
         
-        console.print(f"[dim]Loading QC model on {_device}...[/dim]")
+        console.print(f"[dim]Loading QC model on {_device} (keeping GPU free for LLM)...[/dim]")
         
         _tokenizer = AutoTokenizer.from_pretrained(REPO_ID, cache_dir=".cache")
         _model = AutoModelForSequenceClassification.from_pretrained(REPO_ID, cache_dir=".cache")

@@ -438,7 +438,9 @@ def generate(
             # This maximizes GPU utilization by avoiding sequential retries
             # ============================================================
             
-            BATCH_SIZE = 10  # Number of entries per API call
+            # Optimized for Mac: smaller batches = better quality (less attention decay)
+            # With structured output, format errors are eliminated
+            BATCH_SIZE = 5  # Smaller batches for higher quality per entry
             MAX_CONCURRENT = min(concurrency, 10)  # Concurrent batch requests
             
             # Import concurrent generation function
