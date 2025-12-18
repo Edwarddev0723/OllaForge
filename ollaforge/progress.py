@@ -14,7 +14,7 @@ from rich.text import Text
 from rich.table import Table
 from rich.align import Align
 
-from .models import GenerationResult
+from .models import GenerationResult, AugmentationResult
 
 
 class ProgressTracker:
@@ -182,3 +182,48 @@ class ProgressTracker:
             bool: True if progress tracking is active
         """
         return self.progress is not None and self.task_id is not None
+    
+    def display_augmentation_summary(self, result: AugmentationResult) -> None:
+        """
+        Display a comprehensive summary of the augmentation process.
+        
+        Args:
+            result: AugmentationResult containing operation statistics
+            
+        Requirements satisfied:
+        - 5.2: Display summary including total entries, successful augmentations, and failures
+        """
+        # Create summary table
+        table = Table(show_header=False, box=None, padding=(0, 1))
+        table.add_column("Label", style="bold cyan")
+        table.add_column("Value", style="white")
+        
+        # Add summary rows
+        table.add_row("📊 Total Entries:", str(result.total_entries))
+        table.add_row("✅ Successfully Augmented:", str(result.success_count))
+        table.add_row("❌ Failed:", str(result.failure_count))
+        table.add_row("📈 Success Rate:", f"{result.success_rate:.1f}%")
+        table.add_row("⏱️  Total Time:", f"{result.duration:.2f}s")
+        table.add_row("📄 Output File:", result.output_file)
+        
+        # Display summary in a panel
+        summary_panel = Panel(
+            Align.center(table),
+            title="[bold green]🎉 Augmentation Complete[/bold green]",
+            border_style="green",
+            padding=(1, 2)
+        )
+        
+        self.console.print()
+        self.console.print(summary_panel)
+        
+        # Display errors if any
+        if result.errors:
+            self.console.print()
+            self.console.print("[yellow]⚠️  Errors encountered during augmentation:[/yellow]")
+            for i, error in enumerate(result.errors[:5], 1):  # Show max 5 errors
+                self.console.print(f"  {i}. [red]{error}[/red]")
+            
+            if len(result.errors) > 5:
+                remaining = len(result.errors) - 5
+                self.console.print(f"  ... and {remaining} more error(s)")

@@ -58,6 +58,12 @@ from .file_manager import (
     DiskSpaceError,
 )
 
+# Augmentation
+from .augmentor import (
+    DatasetAugmentor,
+    create_augmentation_prompt,
+)
+
 # Quality control
 from .qc import (
     QualityController,
@@ -98,6 +104,9 @@ __all__ = [
     "read_jsonl_file",
     "FileOperationError",
     "DiskSpaceError",
+    # Augmentation
+    "DatasetAugmentor",
+    "create_augmentation_prompt",
     # QC
     "QualityController",
     "predict_language",

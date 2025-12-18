@@ -9,12 +9,13 @@ from hypothesis import given, strategies as st
 from ollaforge.client import (
     generate_data, 
     _test_ollama_connection, 
-    _create_system_prompt,
+    _create_system_prompt_single,
     _create_user_prompt,
     get_available_models,
     OllamaConnectionError,
     OllamaGenerationError
 )
+from ollaforge.models import DatasetType, OutputLanguage
 
 
 @given(
@@ -171,7 +172,7 @@ def test_connection_test_function():
 def test_system_prompt_creation():
     """Test system prompt creation includes JSON format instructions."""
     topic = "customer service conversations"
-    prompt = _create_system_prompt(topic)
+    prompt = _create_system_prompt_single(topic, DatasetType.SFT, OutputLanguage.EN)
     
     assert topic in prompt
     assert 'JSON' in prompt or 'json' in prompt
@@ -184,7 +185,7 @@ def test_user_prompt_creation():
     """Test user prompt creation."""
     topic = "test topic"
     entry_number = 5
-    prompt = _create_user_prompt(topic, entry_number)
+    prompt = _create_user_prompt(topic, entry_number, DatasetType.SFT, OutputLanguage.EN)
     
     assert topic in prompt
     assert str(entry_number) in prompt
@@ -344,7 +345,7 @@ def test_system_prompt_with_special_characters():
     ]
     
     for topic in special_topics:
-        prompt = _create_system_prompt(topic)
+        prompt = _create_system_prompt_single(topic, DatasetType.SFT, OutputLanguage.EN)
         
         # Should handle special characters without crashing
         assert isinstance(prompt, str)
@@ -355,15 +356,15 @@ def test_system_prompt_with_special_characters():
 def test_user_prompt_with_edge_cases():
     """Test user prompt creation with edge cases."""
     # Test with very large entry numbers
-    prompt = _create_user_prompt("test topic", 999999)
+    prompt = _create_user_prompt("test topic", 999999, DatasetType.SFT, OutputLanguage.EN)
     assert "999999" in prompt
     
     # Test with zero entry number
-    prompt = _create_user_prompt("test topic", 0)
+    prompt = _create_user_prompt("test topic", 0, DatasetType.SFT, OutputLanguage.EN)
     assert "0" in prompt
     
     # Test with negative entry number
-    prompt = _create_user_prompt("test topic", -1)
+    prompt = _create_user_prompt("test topic", -1, DatasetType.SFT, OutputLanguage.EN)
     assert "-1" in prompt
 
 
@@ -527,11 +528,11 @@ def test_prompt_creation_with_extremely_long_topics():
     # Test with very long topic
     long_topic = "a" * 100000  # 100KB topic
     
-    system_prompt = _create_system_prompt(long_topic)
+    system_prompt = _create_system_prompt_single(long_topic, DatasetType.SFT, OutputLanguage.EN)
     assert isinstance(system_prompt, str)
     assert len(system_prompt) > 0
     
-    user_prompt = _create_user_prompt(long_topic, 1)
+    user_prompt = _create_user_prompt(long_topic, 1, DatasetType.SFT, OutputLanguage.EN)
     assert isinstance(user_prompt, str)
     assert len(user_prompt) > 0
 

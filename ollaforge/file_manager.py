@@ -177,21 +177,25 @@ def validate_jsonl_file(file_path: str) -> bool:
         return False
 
 
-def read_jsonl_file(file_path: str) -> List[Dict[str, Any]]:
+def read_jsonl_file(file_path: str, return_field_names: bool = False) -> List[Dict[str, Any]] | tuple[List[Dict[str, Any]], List[str]]:
     """
     Read and parse a JSONL file.
     
     Args:
         file_path: Path to the JSONL file
+        return_field_names: If True, also return unique field names from all entries
         
     Returns:
-        List[Dict[str, Any]]: List of parsed JSON objects
+        List[Dict[str, Any]]: List of parsed JSON objects (if return_field_names=False)
+        Tuple[List[Dict[str, Any]], List[str]]: Tuple of (entries, field_names) (if return_field_names=True)
         
     Raises:
         FileOperationError: If file operations fail
     """
     try:
         entries = []
+        field_names_set: set[str] = set()
+        
         with open(file_path, 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
@@ -200,14 +204,28 @@ def read_jsonl_file(file_path: str) -> List[Dict[str, Any]]:
                     
                 try:
                     entry = json.loads(line)
+                    if not isinstance(entry, dict):
+                        raise FileOperationError(
+                            f"Invalid JSONL on line {line_num}: expected JSON object, got {type(entry).__name__}"
+                        )
                     entries.append(entry)
+                    # Collect field names from this entry
+                    field_names_set.update(entry.keys())
                 except json.JSONDecodeError as e:
-                    raise FileOperationError(f"Invalid JSON on line {line_num}: {str(e)}")
+                    raise FileOperationError(
+                        f"Invalid JSON on line {line_num}: {str(e)}"
+                    )
         
+        if return_field_names:
+            # Return sorted list of unique field names for consistent ordering
+            return entries, sorted(field_names_set)
         return entries
         
     except FileNotFoundError:
         raise FileOperationError(f"File not found: {file_path}")
+    except FileOperationError:
+        # Re-raise FileOperationError without wrapping
+        raise
     except Exception as e:
         raise FileOperationError(f"Failed to read JSONL file: {str(e)}")
 

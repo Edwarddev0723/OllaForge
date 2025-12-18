@@ -668,3 +668,477 @@ def main_interactive() -> Optional[Tuple[GenerationConfig, int]]:
             continue
     
     return None
+
+
+# ============================================================================
+# Augmentation Interactive Wizard
+# ============================================================================
+
+def display_file_selection(prompt_text: str = "Enter JSONL file path") -> Optional[str]:
+    """
+    Prompt user to enter a file path and validate it exists.
+    
+    Args:
+        prompt_text: The prompt text to display
+        
+    Returns:
+        Valid file path or None if cancelled
+    """
+    from pathlib import Path
+    import os
+    
+    while True:
+        file_path = Prompt.ask(f"[bold]{prompt_text}[/bold]")
+        
+        if not file_path or not file_path.strip():
+            if Confirm.ask("[yellow]No file entered. Cancel?[/yellow]", default=False):
+                return None
+            continue
+        
+        file_path = file_path.strip()
+        path = Path(file_path)
+        
+        if not path.exists():
+            console.print(f"[red]❌ File not found: {file_path}[/red]")
+            continue
+        
+        if not path.is_file():
+            console.print(f"[red]❌ Not a file: {file_path}[/red]")
+            continue
+        
+        if not os.access(path, os.R_OK):
+            console.print(f"[red]❌ No read permission: {file_path}[/red]")
+            continue
+        
+        return file_path
+
+
+def display_field_selection(field_names: List[str], allow_new: bool = True) -> Tuple[str, bool]:
+    """
+    Display available fields and let user select one or create new.
+    
+    Args:
+        field_names: List of available field names
+        allow_new: Whether to allow creating a new field
+        
+    Returns:
+        Tuple of (field_name, is_new_field)
+    """
+    console.print("[bold cyan]📋 Available Fields[/bold cyan]\n")
+    
+    table = Table(
+        show_header=True,
+        header_style="bold white on dark_blue",
+        box=ROUNDED,
+        border_style="blue",
+    )
+    
+    table.add_column("#", style="bold cyan", justify="center", width=3)
+    table.add_column("Field Name", style="bold", width=30)
+    
+    for i, field in enumerate(field_names, 1):
+        table.add_row(str(i), field)
+    
+    if allow_new:
+        table.add_row("N", "[yellow]Create new field...[/yellow]")
+    
+    console.print(table)
+    console.print()
+    
+    valid_choices = [str(i) for i in range(1, len(field_names) + 1)]
+    if allow_new:
+        valid_choices.append("N")
+        valid_choices.append("n")
+    
+    while True:
+        choice = Prompt.ask(
+            "[bold]Select field number or 'N' for new[/bold]" if allow_new else "[bold]Select field number[/bold]",
+            default="1",
+        )
+        
+        if choice.upper() == "N" and allow_new:
+            new_field = Prompt.ask("[bold]Enter new field name[/bold]")
+            if new_field and new_field.strip():
+                return new_field.strip(), True
+            console.print("[red]Field name cannot be empty[/red]")
+            continue
+        
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(field_names):
+                return field_names[idx], False
+        except ValueError:
+            pass
+        
+        console.print(f"[red]Invalid choice. Enter 1-{len(field_names)}" + (" or 'N'" if allow_new else "") + "[/red]")
+
+
+def display_context_field_selection(field_names: List[str], target_field: str) -> List[str]:
+    """
+    Let user select context fields to include in augmentation prompt.
+    
+    Args:
+        field_names: List of available field names
+        target_field: The target field (excluded from selection)
+        
+    Returns:
+        List of selected context field names
+    """
+    # Filter out target field from options
+    available_fields = [f for f in field_names if f != target_field]
+    
+    if not available_fields:
+        console.print("[dim]No other fields available for context[/dim]")
+        return []
+    
+    console.print("[bold cyan]📎 Select Context Fields[/bold cyan]")
+    console.print("[dim]These fields will be included as context for the AI[/dim]\n")
+    
+    table = Table(
+        show_header=True,
+        header_style="bold white on dark_green",
+        box=ROUNDED,
+        border_style="green",
+    )
+    
+    table.add_column("#", style="bold cyan", justify="center", width=3)
+    table.add_column("Field Name", style="bold", width=30)
+    
+    for i, field in enumerate(available_fields, 1):
+        table.add_row(str(i), field)
+    
+    table.add_row("A", "[green]Select all[/green]")
+    table.add_row("S", "[yellow]Skip (no context)[/yellow]")
+    
+    console.print(table)
+    console.print()
+    
+    choice = Prompt.ask(
+        "[bold]Enter field numbers (comma-separated), 'A' for all, or 'S' to skip[/bold]",
+        default="A",
+    )
+    
+    if choice.upper() == "S":
+        return []
+    
+    if choice.upper() == "A":
+        return available_fields
+    
+    # Parse comma-separated numbers
+    selected = []
+    for part in choice.split(","):
+        try:
+            idx = int(part.strip()) - 1
+            if 0 <= idx < len(available_fields):
+                field = available_fields[idx]
+                if field not in selected:
+                    selected.append(field)
+        except ValueError:
+            continue
+    
+    return selected
+
+
+def display_augmentation_preview(
+    preview_results: List[Tuple[dict, dict]],
+    target_field: str
+) -> bool:
+    """
+    Display preview results and ask for confirmation.
+    
+    Args:
+        preview_results: List of (original, augmented) entry tuples
+        target_field: The field being augmented
+        
+    Returns:
+        True if user confirms, False to retry with different instruction
+    """
+    console.print()
+    console.print(Panel.fit(
+        Text("🔍 Preview Results", style="bold cyan"),
+        border_style="cyan",
+    ))
+    console.print()
+    
+    for i, (original, augmented) in enumerate(preview_results, 1):
+        console.print(f"[bold]━━━ Entry {i} ━━━[/bold]")
+        
+        original_value = original.get(target_field, "[dim](not present)[/dim]")
+        augmented_value = augmented.get(target_field, "[dim](not present)[/dim]")
+        
+        # Truncate long values for display
+        if isinstance(original_value, str) and len(original_value) > 200:
+            original_value = original_value[:200] + "..."
+        if isinstance(augmented_value, str) and len(augmented_value) > 200:
+            augmented_value = augmented_value[:200] + "..."
+        
+        console.print(f"[dim]Original {target_field}:[/dim]")
+        console.print(f"  {original_value}")
+        console.print(f"[green]Augmented {target_field}:[/green]")
+        console.print(f"  {augmented_value}")
+        console.print()
+    
+    return Confirm.ask(
+        "[bold green]✓ Results look good? Proceed with full augmentation?[/bold green]",
+        default=True
+    )
+
+
+def display_augmentation_config_summary(
+    input_file: str,
+    output_file: str,
+    target_field: str,
+    instruction: str,
+    model: str,
+    concurrency: int,
+    is_new_field: bool,
+    context_fields: List[str],
+    entry_count: int,
+    language: OutputLanguage,
+) -> bool:
+    """
+    Display augmentation configuration summary and ask for confirmation.
+    
+    Returns:
+        True if user confirms, False otherwise
+    """
+    lang_info = LANGUAGE_INFO[language]
+    
+    table = Table(
+        show_header=False,
+        box=ROUNDED,
+        border_style="cyan",
+        padding=(0, 2),
+    )
+    
+    table.add_column("Setting", style="bold cyan", width=20)
+    table.add_column("Value", style="white", width=50)
+    
+    table.add_row("📂 Input File", f"[bold]{input_file}[/bold]")
+    table.add_row("📊 Entries", f"[bold yellow]{entry_count}[/bold yellow]")
+    table.add_row("🎯 Target Field", f"[bold]{target_field}[/bold]" + (" [cyan](new)[/cyan]" if is_new_field else ""))
+    table.add_row("📝 Instruction", f"{instruction[:50]}{'...' if len(instruction) > 50 else ''}")
+    table.add_row("🌐 Language", f"[{lang_info['color']}]{lang_info['name']}[/{lang_info['color']}]")
+    table.add_row("🤖 Model", f"[bold green]{model}[/bold green]")
+    table.add_row("📄 Output", f"[bold]{output_file}[/bold]")
+    table.add_row("⚡ Concurrency", f"{concurrency} parallel requests")
+    
+    if context_fields:
+        table.add_row("📎 Context", ", ".join(context_fields))
+    
+    panel = Panel(
+        table,
+        title="[bold white on blue] 🔧 Augmentation Configuration [/bold white on blue]",
+        border_style="blue",
+        padding=(1, 1),
+    )
+    
+    console.print()
+    console.print(panel)
+    console.print()
+    
+    return Confirm.ask("[bold green]🚀 Start augmentation?[/bold green]", default=True)
+
+
+def augment_interactive() -> Optional[Tuple[str, str, str, str, str, int, bool, List[str], bool, OutputLanguage]]:
+    """
+    Run the interactive augmentation wizard.
+    
+    Guides the user through:
+    1. Input file selection
+    2. Field selection (existing or new)
+    3. Instruction input
+    4. Context field selection
+    5. Model and output configuration
+    6. Preview before full processing
+    
+    Returns:
+        Tuple of (input_file, field, instruction, output, model, concurrency, 
+                  new_field, context_fields, preview, language) if completed,
+        None if cancelled
+        
+    Requirements satisfied:
+    - 6.4: Interactive mode guides user through field selection and instruction input
+    - 7.3: Offer preview before full processing
+    - 7.4: Allow modifying instruction and retry on preview rejection
+    """
+    from pathlib import Path
+    from .file_manager import read_jsonl_file, FileOperationError
+    from .augmentor import DatasetAugmentor
+    from .models import AugmentationConfig
+    
+    try:
+        # Display banner
+        display_banner()
+        console.print("[bold cyan]🔧 Dataset Augmentation Wizard[/bold cyan]\n")
+        
+        # Step 1: Input file selection
+        console.print("[bold cyan]📂 Step 1/6: Select Input File[/bold cyan]")
+        console.print("[dim]Enter the path to your JSONL dataset file[/dim]\n")
+        
+        input_file = display_file_selection("Enter JSONL file path")
+        if input_file is None:
+            console.print("[yellow]❌ Wizard cancelled[/yellow]")
+            return None
+        
+        # Load dataset to get field names
+        console.print(f"\n[dim]Loading dataset from {input_file}...[/dim]")
+        try:
+            entries, field_names = read_jsonl_file(input_file, return_field_names=True)
+        except FileOperationError as e:
+            console.print(f"[red]❌ {str(e)}[/red]")
+            return None
+        
+        console.print(f"[green]✓ Loaded {len(entries)} entries with {len(field_names)} fields[/green]\n")
+        
+        if not entries:
+            console.print("[red]❌ Dataset is empty[/red]")
+            return None
+        
+        # Step 2: Field selection
+        console.print("[bold cyan]🎯 Step 2/6: Select Target Field[/bold cyan]")
+        console.print("[dim]Choose a field to augment or create a new one[/dim]\n")
+        
+        target_field, is_new_field = display_field_selection(field_names, allow_new=True)
+        console.print(f"\n[green]✓ Selected field: {target_field}" + (" (new)" if is_new_field else "") + "[/green]\n")
+        
+        # Step 3: Instruction input (with retry loop for preview)
+        instruction = None
+        preview_confirmed = False
+        
+        while not preview_confirmed:
+            console.print("[bold cyan]📝 Step 3/6: Enter Augmentation Instruction[/bold cyan]")
+            console.print("[dim]Describe how the AI should augment this field[/dim]\n")
+            
+            console.print("[dim]Examples:[/dim]")
+            console.print("[dim]  • Translate to English[/dim]")
+            console.print("[dim]  • Rate difficulty as easy/medium/hard[/dim]")
+            console.print("[dim]  • Summarize in one sentence[/dim]")
+            console.print("[dim]  • Add more detail and context[/dim]\n")
+            
+            if instruction:
+                console.print(f"[yellow]Previous instruction: {instruction}[/yellow]\n")
+            
+            new_instruction = Prompt.ask("[bold]Enter instruction[/bold]")
+            if not new_instruction or not new_instruction.strip():
+                console.print("[red]Instruction cannot be empty[/red]")
+                continue
+            
+            instruction = new_instruction.strip()
+            console.print()
+            
+            # Step 4: Context field selection
+            console.print("[bold cyan]📎 Step 4/6: Select Context Fields[/bold cyan]")
+            console.print("[dim]Choose which fields to include as context for the AI[/dim]\n")
+            
+            context_fields = display_context_field_selection(field_names, target_field)
+            if context_fields:
+                console.print(f"\n[green]✓ Context fields: {', '.join(context_fields)}[/green]\n")
+            else:
+                console.print("\n[dim]No context fields selected[/dim]\n")
+            
+            # Step 5: Model and output configuration
+            console.print("[bold cyan]🤖 Step 5/6: Model & Output Settings[/bold cyan]\n")
+            
+            model = display_model_selection()
+            console.print()
+            
+            # Language selection
+            language = display_language_selection()
+            console.print()
+            
+            # Output file
+            input_path = Path(input_file)
+            default_output = str(input_path.parent / f"{input_path.stem}_augmented{input_path.suffix}")
+            output_file = Prompt.ask(
+                "[bold]Output filename[/bold]",
+                default=default_output,
+            )
+            console.print()
+            
+            # Concurrency
+            if Confirm.ask("[dim]Configure advanced settings?[/dim]", default=False):
+                concurrency = IntPrompt.ask(
+                    "[bold]Concurrency (1-20)[/bold]",
+                    default=5,
+                )
+                concurrency = max(1, min(20, concurrency))
+            else:
+                concurrency = 5
+            
+            console.print()
+            
+            # Step 6: Preview
+            console.print("[bold cyan]🔍 Step 6/6: Preview[/bold cyan]")
+            console.print("[dim]Testing augmentation on sample entries...[/dim]\n")
+            
+            # Create config for preview
+            preview_config = AugmentationConfig(
+                input_file=input_file,
+                output_file=output_file,
+                target_field=target_field,
+                instruction=instruction,
+                model=model,
+                language=language,
+                create_new_field=is_new_field,
+                context_fields=context_fields,
+                preview_count=3,
+            )
+            
+            # Run preview
+            augmentor = DatasetAugmentor(preview_config)
+            console.print("[dim]Generating preview (this may take a moment)...[/dim]\n")
+            
+            try:
+                preview_results = augmentor.preview(entries)
+            except Exception as e:
+                console.print(f"[red]❌ Preview failed: {str(e)}[/red]")
+                if Confirm.ask("[yellow]Try again with different instruction?[/yellow]", default=True):
+                    continue
+                return None
+            
+            # Display preview and ask for confirmation
+            preview_confirmed = display_augmentation_preview(preview_results, target_field)
+            
+            if not preview_confirmed:
+                # Requirement 7.4: Allow modifying instruction and retry
+                if Confirm.ask("[yellow]Modify instruction and try again?[/yellow]", default=True):
+                    console.print()
+                    continue
+                else:
+                    console.print("[yellow]❌ Wizard cancelled[/yellow]")
+                    return None
+        
+        # Show final summary and confirm
+        if not display_augmentation_config_summary(
+            input_file=input_file,
+            output_file=output_file,
+            target_field=target_field,
+            instruction=instruction,
+            model=model,
+            concurrency=concurrency,
+            is_new_field=is_new_field,
+            context_fields=context_fields,
+            entry_count=len(entries),
+            language=language,
+        ):
+            console.print("[yellow]❌ Augmentation cancelled[/yellow]")
+            return None
+        
+        # Return all configuration values
+        return (
+            input_file,
+            target_field,
+            instruction,
+            output_file,
+            model,
+            concurrency,
+            is_new_field,
+            context_fields,
+            False,  # preview already done
+            language,
+        )
+        
+    except KeyboardInterrupt:
+        console.print("\n[yellow]❌ Wizard cancelled[/yellow]")
+        return None

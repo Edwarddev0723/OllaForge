@@ -1,0 +1,134 @@
+# Implementation Plan
+
+- [x] 1. Add augmentation data models
+  - [x] 1.1 Create AugmentationConfig model in models.py
+    - Add fields: input_file, output_file, target_field, instruction, model, language, create_new_field, context_fields, preview_count
+    - Add validators for file paths and field names
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - [x] 1.2 Write property test for AugmentationConfig validation
+    - **Property 3: Field Validation - Existing Field Accepted**
+    - **Property 4: Field Validation - Non-Existing Field Rejected**
+    - **Validates: Requirements 2.1, 2.2**
+  - [x] 1.3 Create AugmentationResult model in models.py
+    - Add fields: total_entries, success_count, failure_count, output_file, duration, errors
+    - Add success_rate property
+    - _Requirements: 5.2, 5.3_
+  - [x] 1.4 Write property test for statistics accuracy
+    - **Property 10: Statistics Accuracy**
+    - **Validates: Requirements 1.4, 5.2, 5.3**
+
+- [x] 2. Implement JSONL file operations for augmentation
+  - [x] 2.1 Extend read_jsonl_file to return field names
+    - Modify file_manager.py to extract unique field names from entries
+    - Return tuple of (entries, field_names)
+    - _Requirements: 1.1, 1.4_
+  - [x] 2.2 Write property test for JSON round-trip
+    - **Property 1: JSON Round-Trip Consistency**
+    - **Validates: Requirements 1.1, 3.4, 4.1**
+  - [x] 2.3 Add error reporting with line numbers for invalid JSONL
+    - Enhance read_jsonl_file to track line numbers
+    - Include line number in error messages
+    - _Requirements: 1.3_
+  - [x] 2.4 Write property test for invalid JSONL error reporting
+    - **Property 2: Invalid JSONL Error Reporting**
+    - **Validates: Requirements 1.3**
+
+- [x] 3. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 4. Create augmentor module
+  - [x] 4.1 Create augmentor.py with DatasetAugmentor class
+    - Implement __init__ with AugmentationConfig
+    - Implement load_dataset method
+    - Implement validate_field method
+    - _Requirements: 1.1, 1.4, 2.1, 2.2_
+  - [x] 4.2 Implement prompt generation for augmentation
+    - Create create_augmentation_prompt function
+    - Include context fields and instruction in prompt
+    - Support language-specific instructions
+    - _Requirements: 2.3, 3.1_
+  - [x] 4.3 Write property test for prompt generation
+    - **Property 5: Prompt Contains Context and Instruction**
+    - **Validates: Requirements 2.3, 3.1**
+  - [x] 4.4 Implement augment_entry method
+    - Call Ollama API with augmentation prompt
+    - Parse response and update target field
+    - Handle new field creation
+    - _Requirements: 2.4, 3.2_
+  - [x] 4.5 Write property test for new field creation
+    - **Property 6: New Field Creation**
+    - **Validates: Requirements 2.4**
+  - [x] 4.6 Write property test for response parsing
+    - **Property 7: Successful Response Updates Target Field**
+    - **Validates: Requirements 3.2**
+  - [x] 4.7 Implement error handling for AI failures
+    - Preserve original entry on failure
+    - Log error message
+    - Continue processing remaining entries
+    - _Requirements: 3.3, 6.4_
+  - [x] 4.8 Write property test for failure preservation
+    - **Property 8: Failure Preserves Original Entry**
+    - **Validates: Requirements 3.3**
+
+- [x] 5. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 6. Implement concurrent processing
+  - [x] 6.1 Implement augment_dataset method with concurrency
+    - Use ThreadPoolExecutor for parallel processing
+    - Support configurable concurrency level
+    - Aggregate results from all entries
+    - _Requirements: 3.5_
+  - [x] 6.2 Write property test for concurrent processing
+    - **Property 9: Concurrent Processing Correctness**
+    - **Validates: Requirements 3.5**
+  - [x] 6.3 Implement progress tracking during augmentation
+    - Integrate with existing ProgressTracker
+    - Display completed/total entries
+    - _Requirements: 5.1_
+
+- [x] 7. Implement preview functionality
+  - [x] 7.1 Implement preview method in DatasetAugmentor
+    - Process configurable number of sample entries
+    - Return original and augmented values for comparison
+    - _Requirements: 7.1, 7.2_
+  - [x] 7.2 Write property test for preview count
+    - **Property 11: Preview Count Correctness**
+    - **Validates: Requirements 7.1**
+
+- [x] 8. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 9. Implement CLI augment command
+  - [x] 9.1 Add augment subcommand to cli.py
+    - Define all CLI options: input_file, field, instruction, output, model, concurrency, new_field, context, preview, interactive, force
+    - Add parameter validation callbacks
+    - _Requirements: 6.1, 6.2, 6.3_
+  - [x] 9.2 Implement main augment command logic
+    - Load dataset and display info
+    - Validate target field
+    - Handle preview mode
+    - Execute augmentation
+    - Write output file
+    - Display summary
+    - _Requirements: 1.4, 4.1, 4.2, 5.2_
+  - [x] 9.3 Implement output file handling
+    - Generate default output filename if not specified
+    - Check for existing file and prompt for confirmation
+    - Handle disk space and permission errors
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 9.4 Implement interruption handling for augmentation
+    - Save partial results on Ctrl+C
+    - Display partial result location
+    - _Requirements: 4.4_
+
+- [x] 10. Implement interactive mode for augmentation
+  - [x] 10.1 Add augment wizard to interactive.py
+    - Prompt for input file selection
+    - Display available fields for selection
+    - Prompt for instruction input
+    - Offer preview before full processing
+    - _Requirements: 6.4, 7.3, 7.4_
+
+- [x] 11. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

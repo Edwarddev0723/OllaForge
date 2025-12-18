@@ -674,3 +674,284 @@ def test_signal_handler_edge_cases():
     
     setup_interruption_handling(large_entries, "large_test.jsonl")
     assert is_interrupted() == False
+
+
+
+# Tests for dataset augmentation file operations (Requirements 1.1, 1.3, 1.4)
+
+def test_read_jsonl_with_field_names():
+    """Test reading JSONL file with field names extraction - Requirements 1.1, 1.4"""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_path = os.path.join(temp_dir, "test.jsonl")
+        
+        # Create test file with various fields
+        with open(test_path, 'w', encoding='utf-8') as f:
+            f.write('{"instruction": "test1", "input": "in1", "output": "out1"}\n')
+            f.write('{"instruction": "test2", "input": "in2", "output": "out2", "extra": "field"}\n')
+            f.write('{"instruction": "test3", "input": "in3", "output": "out3", "another": "one"}\n')
+        
+        # Test with return_field_names=True
+        entries, field_names = read_jsonl_file(test_path, return_field_names=True)
+        
+        assert len(entries) == 3
+        assert isinstance(field_names, list)
+        # Should have all unique fields sorted
+        assert set(field_names) == {"instruction", "input", "output", "extra", "another"}
+        # Should be sorted
+        assert field_names == sorted(field_names)
+        
+        # Test with return_field_names=False (default behavior)
+        entries_only = read_jsonl_file(test_path)
+        assert len(entries_only) == 3
+        assert isinstance(entries_only, list)
+        assert not isinstance(entries_only, tuple)
+
+
+def test_read_jsonl_field_names_empty_file():
+    """Test reading empty JSONL file with field names - Requirements 1.1, 1.4"""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_path = os.path.join(temp_dir, "empty.jsonl")
+        
+        # Create empty file
+        with open(test_path, 'w') as f:
+            pass
+        
+        entries, field_names = read_jsonl_file(test_path, return_field_names=True)
+        
+        assert entries == []
+        assert field_names == []
+
+
+def test_read_jsonl_error_with_line_number():
+    """Test that invalid JSONL reports line number - Requirements 1.3"""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_path = os.path.join(temp_dir, "invalid.jsonl")
+        
+        # Create file with invalid JSON on line 3
+        with open(test_path, 'w', encoding='utf-8') as f:
+            f.write('{"valid": "json"}\n')
+            f.write('{"also": "valid"}\n')
+            f.write('invalid json here\n')
+            f.write('{"more": "valid"}\n')
+        
+        with pytest.raises(FileOperationError) as exc_info:
+            read_jsonl_file(test_path)
+        
+        # Error message should contain line number
+        assert "line 3" in str(exc_info.value).lower()
+
+
+def test_read_jsonl_error_non_object_json():
+    """Test that non-object JSON reports error with line number - Requirements 1.3"""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_path = os.path.join(temp_dir, "array.jsonl")
+        
+        # Create file with JSON array instead of object
+        with open(test_path, 'w', encoding='utf-8') as f:
+            f.write('{"valid": "object"}\n')
+            f.write('[1, 2, 3]\n')  # Array, not object
+        
+        with pytest.raises(FileOperationError) as exc_info:
+            read_jsonl_file(test_path)
+        
+        # Error message should contain line number and indicate type issue
+        error_msg = str(exc_info.value).lower()
+        assert "line 2" in error_msg
+        assert "object" in error_msg or "list" in error_msg
+
+
+def test_read_jsonl_field_names_with_unicode():
+    """Test field names extraction with Unicode field names - Requirements 1.1, 1.4"""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_path = os.path.join(temp_dir, "unicode_fields.jsonl")
+        
+        # Create file with Unicode field names
+        with open(test_path, 'w', encoding='utf-8') as f:
+            f.write('{"指令": "test1", "輸入": "in1", "輸出": "out1"}\n')
+            f.write('{"指令": "test2", "輸入": "in2", "輸出": "out2"}\n')
+        
+        entries, field_names = read_jsonl_file(test_path, return_field_names=True)
+        
+        assert len(entries) == 2
+        assert set(field_names) == {"指令", "輸入", "輸出"}
+
+
+def test_read_jsonl_field_names_varying_fields():
+    """Test field names extraction when entries have different fields - Requirements 1.1, 1.4"""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_path = os.path.join(temp_dir, "varying.jsonl")
+        
+        # Create file where each entry has different fields
+        with open(test_path, 'w', encoding='utf-8') as f:
+            f.write('{"a": 1}\n')
+            f.write('{"b": 2}\n')
+            f.write('{"c": 3}\n')
+            f.write('{"a": 4, "d": 5}\n')
+        
+        entries, field_names = read_jsonl_file(test_path, return_field_names=True)
+        
+        assert len(entries) == 4
+        assert set(field_names) == {"a", "b", "c", "d"}
+
+
+# Strategy for generating valid JSON objects as strings
+valid_json_object_strategy = st.dictionaries(
+    keys=st.text(min_size=1, max_size=20).filter(lambda x: x.strip()),
+    values=st.one_of(
+        st.text(max_size=50),
+        st.integers(),
+        st.floats(allow_nan=False, allow_infinity=False),
+        st.booleans(),
+        st.none()
+    ),
+    min_size=1,
+    max_size=5
+).map(lambda d: json.dumps(d))
+
+
+# Strategy for generating invalid JSON strings (not parseable as JSON)
+invalid_json_strategy = st.one_of(
+    # Incomplete JSON objects
+    st.text(min_size=1, max_size=50).filter(
+        lambda x: x.strip() and not _is_valid_json(x)
+    ),
+    # Strings that look like JSON but are malformed
+    st.sampled_from([
+        'invalid json here',
+        '{missing: quotes}',
+        '{"unclosed": "string',
+        '{"missing": }',
+        '{incomplete',
+        'not json at all',
+        '{"trailing": "comma",}',
+        '[1, 2, 3]',  # Array instead of object - also invalid for our use case
+    ])
+)
+
+
+def _is_valid_json(s: str) -> bool:
+    """Helper to check if a string is valid JSON."""
+    try:
+        result = json.loads(s)
+        return isinstance(result, dict)  # We require JSON objects, not arrays
+    except (json.JSONDecodeError, ValueError):
+        return False
+
+
+@given(
+    valid_lines_before=st.lists(valid_json_object_strategy, min_size=0, max_size=10),
+    invalid_line=invalid_json_strategy,
+    valid_lines_after=st.lists(valid_json_object_strategy, min_size=0, max_size=5)
+)
+def test_invalid_jsonl_error_reports_line_number(valid_lines_before, invalid_line, valid_lines_after):
+    """
+    **Feature: dataset-augmentation, Property 2: Invalid JSONL Error Reporting**
+    **Validates: Requirements 1.3**
+    
+    For any JSONL file containing at least one malformed JSON line, the parser
+    SHALL report an error that includes the line number of the first malformed line.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_path = os.path.join(temp_dir, "test_invalid.jsonl")
+        
+        # Build the file content with valid lines before, invalid line, then valid lines after
+        all_lines = valid_lines_before + [invalid_line] + valid_lines_after
+        
+        with open(test_path, 'w', encoding='utf-8') as f:
+            for line in all_lines:
+                f.write(line + '\n')
+        
+        # The expected line number of the first invalid line (1-indexed)
+        expected_line_num = len(valid_lines_before) + 1
+        
+        # Attempt to read the file - should raise FileOperationError
+        with pytest.raises(FileOperationError) as exc_info:
+            read_jsonl_file(test_path)
+        
+        # The error message should contain the line number
+        error_message = str(exc_info.value).lower()
+        assert f"line {expected_line_num}" in error_message, (
+            f"Error message should contain 'line {expected_line_num}', "
+            f"but got: {exc_info.value}"
+        )
+
+
+# Strategy for generating valid dictionary entries for augmentation
+augmentation_entry_strategy = st.dictionaries(
+    keys=st.text(min_size=1, max_size=30).filter(lambda x: x.strip() and '\x00' not in x),
+    values=st.one_of(
+        st.text(max_size=100),
+        st.integers(),
+        st.floats(allow_nan=False, allow_infinity=False),
+        st.booleans(),
+        st.none(),
+        st.lists(st.one_of(st.text(max_size=20), st.integers()), max_size=5),
+        st.dictionaries(
+            keys=st.text(min_size=1, max_size=10).filter(lambda x: x.strip()),
+            values=st.one_of(st.text(max_size=20), st.integers()),
+            max_size=3
+        )
+    ),
+    min_size=1,
+    max_size=10
+)
+
+
+@given(entry=augmentation_entry_strategy)
+def test_json_round_trip_consistency(entry):
+    """
+    **Feature: dataset-augmentation, Property 1: JSON Round-Trip Consistency**
+    **Validates: Requirements 1.1, 3.4, 4.1**
+    
+    For any valid dictionary entry, serializing it to JSON and deserializing it back
+    SHALL produce an equivalent dictionary.
+    
+    This property validates the core data integrity of the augmentation pipeline -
+    entries must survive the serialization/deserialization cycle without data loss
+    or corruption.
+    """
+    # Serialize the entry to JSON string
+    json_string = json.dumps(entry)
+    
+    # Deserialize back to dictionary
+    deserialized = json.loads(json_string)
+    
+    # The round-trip should produce an equivalent dictionary
+    assert deserialized == entry, (
+        f"Round-trip failed: original={entry}, deserialized={deserialized}"
+    )
+
+
+@given(entries=st.lists(augmentation_entry_strategy, min_size=1, max_size=10))
+def test_jsonl_file_round_trip_consistency(entries):
+    """
+    **Feature: dataset-augmentation, Property 1: JSON Round-Trip Consistency (File-level)**
+    **Validates: Requirements 1.1, 3.4, 4.1**
+    
+    For any list of valid dictionary entries, writing them to a JSONL file and reading
+    them back SHALL produce an equivalent list of dictionaries.
+    
+    This tests the full file I/O round-trip for the augmentation pipeline.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_path = os.path.join(temp_dir, "round_trip_test.jsonl")
+        
+        # Write entries to JSONL file manually (simulating augmentation output)
+        with open(test_path, 'w', encoding='utf-8') as f:
+            for entry in entries:
+                json_line = json.dumps(entry)
+                f.write(json_line + '\n')
+        
+        # Read entries back using the file_manager function
+        read_entries = read_jsonl_file(test_path)
+        
+        # Should have same number of entries
+        assert len(read_entries) == len(entries), (
+            f"Entry count mismatch: wrote {len(entries)}, read {len(read_entries)}"
+        )
+        
+        # Each entry should be equivalent
+        for i, (original, read_back) in enumerate(zip(entries, read_entries)):
+            assert read_back == original, (
+                f"Entry {i} mismatch: original={original}, read_back={read_back}"
+            )

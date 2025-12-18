@@ -14,10 +14,13 @@ import time
 import sys
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from pydantic import ValidationError
 
-from .models import GenerationConfig, GenerationResult, DatasetType, OutputLanguage
+from .models import (
+    GenerationConfig, GenerationResult, DatasetType, OutputLanguage,
+    AugmentationConfig, AugmentationResult, FieldValidationError
+)
 from .progress import ProgressTracker
 
 # Initialize Rich console for beautiful output
@@ -463,6 +466,437 @@ def _run_generation(config: GenerationConfig, concurrency: int) -> None:
         errors=progress_tracker.errors,
     )
     progress_tracker.display_summary(result)
+
+
+def validate_input_file(value: str) -> str:
+    """Validate input file exists and is readable."""
+    if not value or not value.strip():
+        raise typer.BadParameter("Input file path cannot be empty")
+    
+    input_path = Path(value.strip())
+    if not input_path.exists():
+        raise typer.BadParameter(f"Input file not found: {value}")
+    if not input_path.is_file():
+        raise typer.BadParameter(f"Path is not a file: {value}")
+    if not os.access(input_path, os.R_OK):
+        raise typer.BadParameter(f"No read permission for file: {value}")
+    
+    return value.strip()
+
+
+def validate_field_name(value: str) -> str:
+    """Validate field name is not empty."""
+    if not value or not value.strip():
+        raise typer.BadParameter("Field name cannot be empty")
+    return value.strip()
+
+
+def validate_instruction(value: str) -> str:
+    """Validate instruction is not empty."""
+    if not value or not value.strip():
+        raise typer.BadParameter("Instruction cannot be empty")
+    return value.strip()
+
+
+def validate_preview_count(value: int) -> int:
+    """Validate preview count is within acceptable range."""
+    if value < 1:
+        raise typer.BadParameter("Preview count must be at least 1")
+    if value > 10:
+        raise typer.BadParameter("Preview count cannot exceed 10")
+    return value
+
+
+# Help text for augment command
+AUGMENT_FIELD_HELP = """Target field to augment or create. Must exist in the dataset unless --new-field is specified."""
+
+AUGMENT_INSTRUCTION_HELP = """AI instruction describing how to augment the field. 
+Example: "Translate to English" or "Add difficulty rating (easy/medium/hard)" """
+
+AUGMENT_CONTEXT_HELP = """Additional fields to include as context for the AI. Can be specified multiple times.
+Example: --context instruction --context input"""
+
+
+@app.command()
+def augment(
+    input_file: str = typer.Argument(
+        ...,
+        help="Source JSONL file to augment",
+        callback=lambda ctx, param, value: validate_input_file(value) if value else value,
+    ),
+    field: str = typer.Option(
+        ...,
+        "--field",
+        "-f",
+        help=AUGMENT_FIELD_HELP,
+        callback=lambda ctx, param, value: validate_field_name(value) if value else value,
+    ),
+    instruction: str = typer.Option(
+        ...,
+        "--instruction",
+        "-I",
+        help=AUGMENT_INSTRUCTION_HELP,
+        callback=lambda ctx, param, value: validate_instruction(value) if value else value,
+    ),
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output file (default: input_augmented.jsonl)",
+    ),
+    model: str = typer.Option(
+        "llama3.2",
+        "--model",
+        "-m",
+        help="Ollama model to use for augmentation",
+    ),
+    concurrency: int = typer.Option(
+        5,
+        "--concurrency",
+        "-j",
+        help="Number of parallel requests (1-20)",
+        callback=lambda ctx, param, value: validate_concurrency(value) if value is not None else value,
+    ),
+    new_field: bool = typer.Option(
+        False,
+        "--new-field",
+        help="Create a new field instead of modifying existing",
+    ),
+    context: Optional[List[str]] = typer.Option(
+        None,
+        "--context",
+        "-c",
+        help=AUGMENT_CONTEXT_HELP,
+    ),
+    preview: bool = typer.Option(
+        False,
+        "--preview",
+        "-p",
+        help="Preview augmentation on sample entries before full processing",
+    ),
+    preview_count: int = typer.Option(
+        3,
+        "--preview-count",
+        help="Number of entries to preview (1-10)",
+        callback=lambda ctx, param, value: validate_preview_count(value) if value is not None else value,
+    ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Interactive mode with step-by-step wizard",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-y",
+        help="Overwrite output file without confirmation",
+    ),
+    language: str = typer.Option(
+        "en",
+        "--lang",
+        "-l",
+        help=LANGUAGE_HELP,
+        callback=lambda ctx, param, value: validate_language(value) if value is not None else value,
+    ),
+) -> None:
+    """
+    Augment an existing dataset by modifying or adding fields using AI.
+
+    Examples:
+
+        # Augment the 'output' field with translation
+        ollaforge augment data.jsonl --field output --instruction "Translate to English"
+
+        # Add a new 'difficulty' field using context from other fields
+        ollaforge augment data.jsonl --field difficulty --new-field \\
+            --instruction "Rate difficulty as easy/medium/hard" \\
+            --context instruction --context input
+
+        # Preview before full processing
+        ollaforge augment data.jsonl --field output -I "Improve grammar" --preview
+    """
+    try:
+        # Handle interactive mode
+        if interactive:
+            from .interactive import augment_interactive
+            result = augment_interactive()
+            if result is None:
+                raise typer.Exit(0)
+            # Unpack interactive result and continue with augmentation
+            input_file, field, instruction, output, model, concurrency, new_field, context, preview, language = result
+        
+        # Generate default output filename if not specified
+        output_file = _generate_output_filename(input_file, output)
+        
+        # Check for existing output file
+        if not force and _check_output_exists(output_file):
+            if not typer.confirm(f"Output file '{output_file}' already exists. Overwrite?"):
+                console.print("[yellow]Operation cancelled.[/yellow]")
+                raise typer.Exit(0)
+        
+        # Run augmentation
+        _run_augmentation(
+            input_file=input_file,
+            output_file=output_file,
+            field=field,
+            instruction=instruction,
+            model=model,
+            concurrency=concurrency,
+            new_field=new_field,
+            context_fields=context or [],
+            preview_mode=preview,
+            preview_count=preview_count,
+            language=language,
+            force=force,
+        )
+        
+    except KeyboardInterrupt:
+        console.print("\n[yellow]⚠️  Operation cancelled by user[/yellow]")
+        raise typer.Exit(130)
+    except typer.Exit:
+        raise
+    except Exception as e:
+        console.print(f"[red]❌ Unexpected error: {str(e)}[/red]")
+        raise typer.Exit(1)
+
+
+def _generate_output_filename(input_file: str, output: Optional[str]) -> str:
+    """Generate default output filename if not specified."""
+    if output:
+        return output
+    
+    input_path = Path(input_file)
+    stem = input_path.stem
+    suffix = input_path.suffix or ".jsonl"
+    return str(input_path.parent / f"{stem}_augmented{suffix}")
+
+
+def _check_output_exists(output_file: str) -> bool:
+    """Check if output file already exists."""
+    return Path(output_file).exists()
+
+
+def _run_augmentation(
+    input_file: str,
+    output_file: str,
+    field: str,
+    instruction: str,
+    model: str,
+    concurrency: int,
+    new_field: bool,
+    context_fields: List[str],
+    preview_mode: bool,
+    preview_count: int,
+    language: OutputLanguage,
+    force: bool,
+) -> None:
+    """Execute the augmentation process."""
+    from .augmentor import DatasetAugmentor
+    from .file_manager import (
+        read_jsonl_file,
+        FileOperationError,
+        DiskSpaceError,
+        check_disk_space,
+        estimate_file_size,
+    )
+    import json
+    import signal
+    
+    # Create augmentation config
+    config = AugmentationConfig(
+        input_file=input_file,
+        output_file=output_file,
+        target_field=field,
+        instruction=instruction,
+        model=model,
+        language=language,
+        create_new_field=new_field,
+        context_fields=context_fields,
+        preview_count=preview_count,
+    )
+    
+    # Initialize augmentor
+    augmentor = DatasetAugmentor(config)
+    
+    # Load dataset and display info
+    console.print(Panel.fit(
+        Text("🔧 OllaForge Dataset Augmentor", style="bold magenta"),
+        border_style="bright_blue",
+    ))
+    
+    try:
+        entries, field_names = augmentor.load_dataset()
+    except FileOperationError as e:
+        console.print(f"[red]❌ {str(e)}[/red]")
+        raise typer.Exit(1)
+    
+    # Display dataset info (Requirement 1.4)
+    console.print(f"📂 Input: {input_file}")
+    console.print(f"📊 Entries: {len(entries)}")
+    console.print(f"📋 Fields: {', '.join(field_names)}")
+    console.print(f"🎯 Target field: {field}")
+    console.print(f"📝 Instruction: {instruction[:50]}{'...' if len(instruction) > 50 else ''}")
+    console.print(f"🤖 Model: {model}")
+    console.print(f"⚡ Concurrency: {concurrency}")
+    if context_fields:
+        console.print(f"📎 Context fields: {', '.join(context_fields)}")
+    if new_field:
+        console.print("[cyan]➕ Creating new field[/cyan]")
+    console.print()
+    
+    # Validate target field (Requirement 2.1, 2.2)
+    try:
+        augmentor.validate_field(entries, field)
+    except FieldValidationError as e:
+        console.print(f"[red]❌ {e.message}[/red]")
+        if e.available_fields:
+            console.print(f"[yellow]Available fields: {', '.join(e.available_fields)}[/yellow]")
+        raise typer.Exit(1)
+    
+    # Handle preview mode (Requirement 7.1, 7.2)
+    if preview_mode:
+        console.print(f"[cyan]🔍 Preview mode: processing {min(len(entries), preview_count)} sample entries...[/cyan]")
+        console.print()
+        
+        preview_results = augmentor.preview(entries)
+        
+        for i, (original, augmented) in enumerate(preview_results, 1):
+            console.print(f"[bold]--- Entry {i} ---[/bold]")
+            original_value = original.get(field, "(not present)")
+            augmented_value = augmented.get(field, "(not present)")
+            
+            console.print(f"[dim]Original {field}:[/dim] {original_value}")
+            console.print(f"[green]Augmented {field}:[/green] {augmented_value}")
+            console.print()
+        
+        # Ask for confirmation to proceed (Requirement 7.3, 7.4)
+        if not typer.confirm("Proceed with full dataset augmentation?"):
+            console.print("[yellow]Operation cancelled. You can modify the instruction and retry.[/yellow]")
+            raise typer.Exit(0)
+        
+        console.print()
+    
+    # Check disk space before processing
+    try:
+        estimated_size = estimate_file_size(len(entries))
+        check_disk_space(output_file, estimated_size)
+    except DiskSpaceError as e:
+        console.print(f"[red]❌ {str(e)}[/red]")
+        raise typer.Exit(1)
+    
+    # Set up interruption handling for partial results (Requirement 4.4)
+    partial_entries: List[dict] = []
+    interrupted = False
+    
+    def handle_interrupt(signum, frame):
+        nonlocal interrupted
+        interrupted = True
+        console.print("\n[yellow]⚠️  Interruption detected, saving partial results...[/yellow]")
+    
+    original_handler = signal.signal(signal.SIGINT, handle_interrupt)
+    
+    try:
+        # Execute augmentation (Requirement 3.5, 5.1)
+        result = augmentor.augment_dataset(entries, concurrency=concurrency)
+        augmented_entries = augmentor.get_augmented_entries()
+        
+        if interrupted:
+            # Save partial results
+            _save_partial_results(augmented_entries, output_file)
+            raise typer.Exit(130)
+        
+        # Write output file (Requirement 4.1)
+        _write_augmented_output(augmented_entries, output_file)
+        
+        # Display summary (Requirement 5.2, 5.3)
+        _display_augmentation_summary(result)
+        
+    except Exception as e:
+        if interrupted:
+            # Try to save whatever we have
+            augmented_entries = augmentor.get_augmented_entries()
+            if augmented_entries:
+                _save_partial_results(augmented_entries, output_file)
+            raise typer.Exit(130)
+        raise
+    finally:
+        # Restore original signal handler
+        signal.signal(signal.SIGINT, original_handler)
+
+
+def _save_partial_results(entries: List[dict], output_file: str) -> None:
+    """Save partial results on interruption."""
+    import json
+    import time
+    
+    if not entries:
+        console.print("[yellow]No entries to save.[/yellow]")
+        return
+    
+    # Filter out None entries
+    valid_entries = [e for e in entries if e is not None]
+    
+    if not valid_entries:
+        console.print("[yellow]No valid entries to save.[/yellow]")
+        return
+    
+    # Generate partial output filename
+    output_path = Path(output_file)
+    timestamp = int(time.time())
+    partial_file = output_path.parent / f"{output_path.stem}_partial_{timestamp}.jsonl"
+    
+    try:
+        with open(partial_file, 'w', encoding='utf-8') as f:
+            for entry in valid_entries:
+                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        
+        console.print(f"[green]✅ Partial results saved to: {partial_file}[/green]")
+        console.print(f"[cyan]📊 Saved {len(valid_entries)} entries[/cyan]")
+    except Exception as e:
+        console.print(f"[red]❌ Failed to save partial results: {str(e)}[/red]")
+
+
+def _write_augmented_output(entries: List[dict], output_file: str) -> None:
+    """Write augmented entries to output file."""
+    import json
+    
+    # Filter out None entries
+    valid_entries = [e for e in entries if e is not None]
+    
+    try:
+        output_path = Path(output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            for entry in valid_entries:
+                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        
+        console.print(f"[green]✅ Output written to: {output_file}[/green]")
+    except PermissionError:
+        console.print(f"[red]❌ Permission denied: cannot write to {output_file}[/red]")
+        raise typer.Exit(1)
+    except OSError as e:
+        console.print(f"[red]❌ Failed to write output: {str(e)}[/red]")
+        raise typer.Exit(1)
+
+
+def _display_augmentation_summary(result: AugmentationResult) -> None:
+    """Display augmentation summary statistics."""
+    console.print()
+    console.print(Panel.fit(
+        Text("📊 Augmentation Summary", style="bold green"),
+        border_style="green",
+    ))
+    console.print(f"📁 Output: {result.output_file}")
+    console.print(f"📊 Total entries: {result.total_entries}")
+    console.print(f"✅ Successful: {result.success_count}")
+    console.print(f"❌ Failed: {result.failure_count}")
+    console.print(f"📈 Success rate: {result.success_rate:.1f}%")
+    console.print(f"⏱️  Duration: {result.duration:.1f}s")
+    
+    if result.errors:
+        console.print(f"\n[yellow]⚠️  {len(result.errors)} error(s) occurred during processing[/yellow]")
 
 
 def main():

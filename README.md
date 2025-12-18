@@ -5,14 +5,15 @@
 <h1 align="center">OllaForge 🔥</h1>
 
 <p align="center">
-  <strong>AI-Powered Dataset Generator for LLM Training</strong>
+  <strong>AI-Powered Dataset Generator for LLM Fine-tuning</strong>
 </p>
 
 <p align="center">
   <a href="#features">Features</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#usage">Usage</a> •
-  <a href="#dataset-formats">Dataset Formats</a> •
+  <a href="#dataset-formats">Formats</a> •
+  <a href="#performance">Performance</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
@@ -21,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python 3.8+">
+  <img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="Python 3.9+">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT">
   <img src="https://img.shields.io/badge/ollama-local-orange.svg" alt="Ollama">
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome">
@@ -29,27 +30,27 @@
 
 ---
 
-**OllaForge** is a powerful CLI tool that leverages local Ollama models to automatically generate high-quality, topic-specific datasets for LLM training. Generate SFT, Pre-training, Conversation, and DPO datasets with a single command.
+**OllaForge** is a high-performance CLI tool that leverages local Ollama models to generate training datasets for LLM fine-tuning. With structured JSON output, concurrent batch processing, and built-in quality control for Traditional Chinese, it's optimized for both quality and speed.
 
 ## ✨ Features
 
 | Feature | Description |
 |---------|-------------|
 | 🎯 **Natural Language Topics** | Describe your dataset needs in plain language |
-| 🤖 **Multiple LLM Support** | Works with Llama 3, Mistral, Qwen, DeepSeek, and more |
+| 🤖 **Any Ollama Model** | Works with Llama 3, Mistral, Qwen, DeepSeek, Gemma, and more |
 | 📊 **4 Dataset Formats** | SFT, Pre-training, Conversation (ShareGPT), DPO |
-| 🌐 **Multi-language Output** | Generate datasets in English or Traditional Chinese |
+| 🌐 **Multi-language** | English and Traditional Chinese (Taiwan) with QC |
+| ⚡ **High Performance** | Structured output + concurrent batching |
+| 🔍 **Quality Control** | BERT-based filtering for Taiwan Chinese terminology |
 | 🎨 **Beautiful CLI** | Interactive wizard with Rich-powered UI |
-| ⚡ **Batch Processing** | Efficient generation with configurable concurrency |
-| ✅ **Auto Validation** | Built-in JSON validation and error recovery |
-| 🔄 **HuggingFace Compatible** | Output formats work with HuggingFace & LLaMA-Factory |
+| 🔄 **HuggingFace Ready** | Compatible with HuggingFace & LLaMA-Factory |
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.8+
-- [Ollama](https://ollama.ai/) installed and running locally
+- Python 3.9+
+- [Ollama](https://ollama.ai/) installed and running
 
 ### Installation
 
@@ -58,252 +59,225 @@
 git clone https://github.com/yourusername/ollaforge.git
 cd ollaforge
 
-# Install dependencies
-pip install -r requirements.txt
+# Install (basic)
+pip install -e .
 
-# Verify Ollama is running
-ollama list
+# Install with QC support for Traditional Chinese
+pip install -e ".[qc]"
+
+# Install with dev tools
+pip install -e ".[dev]"
 ```
 
 ### Your First Dataset
 
 ```bash
 # Interactive mode (recommended for beginners)
-python main.py -i
+ollaforge -i
 
 # Or generate directly
-python main.py "Python programming tutorials" --count 100 --output python_sft.jsonl
+ollaforge "Python programming tutorials" --count 100 --output python_sft.jsonl
+
+# Traditional Chinese conversation dataset
+ollaforge "咖啡點餐對話" --type sft_conv --lang zh-tw --count 100
 ```
 
 ## 📖 Usage
 
-### Interactive Mode
-
-Launch the step-by-step wizard:
+### Command Line
 
 ```bash
-python main.py -i
+ollaforge <topic> [options]
 ```
-
-The wizard guides you through:
-1. 📝 Topic description
-2. 📊 Dataset type selection
-3. 🌐 Output language
-4. 🔢 Number of entries
-5. 🤖 Model selection
-6. 📄 Output settings
-
-### Command Line Mode
-
-```bash
-python main.py <topic> [options]
-```
-
-#### Options
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--count` | `-c` | 10 | Number of entries to generate |
-| `--model` | `-m` | gpt-oss:20b | Ollama model to use |
+| `--count` | `-c` | 10 | Number of entries (1-10,000) |
+| `--model` | `-m` | llama3.2 | Ollama model name |
 | `--output` | `-o` | dataset.jsonl | Output filename |
-| `--type` | `-t` | sft | Dataset type (sft/pretrain/sft_conv/dpo) |
-| `--lang` | `-l` | en | Output language (en/zh-tw) |
-| `--qc/--no-qc` | - | --qc | Enable/disable Taiwan Chinese QC |
-| `--qc-confidence` | - | 0.9 | QC confidence threshold (0.0-1.0) |
+| `--type` | `-t` | sft | Format: `sft`, `pretrain`, `sft_conv`, `dpo` |
+| `--lang` | `-l` | en | Language: `en`, `zh-tw` |
 | `--concurrency` | `-j` | 5 | Parallel requests (1-20) |
-| `--interactive` | `-i` | - | Launch interactive mode |
+| `--qc/--no-qc` | | --qc | Taiwan Chinese QC filter |
+| `--qc-confidence` | | 0.9 | QC threshold (0.0-1.0) |
+| `--interactive` | `-i` | | Launch wizard mode |
 
-#### Examples
-
+### Examples
 
 ```bash
-# Generate SFT training data
-python main.py "customer service conversations" --count 500 --type sft
+# SFT instruction-following data
+ollaforge "customer service conversations" --count 500 --type sft
 
-# Generate pre-training corpus
-python main.py "machine learning research papers" --type pretrain --count 1000
+# Pre-training corpus
+ollaforge "machine learning concepts" --type pretrain --count 1000
 
-# Generate multi-turn conversations
-python main.py "technical support dialogues" --type sft_conv --output conversations.jsonl
+# Multi-turn conversations (ShareGPT format)
+ollaforge "technical support dialogues" --type sft_conv -o conversations.jsonl
 
-# Generate DPO preference pairs
-python main.py "code review feedback" --type dpo --count 200
+# DPO preference pairs
+ollaforge "code review feedback" --type dpo --count 200
 
-# Generate in Traditional Chinese
-python main.py "客服對話範例" --lang zh-tw --count 100 --output zh_dataset.jsonl
+# Traditional Chinese with QC
+ollaforge "客服對話範例" --lang zh-tw --count 100 --qc-confidence 0.85
 
-# Use a specific model
-python main.py "medical Q&A" --model deepseek-r1:14b --count 50
+# Use specific model with high concurrency
+ollaforge "medical Q&A" --model qwen2.5:14b --count 500 -j 10
 ```
 
 ## 📋 Dataset Formats
 
-OllaForge generates datasets compatible with **HuggingFace** and **LLaMA-Factory**.
-
-### SFT (Supervised Fine-tuning)
-
-Alpaca-style format for instruction tuning:
-
+### SFT (Alpaca Format)
 ```json
-{
-  "instruction": "Explain the concept of recursion",
-  "input": "I'm learning programming",
-  "output": "Recursion is a programming technique where a function calls itself..."
-}
+{"instruction": "Explain recursion", "input": "", "output": "Recursion is..."}
 ```
 
 ### Pre-training
-
-Raw text format for continued pre-training:
-
 ```json
-{
-  "text": "Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience..."
-}
+{"text": "Machine learning is a subset of artificial intelligence..."}
 ```
 
 ### SFT Conversation (ShareGPT/ChatML)
-
-Multi-turn dialogue format:
-
 ```json
 {
   "conversations": [
-    {"role": "system", "content": "You are a helpful coding assistant."},
-    {"role": "user", "content": "How do I reverse a string in Python?"},
-    {"role": "assistant", "content": "You can reverse a string using slicing: `reversed_string = original[::-1]`"},
-    {"role": "user", "content": "What about using a loop?"},
-    {"role": "assistant", "content": "Here's how to do it with a loop:\n```python\ndef reverse_string(s):\n    result = ''\n    for char in s:\n        result = char + result\n    return result\n```"}
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": "How do I reverse a string?"},
+    {"role": "assistant", "content": "Use slicing: `s[::-1]`"}
   ]
 }
 ```
 
-### DPO (Direct Preference Optimization)
-
-Preference pairs for RLHF training:
-
+### DPO (Preference Pairs)
 ```json
-{
-  "prompt": "Write a function to calculate factorial",
-  "chosen": "Here's an efficient recursive implementation with proper error handling:\n```python\ndef factorial(n):\n    if n < 0:\n        raise ValueError('Factorial is not defined for negative numbers')\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\n```",
-  "rejected": "def f(n): return n*f(n-1) if n else 1"
-}
+{"prompt": "Write factorial", "chosen": "def factorial(n)...", "rejected": "def f(n):..."}
 ```
 
-## 🌐 Supported Languages
+## ⚡ Performance Optimizations
 
-| Code | Language | Example |
-|------|----------|---------|
-| `en` | English | `--lang en` |
-| `zh-tw` | 繁體中文（台灣） | `--lang zh-tw` |
+OllaForge is optimized for Mac (Apple Silicon) and local LLM inference:
 
-## 🔍 Quality Control (QC) for Traditional Chinese
+| Optimization | Benefit |
+|--------------|---------|
+| **Structured JSON Output** | 0% format errors via Ollama's schema enforcement |
+| **Small Batch Size (5)** | Reduces attention decay, improves quality |
+| **Concurrent Requests** | Up to 10 parallel batch requests |
+| **BERT on CPU** | Keeps GPU/MPS free for LLM generation |
+| **Funnel Architecture** | Over-request → Filter → Keep valid entries |
 
-When generating datasets in Traditional Chinese (`--lang zh-tw`), OllaForge includes an optional **Quality Control** system that automatically filters out Mainland Chinese expressions.
+### Architecture
 
-### How It Works
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Prompt    │────▶│  Ollama API  │────▶│   JSON      │
+│  Engineering│     │  (Parallel)  │     │   Schema    │
+└─────────────┘     └──────────────┘     └──────────────┘
+                                                │
+                    ┌──────────────┐            ▼
+                    │   QC Filter  │◀────┌─────────────┐
+                    │  (CPU BERT)  │     │  Processor  │
+                    └──────────────┘     └─────────────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │   JSONL     │
+                    │   Output    │
+                    └─────────────┘
+```
 
-- Uses a BERT-based classifier ([renhehuang/bert-traditional-chinese-classifier](https://huggingface.co/renhehuang/bert-traditional-chinese-classifier))
-- Classifies text as "Taiwan Traditional" or "Mainland Traditional"
-- Entries with Mainland expressions are automatically regenerated
-- Default confidence threshold: 90%
+## 🔍 Traditional Chinese QC
 
-### Usage
+When using `--lang zh-tw`, OllaForge automatically filters Mainland Chinese expressions:
+
+| ❌ Filtered | ✅ Accepted |
+|-------------|-------------|
+| 軟件 | 軟體 |
+| 視頻 | 影片 |
+| 程序 | 程式 |
+| 網絡 | 網路 |
+| 信息 | 資訊 |
 
 ```bash
-# Enable QC (default when using zh-tw)
-python main.py "客服對話" --lang zh-tw --qc
+# Enable QC (default)
+ollaforge "對話" --lang zh-tw --qc
+
+# Stricter threshold
+ollaforge "對話" --lang zh-tw --qc-confidence 0.95
 
 # Disable QC
-python main.py "客服對話" --lang zh-tw --no-qc
-
-# Adjust confidence threshold (stricter)
-python main.py "客服對話" --lang zh-tw --qc-confidence 0.95
+ollaforge "對話" --lang zh-tw --no-qc
 ```
-
-### Examples of Filtered Expressions
-
-| Mainland (Filtered) | Taiwan (Accepted) |
-|---------------------|-------------------|
-| 軟件 | 軟體 |
-| 程序 | 程式 |
-| 計算機 | 電腦 |
-| 網絡 | 網路 |
-| 界面 | 介面 |
 
 ## 🤖 Recommended Models
 
-| Model | Size | Best For |
-|-------|------|----------|
-| `gpt-oss:20b` | 20B | General purpose (default) |
-| `deepseek-r1:14b` | 14B | Reasoning & complex tasks |
-| `qwen3:14b` | 14B | Multilingual support |
-| `ministral-3:14b` | 14B | Edge deployment |
-| `gemma3:12b` | 12B | Single GPU efficiency |
+| Model | Best For |
+|-------|----------|
+| `llama3.2` | General purpose (default) |
+| `qwen2.5:14b` | Multilingual, Chinese |
+| `deepseek-r1:14b` | Reasoning tasks |
+| `gemma2:9b` | Efficient, single GPU |
+| `mistral:7b` | Fast inference |
 
-## 🏗️ Architecture
+## 🏗️ Project Structure
 
 ```
 ollaforge/
-├── main.py              # CLI entry point
 ├── ollaforge/
-│   ├── client.py        # Ollama API communication
-│   ├── processor.py     # Response parsing & validation
-│   ├── models.py        # Pydantic data models
-│   ├── interactive.py   # Rich-based interactive UI
+│   ├── __init__.py      # Package exports
+│   ├── cli.py           # CLI implementation
+│   ├── client.py        # Ollama API + JSON schema
+│   ├── processor.py     # Response parsing
+│   ├── models.py        # Pydantic models
+│   ├── qc.py            # Taiwan Chinese QC
 │   ├── progress.py      # Progress tracking
-│   └── file_manager.py  # File I/O operations
-└── tests/               # Comprehensive test suite
+│   └── file_manager.py  # File I/O
+├── tests/               # Test suite
+├── pyproject.toml       # Project config
+└── Makefile             # Dev commands
 ```
 
 ## 🧪 Development
 
 ```bash
+# Install dev dependencies
+make install-dev
+
 # Run tests
-pytest tests/ -v
+make test
 
-# Run with coverage
-pytest tests/ --cov=ollaforge
+# Lint & format
+make lint
+make format
 
-# Type checking
-mypy ollaforge/
+# Type check
+make typecheck
+
+# All checks
+make check
 ```
 
 ## 🤝 Contributing
 
-We welcome contributions! Here's how you can help:
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing`)
+5. Open a Pull Request
 
-1. 🍴 Fork the repository
-2. 🌿 Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. 💾 Commit your changes (`git commit -m 'Add amazing feature'`)
-4. 📤 Push to the branch (`git push origin feature/amazing-feature`)
-5. 🔃 Open a Pull Request
-
-### Areas We Need Help
-
-- [ ] Additional language support (Japanese, Korean, etc.)
-- [ ] More dataset format templates
-- [ ] Performance optimizations
-- [ ] Documentation improvements
-- [ ] Test coverage expansion
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
-- [Ollama](https://ollama.ai/) for making local LLMs accessible
-- [Rich](https://github.com/Textualize/rich) for beautiful terminal output
-- [Typer](https://typer.tiangolo.com/) for elegant CLI creation
-- [Pydantic](https://pydantic.dev/) for data validation
+- [Ollama](https://ollama.ai/) - Local LLM inference
+- [Rich](https://github.com/Textualize/rich) - Beautiful terminal UI
+- [Typer](https://typer.tiangolo.com/) - CLI framework
+- [Pydantic](https://pydantic.dev/) - Data validation
 
 ---
 
 <p align="center">
   Made with ❤️ by the OllaForge Team
-</p>
-
-<p align="center">
-  <a href="https://github.com/yourusername/ollaforge/stargazers">⭐ Star us on GitHub</a>
 </p>
