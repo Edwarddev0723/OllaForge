@@ -1142,3 +1142,78 @@ def augment_interactive() -> Optional[Tuple[str, str, str, str, str, int, bool, 
     except KeyboardInterrupt:
         console.print("\n[yellow]❌ Wizard cancelled[/yellow]")
         return None
+
+
+def main_interactive_router() -> None:
+    """
+    Main router for interactive mode - allows user to choose between generation and augmentation.
+    """
+    display_banner()
+    
+    console.print()
+    console.print("[bold cyan]Welcome to OllaForge Interactive Mode![/bold cyan]")
+    console.print()
+    
+    # Create choice table
+    table = Table(show_header=False, box=ROUNDED, border_style="cyan")
+    table.add_column("Option", style="bold", width=8)
+    table.add_column("Description", style="")
+    
+    table.add_row("1", "🆕 [green]Generate[/green] - Create new datasets from scratch")
+    table.add_row("2", "🔄 [blue]Augment[/blue] - Enhance existing datasets")
+    table.add_row("3", "❌ [red]Exit[/red] - Quit the application")
+    
+    console.print(Align.center(table))
+    console.print()
+    
+    while True:
+        try:
+            choice = Prompt.ask(
+                "[bold]What would you like to do?[/bold]",
+                choices=["1", "2", "3"],
+                default="1"
+            )
+            
+            if choice == "1":
+                # Generation mode
+                console.print("\n[green]🆕 Entering Dataset Generation Mode...[/green]\n")
+                result = main_interactive()
+                if result is not None:
+                    config, concurrency = result
+                    from .cli import _run_generation
+                    _run_generation(config, concurrency)
+                break
+                
+            elif choice == "2":
+                # Augmentation mode
+                console.print("\n[blue]🔄 Entering Dataset Augmentation Mode...[/blue]\n")
+                result = augment_interactive()
+                if result is not None:
+                    input_file, field, instruction, output, model, concurrency, new_field, context, preview, language = result
+                    from .cli import _run_augmentation
+                    _run_augmentation(
+                        input_file=input_file,
+                        output_file=output,
+                        field=field,
+                        instruction=instruction,
+                        model=model,
+                        concurrency=concurrency,
+                        new_field=new_field,
+                        context_fields=context,
+                        preview_mode=preview,
+                        preview_count=3,
+                        language=language,
+                        force=False,
+                    )
+                break
+                
+            elif choice == "3":
+                console.print("\n[yellow]👋 Goodbye![/yellow]")
+                break
+                
+        except KeyboardInterrupt:
+            console.print("\n[yellow]👋 Goodbye![/yellow]")
+            break
+        except Exception as e:
+            console.print(f"\n[red]❌ Error: {str(e)}[/red]")
+            console.print("[yellow]Please try again or press Ctrl+C to exit.[/yellow]\n")

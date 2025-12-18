@@ -17,7 +17,7 @@ Usage:
     ollaforge -i  # Interactive mode
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "OllaForge Team"
 __description__ = "CLI tool for generating datasets using local Ollama models"
 
@@ -72,7 +72,7 @@ from .qc import (
 )
 
 # CLI
-from .cli import app, main
+from .cli import app
 
 __all__ = [
     # Version info
@@ -113,5 +113,4 @@ __all__ = [
     "is_taiwan_chinese",
     # CLI
     "app",
-    "main",
 ]

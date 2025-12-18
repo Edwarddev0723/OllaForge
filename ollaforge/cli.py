@@ -29,7 +29,7 @@ console = Console()
 # Initialize Typer app
 app = typer.Typer(
     name="ollaforge",
-    help="Generate datasets using local Ollama models",
+    help="Generate and augment datasets using local Ollama models",
     add_completion=False,
     invoke_without_command=True,
 )
@@ -899,10 +899,60 @@ def _display_augmentation_summary(result: AugmentationResult) -> None:
         console.print(f"\n[yellow]⚠️  {len(result.errors)} error(s) occurred during processing[/yellow]")
 
 
-def main():
-    """Entry point for the CLI."""
-    app()
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Launch interactive mode with step-by-step wizard",
+    ),
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-v",
+        help="Show version information",
+    ),
+) -> None:
+    """
+    OllaForge - AI-Powered Dataset Generator & Augmentor for LLM Fine-tuning
+    
+    Generate new datasets or augment existing ones using local Ollama models.
+    
+    Examples:
+    
+        # Interactive mode (recommended for beginners)
+        ollaforge -i
+        
+        # Generate dataset directly
+        ollaforge generate "Python tutorials" --count 100
+        
+        # Augment existing dataset
+        ollaforge augment data.jsonl --field output --instruction "Add more detail"
+    """
+    if version:
+        from . import __version__
+        console.print(f"OllaForge version {__version__}")
+        raise typer.Exit(0)
+    
+    if interactive:
+        from .interactive import main_interactive_router
+        try:
+            main_interactive_router()
+        except KeyboardInterrupt:
+            console.print("\n[yellow]⚠️  Operation cancelled by user[/yellow]")
+            raise typer.Exit(130)
+        except Exception as e:
+            console.print(f"[red]❌ Unexpected error: {str(e)}[/red]")
+            raise typer.Exit(1)
+        return
+    
+    if ctx.invoked_subcommand is None:
+        # Show help if no subcommand is provided
+        console.print(app.get_help(ctx))
+        console.print("\n[yellow]💡 Use 'ollaforge -i' for interactive mode or 'ollaforge --help' for more options[/yellow]")
 
 
 if __name__ == "__main__":
-    main()
+    app()

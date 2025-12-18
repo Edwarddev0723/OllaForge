@@ -87,7 +87,7 @@ def test_cli_help_display():
     """Test that CLI displays help information correctly."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "Generate datasets using local Ollama models" in result.stdout
+    assert "Generate and augment datasets using local Ollama models" in result.stdout
     assert "generate" in result.stdout
     assert "augment" in result.stdout
     
