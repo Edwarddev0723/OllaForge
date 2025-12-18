@@ -62,6 +62,15 @@
 | 👀 **預覽模式** | 在完整處理前先測試樣本 |
 | 🛡️ **失敗復原** | AI 失敗時保留原始資料 |
 
+### 📁 多格式支援
+| 功能 | 說明 |
+|------|------|
+| 📄 **JSONL** | JSON Lines 格式（預設）- 每行一個 JSON 物件 |
+| 📋 **JSON** | 單一 JSON 物件陣列 |
+| 📊 **CSV** | 逗號分隔值，自動偵測標題 |
+| 📑 **TSV** | Tab 分隔值，適用於結構化資料 |
+| 🗃️ **Parquet** | 列式儲存格式（需要 pandas） |
+
 ### 🌐 品質與在地化
 | 功能 | 說明 |
 |------|------|
@@ -93,6 +102,9 @@ pip install -e .
 # 包含繁體中文品質控制支援
 pip install ollaforge[qc]
 
+# 包含多格式支援（CSV、Parquet 等）
+pip install ollaforge[formats]
+
 # 包含所有功能
 pip install ollaforge[all]
 ```
@@ -118,6 +130,12 @@ ollaforge augment data.jsonl --field output --instruction "增加更多細節" -
 
 # 新增欄位
 ollaforge augment data.jsonl --field difficulty --new-field --instruction "評估難度：簡單/中等/困難"
+
+# 處理 CSV 檔案
+ollaforge augment data.csv --field sentiment --new-field --instruction "分析情感：正面/負面/中性"
+
+# 格式轉換
+ollaforge convert data.csv data.jsonl
 
 # 互動式擴增精靈
 ollaforge augment data.jsonl -i

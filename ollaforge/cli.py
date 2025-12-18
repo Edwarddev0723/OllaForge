@@ -21,6 +21,7 @@ from .models import (
     GenerationConfig, GenerationResult, DatasetType, OutputLanguage,
     AugmentationConfig, AugmentationResult, FieldValidationError
 )
+from .formats import FileFormat
 from .progress import ProgressTracker
 
 # Initialize Rich console for beautiful output
@@ -409,7 +410,10 @@ def _run_generation(config: GenerationConfig, concurrency: int) -> None:
                     is_batch=is_batch,
                     dataset_type=config.dataset_type,
                 )
-                all_entries.extend(processed_entries)
+                if isinstance(processed_entries, list):
+                    all_entries.extend(processed_entries)
+                elif processed_entries is not None:
+                    all_entries.append(processed_entries)
 
         console.print(f"[dim]📝 Parsed {len(all_entries)} entries from responses[/dim]")
 
@@ -516,6 +520,9 @@ Example: "Translate to English" or "Add difficulty rating (easy/medium/hard)" ""
 AUGMENT_CONTEXT_HELP = """Additional fields to include as context for the AI. Can be specified multiple times.
 Example: --context instruction --context input"""
 
+FORMAT_HELP = """Input/output file format. Auto-detected from extension if not specified.
+Supported formats: jsonl, json, csv, tsv, parquet"""
+
 
 @app.command()
 def augment(
@@ -599,6 +606,16 @@ def augment(
         help=LANGUAGE_HELP,
         callback=lambda ctx, param, value: validate_language(value) if value is not None else value,
     ),
+    input_format: Optional[str] = typer.Option(
+        None,
+        "--input-format",
+        help="Input file format (auto-detected if not specified): jsonl, json, csv, tsv, parquet",
+    ),
+    output_format: Optional[str] = typer.Option(
+        None,
+        "--output-format",
+        help="Output file format (auto-detected if not specified): jsonl, json, csv, tsv, parquet",
+    ),
 ) -> None:
     """
     Augment an existing dataset by modifying or adding fields using AI.
@@ -649,6 +666,8 @@ def augment(
             preview_count=preview_count,
             language=language,
             force=force,
+            input_format=input_format,
+            output_format=output_format,
         )
         
     except KeyboardInterrupt:
@@ -690,16 +709,21 @@ def _run_augmentation(
     preview_count: int,
     language: OutputLanguage,
     force: bool,
+    input_format: Optional[str] = None,
+    output_format: Optional[str] = None,
 ) -> None:
     """Execute the augmentation process."""
     from .augmentor import DatasetAugmentor
     from .file_manager import (
         read_jsonl_file,
+        write_dataset_file,
+        validate_file_format,
         FileOperationError,
         DiskSpaceError,
         check_disk_space,
         estimate_file_size,
     )
+    from .formats import FileFormat, FormatError
     import json
     import signal
     
@@ -718,6 +742,33 @@ def _run_augmentation(
     
     # Initialize augmentor
     augmentor = DatasetAugmentor(config)
+    
+    # Validate file formats
+    if input_format:
+        try:
+            input_fmt = FileFormat(input_format.lower())
+        except ValueError:
+            console.print(f"[red]❌ Invalid input format: {input_format}[/red]")
+            console.print(f"[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+            raise typer.Exit(1)
+    else:
+        input_fmt = None
+    
+    if output_format:
+        try:
+            output_fmt = FileFormat(output_format.lower())
+        except ValueError:
+            console.print(f"[red]❌ Invalid output format: {output_format}[/red]")
+            console.print(f"[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+            raise typer.Exit(1)
+    else:
+        output_fmt = None
+    
+    # Validate input file format
+    is_supported, message = validate_file_format(input_file)
+    if not is_supported and not input_format:
+        console.print(f"[red]❌ {message}[/red]")
+        raise typer.Exit(1)
     
     # Load dataset and display info
     console.print(Panel.fit(
@@ -807,7 +858,7 @@ def _run_augmentation(
             raise typer.Exit(130)
         
         # Write output file (Requirement 4.1)
-        _write_augmented_output(augmented_entries, output_file)
+        _write_augmented_output(augmented_entries, output_file, output_fmt)
         
         # Display summary (Requirement 5.2, 5.3)
         _display_augmentation_summary(result)
@@ -857,27 +908,25 @@ def _save_partial_results(entries: List[dict], output_file: str) -> None:
         console.print(f"[red]❌ Failed to save partial results: {str(e)}[/red]")
 
 
-def _write_augmented_output(entries: List[dict], output_file: str) -> None:
-    """Write augmented entries to output file."""
-    import json
-    
+def _write_augmented_output(entries: List[dict], output_file: str, 
+                           output_format: Optional[FileFormat] = None) -> None:
+    """Write augmented entries to output file in specified format."""
     # Filter out None entries
     valid_entries = [e for e in entries if e is not None]
     
+    if not valid_entries:
+        console.print("[yellow]⚠️  No valid entries to write[/yellow]")
+        return
+    
     try:
-        output_path = Path(output_file)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Use multi-format writing
+        write_dataset_file(valid_entries, output_file, output_format, overwrite=True)
         
-        with open(output_file, 'w', encoding='utf-8') as f:
-            for entry in valid_entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
-        
-        console.print(f"[green]✅ Output written to: {output_file}[/green]")
-    except PermissionError:
-        console.print(f"[red]❌ Permission denied: cannot write to {output_file}[/red]")
-        raise typer.Exit(1)
-    except OSError as e:
+    except FileOperationError as e:
         console.print(f"[red]❌ Failed to write output: {str(e)}[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]❌ Unexpected error writing output: {str(e)}[/red]")
         raise typer.Exit(1)
 
 
@@ -956,3 +1005,110 @@ def main(
 
 if __name__ == "__main__":
     app()
+
+@app.command()
+def convert(
+    input_file: str = typer.Argument(
+        ...,
+        help="Source dataset file to convert",
+    ),
+    output_file: str = typer.Argument(
+        ...,
+        help="Output file path",
+    ),
+    input_format: Optional[str] = typer.Option(
+        None,
+        "--input-format",
+        help="Input file format (auto-detected if not specified): jsonl, json, csv, tsv, parquet",
+    ),
+    output_format: Optional[str] = typer.Option(
+        None,
+        "--output-format", 
+        help="Output file format (auto-detected if not specified): jsonl, json, csv, tsv, parquet",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-y",
+        help="Overwrite output file without confirmation",
+    ),
+) -> None:
+    """
+    Convert dataset files between different formats.
+    
+    Supports conversion between JSONL, JSON, CSV, TSV, and Parquet formats.
+    Format is automatically detected from file extensions if not specified.
+    
+    Examples:
+    
+        # Convert JSONL to CSV
+        ollaforge convert data.jsonl data.csv
+        
+        # Convert CSV to JSON with explicit formats
+        ollaforge convert data.csv data.json --input-format csv --output-format json
+        
+        # Convert to Parquet (requires pandas)
+        ollaforge convert data.jsonl data.parquet
+    """
+    try:
+        from .file_manager import convert_file_format, validate_file_format
+        from .formats import FileFormat
+        
+        # Validate input file
+        if not Path(input_file).exists():
+            console.print(f"[red]❌ Input file not found: {input_file}[/red]")
+            raise typer.Exit(1)
+        
+        # Validate formats if specified
+        input_fmt = None
+        if input_format:
+            try:
+                input_fmt = FileFormat(input_format.lower())
+            except ValueError:
+                console.print(f"[red]❌ Invalid input format: {input_format}[/red]")
+                console.print(f"[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+                raise typer.Exit(1)
+        
+        output_fmt = None
+        if output_format:
+            try:
+                output_fmt = FileFormat(output_format.lower())
+            except ValueError:
+                console.print(f"[red]❌ Invalid output format: {output_format}[/red]")
+                console.print(f"[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+                raise typer.Exit(1)
+        
+        # Check if output file exists
+        if Path(output_file).exists() and not force:
+            if not typer.confirm(f"Output file '{output_file}' already exists. Overwrite?"):
+                console.print("[yellow]Operation cancelled.[/yellow]")
+                raise typer.Exit(0)
+        
+        # Display conversion info
+        console.print(Panel.fit(
+            Text("🔄 OllaForge Format Converter", style="bold cyan"),
+            border_style="bright_blue",
+        ))
+        
+        console.print(f"📂 Input: {input_file}")
+        console.print(f"📁 Output: {output_file}")
+        
+        # Validate input format
+        is_supported, message = validate_file_format(input_file)
+        if is_supported:
+            console.print(f"[dim]📄 {message}[/dim]")
+        elif not input_format:
+            console.print(f"[red]❌ {message}[/red]")
+            raise typer.Exit(1)
+        
+        console.print()
+        
+        # Perform conversion
+        convert_file_format(input_file, output_file, input_fmt, output_fmt)
+        
+    except KeyboardInterrupt:
+        console.print("\n[yellow]⚠️  Operation cancelled by user[/yellow]")
+        raise typer.Exit(130)
+    except Exception as e:
+        console.print(f"[red]❌ Conversion failed: {str(e)}[/red]")
+        raise typer.Exit(1)

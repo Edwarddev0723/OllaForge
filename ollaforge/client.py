@@ -228,7 +228,17 @@ def _generate_single_entry(topic: str, model: str, entry_number: int,
             return {'error': 'Invalid response format', 'entry_number': entry_number}
             
     except Exception as e:
-        return {'error': str(e), 'entry_number': entry_number}
+        error_msg = str(e).lower()
+        if "model" in error_msg and "not found" in error_msg:
+            raise OllamaGenerationError("Model not found")
+        elif "model loading timeout" in error_msg:
+            raise OllamaGenerationError("Model loading timeout")
+        elif "context length exceeded" in error_msg:
+            raise OllamaGenerationError("Context length exceeded")
+        elif "connection" in error_msg or "refused" in error_msg:
+            raise OllamaConnectionError(f"Failed to connect: {str(e)}")
+        else:
+            return {'error': str(e), 'entry_number': entry_number}
 
 
 def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: int,
@@ -304,7 +314,11 @@ def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
         if "connection" in error_msg or "refused" in error_msg:
             raise OllamaConnectionError(f"Failed to connect: {str(e)}")
         elif "model" in error_msg and "not found" in error_msg:
-            raise OllamaGenerationError(f"Model not found: {str(e)}")
+            raise OllamaGenerationError("Model not found")
+        elif "model loading timeout" in error_msg:
+            raise OllamaGenerationError("Model loading timeout")
+        elif "context length exceeded" in error_msg:
+            raise OllamaGenerationError("Context length exceeded")
         else:
             raise OllamaGenerationError(f"Generation failed: {str(e)}")
 

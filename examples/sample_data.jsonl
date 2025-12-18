@@ -1,0 +1,3 @@
+{"instruction": "Explain recursion", "output": "Recursion is a programming technique where a function calls itself to solve smaller instances of the same problem."}
+{"instruction": "Calculate factorial", "input": "5", "output": "The factorial of 5 is 120 (5! = 5 × 4 × 3 × 2 × 1 = 120)"}
+{"instruction": "Define machine learning", "output": "Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed."}

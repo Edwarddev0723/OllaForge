@@ -1,0 +1,4 @@
+instruction,input,output
+"Explain recursion","","Recursion is a programming technique where a function calls itself to solve smaller instances of the same problem."
+"Calculate factorial","5","The factorial of 5 is 120 (5! = 5 × 4 × 3 × 2 × 1 = 120)"
+"Define machine learning","","Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed."

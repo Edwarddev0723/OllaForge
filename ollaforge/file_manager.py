@@ -29,10 +29,11 @@ import signal
 import sys
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from rich.console import Console
 
 from .models import DataEntry, GenerationResult
+from .formats import FileFormat, FormatError, read_file, write_file, detect_format
 
 console = Console()
 
@@ -420,3 +421,206 @@ def is_interrupted() -> bool:
         bool: True if interrupted
     """
     return _interrupted
+
+
+# ============================================================================
+# Multi-Format File Operations
+# ============================================================================
+
+def read_dataset_file(file_path: str, format_hint: Optional[FileFormat] = None) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """
+    Read dataset file in any supported format and return entries with field names.
+    
+    This function automatically detects the file format from the extension or uses
+    the provided format hint. It supports JSONL, JSON, CSV, TSV, and Parquet formats.
+    
+    Args:
+        file_path: Path to the input file
+        format_hint: Optional format hint to override automatic detection
+        
+    Returns:
+        Tuple of (entries, field_names)
+        
+    Raises:
+        FileOperationError: If file cannot be read or parsed
+    """
+    try:
+        entries, field_names = read_file(file_path, format_hint)
+        
+        if not entries:
+            console.print(f"[yellow]⚠️  Warning: No entries found in {file_path}[/yellow]")
+        
+        return entries, field_names
+        
+    except FormatError as e:
+        raise FileOperationError(f"Format error: {str(e)}")
+    except Exception as e:
+        raise FileOperationError(f"Failed to read dataset file: {str(e)}")
+
+
+def write_dataset_file(entries: List[Dict[str, Any]], file_path: str, 
+                      format_hint: Optional[FileFormat] = None, 
+                      overwrite: bool = True) -> None:
+    """
+    Write dataset entries to file in any supported format.
+    
+    This function automatically detects the output format from the file extension
+    or uses the provided format hint. It supports JSONL, JSON, CSV, TSV, and Parquet formats.
+    
+    Args:
+        entries: List of data entries to write
+        file_path: Output file path
+        format_hint: Optional format hint to override automatic detection
+        overwrite: Whether to overwrite existing files
+        
+    Raises:
+        FileOperationError: If file cannot be written
+    """
+    if not entries:
+        raise FileOperationError("No entries to write")
+    
+    # Check if file exists and handle overwrite
+    output_path = Path(file_path)
+    if output_path.exists() and not overwrite:
+        raise FileOperationError(f"File already exists: {file_path}")
+    
+    # Ensure parent directory exists
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        # Detect format if not provided
+        if format_hint is None:
+            try:
+                file_format = detect_format(file_path)
+            except FormatError:
+                # Default to JSONL if detection fails
+                file_format = FileFormat.JSONL
+                console.print(f"[yellow]⚠️  Could not detect format, defaulting to JSONL[/yellow]")
+        else:
+            file_format = format_hint
+        
+        # Check disk space before writing
+        estimated_size = estimate_file_size(len(entries))
+        check_disk_space(file_path, estimated_size)
+        
+        # Write using atomic operation for data integrity
+        temp_file = None
+        try:
+            # Create temporary file in same directory
+            temp_fd, temp_file = tempfile.mkstemp(
+                suffix=output_path.suffix,
+                dir=output_path.parent,
+                prefix=f".{output_path.name}_tmp_"
+            )
+            os.close(temp_fd)  # Close file descriptor, we'll use the path
+            
+            # Write to temporary file
+            write_file(entries, temp_file, file_format)
+            
+            # Atomic move to final location
+            shutil.move(temp_file, file_path)
+            temp_file = None  # Successfully moved
+            
+            console.print(f"[green]✅ Successfully wrote {len(entries)} entries to {file_path}[/green]")
+            
+        except Exception as e:
+            # Clean up temporary file if it exists
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.unlink(temp_file)
+                except OSError:
+                    pass
+            raise
+            
+    except FormatError as e:
+        raise FileOperationError(f"Format error: {str(e)}")
+    except DiskSpaceError:
+        raise  # Re-raise disk space errors as-is
+    except Exception as e:
+        raise FileOperationError(f"Failed to write dataset file: {str(e)}")
+
+
+def get_supported_extensions() -> List[str]:
+    """
+    Get list of supported file extensions.
+    
+    Returns:
+        List of supported file extensions (with dots)
+    """
+    return ['.jsonl', '.json', '.csv', '.tsv', '.parquet']
+
+
+def validate_file_format(file_path: str) -> Tuple[bool, str]:
+    """
+    Validate if file format is supported and provide feedback.
+    
+    Args:
+        file_path: Path to validate
+        
+    Returns:
+        Tuple of (is_supported, message)
+    """
+    try:
+        file_format = detect_format(file_path)
+        from .formats import get_format_description
+        description = get_format_description(file_format)
+        return True, f"Detected format: {description}"
+    except FormatError as e:
+        supported = get_supported_extensions()
+        return False, f"Unsupported format. Supported extensions: {', '.join(supported)}"
+
+
+def convert_file_format(input_path: str, output_path: str, 
+                       input_format: Optional[FileFormat] = None,
+                       output_format: Optional[FileFormat] = None) -> None:
+    """
+    Convert dataset file from one format to another.
+    
+    Args:
+        input_path: Source file path
+        output_path: Destination file path
+        input_format: Optional input format hint
+        output_format: Optional output format hint
+        
+    Raises:
+        FileOperationError: If conversion fails
+    """
+    try:
+        # Read from source format
+        entries, field_names = read_dataset_file(input_path, input_format)
+        
+        if not entries:
+            raise FileOperationError("No entries found in source file")
+        
+        # Validate compatibility with target format
+        if output_format is None:
+            try:
+                output_format = detect_format(output_path)
+            except FormatError:
+                output_format = FileFormat.JSONL
+        
+        from .formats import validate_format_compatibility
+        if not validate_format_compatibility(entries, output_format):
+            console.print(f"[yellow]⚠️  Warning: Some data may be modified for {output_format.value} format[/yellow]")
+        
+        # Write to target format
+        write_dataset_file(entries, output_path, output_format, overwrite=True)
+        
+        console.print(f"[green]✅ Converted {len(entries)} entries from {input_path} to {output_path}[/green]")
+        
+    except Exception as e:
+        raise FileOperationError(f"Format conversion failed: {str(e)}")
+
+
+# Backward compatibility aliases
+def read_jsonl_file_with_field_names(file_path: str) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """
+    Backward compatibility wrapper for read_jsonl_file with field names.
+    
+    Args:
+        file_path: Path to JSONL file
+        
+    Returns:
+        Tuple of (entries, field_names)
+    """
+    return read_jsonl_file(file_path, return_field_names=True)

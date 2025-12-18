@@ -72,6 +72,15 @@
 | 👀 **Preview Mode** | Test augmentation on samples before full processing |
 | 🛡️ **Failure Recovery** | Preserves original data on AI failures |
 
+### 📁 Multi-Format Support
+| Feature | Description |
+|---------|-------------|
+| 📄 **JSONL** | JSON Lines format (default) - one JSON object per line |
+| 📋 **JSON** | Single JSON array of objects |
+| 📊 **CSV** | Comma-separated values with automatic header detection |
+| 📑 **TSV** | Tab-separated values for structured data |
+| 🗃️ **Parquet** | Columnar storage format (requires pandas) |
+
 ### 🌐 Quality & Localization
 | Feature | Description |
 |---------|-------------|
@@ -103,6 +112,9 @@ pip install -e .
 # With QC support for Traditional Chinese
 pip install ollaforge[qc]
 
+# With multi-format support (CSV, Parquet, etc.)
+pip install ollaforge[formats]
+
 # With all features
 pip install ollaforge[all]
 ```
@@ -128,6 +140,12 @@ ollaforge augment data.jsonl --field output --instruction "Add more detail" --pr
 
 # Augment with new field
 ollaforge augment data.jsonl --field difficulty --new-field --instruction "Rate difficulty: easy/medium/hard"
+
+# Work with CSV files
+ollaforge augment data.csv --field sentiment --new-field --instruction "Analyze sentiment: positive/negative/neutral"
+
+# Convert between formats
+ollaforge convert data.csv data.jsonl
 
 # Interactive augmentation wizard
 ollaforge augment data.jsonl -i
@@ -188,17 +206,21 @@ OllaForge can enhance existing JSONL datasets by modifying or adding fields usin
 ### Examples
 
 ```bash
-# Translate output field to Chinese
+# Translate output field to Chinese (JSONL)
 ollaforge augment qa.jsonl -f output -I "Translate to Traditional Chinese (Taiwan)"
 
-# Add difficulty rating
-ollaforge augment problems.jsonl -f difficulty --new-field -I "Rate: easy/medium/hard based on complexity"
+# Add difficulty rating (CSV)
+ollaforge augment problems.csv -f difficulty --new-field -I "Rate: easy/medium/hard based on complexity"
 
-# Expand brief answers
-ollaforge augment faq.jsonl -f answer -I "Expand this answer with more detail and examples"
+# Expand brief answers (JSON)
+ollaforge augment faq.json -f answer -I "Expand this answer with more detail and examples"
 
-# Add category field using context
-ollaforge augment articles.jsonl -f category --new-field -c title -c content -I "Categorize: tech/science/business/other"
+# Add category field using context (TSV)
+ollaforge augment articles.tsv -f category --new-field -c title -c content -I "Categorize: tech/science/business/other"
+
+# Convert formats
+ollaforge convert data.csv data.parquet  # CSV to Parquet
+ollaforge convert data.jsonl data.json   # JSONL to JSON array
 ```
 
 ### Preview Mode

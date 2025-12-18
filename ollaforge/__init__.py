@@ -17,7 +17,7 @@ Usage:
     ollaforge -i  # Interactive mode
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "OllaForge Team"
 __description__ = "CLI tool for generating datasets using local Ollama models"
 
@@ -64,6 +64,15 @@ from .augmentor import (
     create_augmentation_prompt,
 )
 
+# Multi-format support
+from .formats import (
+    FileFormat,
+    FormatError,
+    detect_format,
+    get_supported_formats,
+    get_format_description,
+)
+
 # Quality control
 from .qc import (
     QualityController,
@@ -107,6 +116,12 @@ __all__ = [
     # Augmentation
     "DatasetAugmentor",
     "create_augmentation_prompt",
+    # Multi-format support
+    "FileFormat",
+    "FormatError", 
+    "detect_format",
+    "get_supported_formats",
+    "get_format_description",
     # QC
     "QualityController",
     "predict_language",

@@ -45,7 +45,8 @@ from .models import (
     FieldValidationError,
     validate_target_field,
 )
-from .file_manager import read_jsonl_file, FileOperationError
+from .file_manager import read_jsonl_file, read_dataset_file, FileOperationError
+from .formats import FileFormat, FormatError
 from .progress import ProgressTracker
 
 
@@ -140,6 +141,9 @@ class DatasetAugmentor:
         """
         Load dataset and extract available fields.
         
+        Supports multiple file formats: JSONL, JSON, CSV, TSV, Parquet.
+        Format is automatically detected from file extension.
+        
         Returns:
             Tuple of (entries, field_names)
             
@@ -147,14 +151,38 @@ class DatasetAugmentor:
             FileOperationError: If file cannot be read or parsed
             
         Requirements satisfied:
-        - 1.1: Read and parse JSONL file
+        - 1.1: Read and parse dataset files in multiple formats
         - 1.4: Return entry count and field names
         """
-        entries, field_names = read_jsonl_file(
-            self.config.input_file, 
-            return_field_names=True
-        )
-        return entries, field_names
+        try:
+            # Try multi-format reading first
+            entries, field_names = read_dataset_file(self.config.input_file)
+            
+            # Display format information
+            from .formats import detect_format, get_format_description
+            try:
+                file_format = detect_format(self.config.input_file)
+                format_desc = get_format_description(file_format)
+                self.console.print(f"[dim]📄 Format: {format_desc}[/dim]")
+            except FormatError:
+                pass  # Format detection failed, but reading succeeded
+            
+            return entries, field_names
+            
+        except FileOperationError as e:
+            # If multi-format reading fails, try legacy JSONL reading for backward compatibility
+            if "format error" in str(e).lower():
+                try:
+                    self.console.print(f"[yellow]⚠️  Multi-format reading failed, trying JSONL format...[/yellow]")
+                    entries, field_names = read_jsonl_file(
+                        self.config.input_file, 
+                        return_field_names=True
+                    )
+                    return entries, field_names
+                except FileOperationError:
+                    pass  # Fall through to original error
+            
+            raise  # Re-raise original error
     
     def validate_field(self, entries: List[Dict[str, Any]], field: str) -> bool:
         """

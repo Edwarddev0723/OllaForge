@@ -35,8 +35,26 @@ def _clean_response(response: str) -> str:
     
     cleaned = response.strip()
     
-    # Remove markdown code blocks
-    cleaned = re.sub(r'```(?:json)?\s*\n?(.*?)\n?```', r'\1', cleaned, flags=re.DOTALL | re.MULTILINE)
+    # Remove markdown code blocks - be more careful about nested backticks
+    # Only remove if we have proper opening and closing code blocks
+    if cleaned.startswith('```') and cleaned.endswith('```'):
+        # Find the first newline after opening backticks
+        first_newline = cleaned.find('\n')
+        if first_newline != -1:
+            # Remove opening ```json\n and closing ```
+            cleaned = cleaned[first_newline+1:-3].strip()
+        else:
+            # No newline, just remove the backticks
+            cleaned = cleaned[3:-3].strip()
+    elif '```json\n' in cleaned and cleaned.endswith('```'):
+        # Handle cases where there's text before the code block
+        start_idx = cleaned.find('```json\n') + 8
+        cleaned = cleaned[start_idx:-3].strip()
+    elif '```\n' in cleaned and cleaned.endswith('```'):
+        # Handle cases with generic code blocks
+        start_idx = cleaned.find('```\n') + 4
+        cleaned = cleaned[start_idx:-3].strip()
+    
     cleaned = cleaned.strip()
     
     # Remove common prefixes
@@ -193,7 +211,7 @@ def validate_entry(data: Dict[str, Any], dataset_type: DatasetType = DatasetType
 
 
 def process_model_response(response: str, is_batch: bool = False, 
-                           dataset_type: DatasetType = DatasetType.SFT) -> List[DatasetEntry]:
+                           dataset_type: DatasetType = DatasetType.SFT) -> Union[DatasetEntry, List[DatasetEntry], None]:
     """
     Process a raw model response into validated entry objects.
     
@@ -203,7 +221,8 @@ def process_model_response(response: str, is_batch: bool = False,
         dataset_type: Type of dataset being generated
         
     Returns:
-        List of validated entry instances (empty list if processing fails)
+        For single entries (is_batch=False): DatasetEntry or None if processing fails
+        For batch entries (is_batch=True): List of validated entry instances (empty list if processing fails)
     """
     if is_batch:
         # Parse as JSON array
@@ -228,9 +247,9 @@ def process_model_response(response: str, is_batch: bool = False,
         # Parse as single JSON object
         json_data = clean_json(response)
         if json_data is None:
-            return []
+            return None
         entry = validate_entry(json_data, dataset_type)
-        return [entry] if entry else []
+        return entry
 
 
 def process_responses(responses: List[str], 
@@ -248,7 +267,10 @@ def process_responses(responses: List[str],
     valid_entries = []
     
     for response in responses:
-        entries = process_model_response(response, dataset_type=dataset_type)
-        valid_entries.extend(entries)
+        entries = process_model_response(response, is_batch=True, dataset_type=dataset_type)
+        if isinstance(entries, list):
+            valid_entries.extend(entries)
+        elif entries is not None:
+            valid_entries.append(entries)
     
     return valid_entries

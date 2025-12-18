@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ollaforge"
-version = "1.1.0"
+version = "1.2.0"
 description = "CLI tool for generating datasets using local Ollama models"
 readme = "README.md"
 license = {text = "MIT"}
@@ -50,6 +50,10 @@ qc = [
     "transformers>=4.36.0",
     "torch>=2.0.0",
 ]
+formats = [
+    "pandas>=1.5.0",
+    "pyarrow>=10.0.0",
+]
 dev = [
     "pytest>=7.4.0",
     "hypothesis>=6.90.0",
@@ -59,7 +63,7 @@ dev = [
     "mypy>=1.0.0",
 ]
 all = [
-    "ollaforge[qc,dev]",
+    "ollaforge[qc,dev,formats]",
 ]
 
 [project.scripts]

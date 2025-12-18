@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2024-12-18
+
+### Added
+- **Multi-Format Support** - Support for CSV, JSON, TSV, and Parquet formats
+  - Automatic format detection from file extensions
+  - `convert` command for format conversion between formats
+  - `--input-format` and `--output-format` options for augment command
+  - Backward compatibility with existing JSONL workflows
+  - Smart handling of complex data structures in CSV/TSV (JSON encoding)
+  - Optional pandas dependency for Parquet support
+
+### Enhanced
+- Augmentation engine now supports multiple input/output formats
+- File manager with unified multi-format reading/writing
+- CLI with format validation and user-friendly error messages
+- Comprehensive test suite for all supported formats
+
 ## [1.1.0] - 2024-12-18
 
 ### Added
