@@ -5,15 +5,16 @@
 <h1 align="center">OllaForge 🔥</h1>
 
 <p align="center">
-  <strong>AI 驅動的 LLM 訓練資料集生成器</strong>
+  <strong>AI 驅動的 LLM 微調資料集生成與擴增工具</strong>
 </p>
 
 <p align="center">
-  <a href="#功能特色">功能特色</a> •
-  <a href="#快速開始">快速開始</a> •
-  <a href="#使用方式">使用方式</a> •
-  <a href="#資料集格式">資料集格式</a> •
-  <a href="#貢獻指南">貢獻指南</a>
+  <a href="#-功能特色">功能特色</a> •
+  <a href="#-快速開始">快速開始</a> •
+  <a href="#-使用方式">使用方式</a> •
+  <a href="#-資料集擴增">資料集擴增</a> •
+  <a href="#-資料集格式">資料集格式</a> •
+  <a href="#-效能優化">效能優化</a>
 </p>
 
 <p align="center">
@@ -21,286 +22,281 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python 3.8+">
-  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT">
-  <img src="https://img.shields.io/badge/ollama-local-orange.svg" alt="Ollama">
-  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome">
+  <a href="https://github.com/ollaforge/ollaforge/actions"><img src="https://img.shields.io/github/actions/workflow/status/ollaforge/ollaforge/ci.yml?branch=main&label=CI&logo=github" alt="CI Status"></a>
+  <a href="https://pypi.org/project/ollaforge/"><img src="https://img.shields.io/pypi/v/ollaforge?color=blue&logo=pypi&logoColor=white" alt="PyPI Version"></a>
+  <a href="https://pypi.org/project/ollaforge/"><img src="https://img.shields.io/pypi/pyversions/ollaforge?logo=python&logoColor=white" alt="Python Versions"></a>
+  <a href="https://github.com/ollaforge/ollaforge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ollaforge/ollaforge?color=green" alt="License"></a>
 </p>
 
 ---
 
-**OllaForge** 是一款強大的命令列工具，利用本地 Ollama 模型自動生成高品質、主題特定的 LLM 訓練資料集。只需一個指令，即可生成 SFT、預訓練、對話和 DPO 資料集。
+## 🎯 什麼是 OllaForge？
+
+**OllaForge** 是一個高效能的 CLI 工具，利用本地 Ollama 模型來**生成**和**擴增** LLM 微調訓練資料集。具備結構化 JSON 輸出、並行批次處理和內建品質控制功能，同時兼顧品質與速度。
+
+### 為什麼選擇 OllaForge？
+
+- 🔒 **100% 本地與隱私** - 您的資料永遠不會離開您的電腦
+- ⚡ **極速處理** - 結構化輸出的並行批次處理
+- 🎨 **靈活彈性** - 生成新資料集或擴增現有資料集
+- 🌐 **多語言支援** - 英文與繁體中文（台灣）並附品質控制
+- 🔧 **生產就緒** - 相容 HuggingFace 與 LLaMA-Factory
+
+---
 
 ## ✨ 功能特色
 
+### 🆕 資料集生成
 | 功能 | 說明 |
 |------|------|
-| 🎯 **自然語言主題** | 用白話文描述你的資料集需求 |
-| 🤖 **多模型支援** | 支援 Llama 3、Mistral、Qwen、DeepSeek 等模型 |
-| 📊 **4 種資料集格式** | SFT、預訓練、對話 (ShareGPT)、DPO |
-| 🌐 **多語言輸出** | 支援英文和繁體中文（台灣用語）|
-| 🎨 **精美介面** | 基於 Rich 的互動式精靈介面 |
-| ⚡ **批次處理** | 可設定並行數的高效生成 |
-| ✅ **自動驗證** | 內建 JSON 驗證和錯誤恢復機制 |
-| 🔄 **HuggingFace 相容** | 輸出格式相容 HuggingFace 和 LLaMA-Factory |
+| 🎯 **自然語言主題** | 用自然語言描述您的資料集需求 |
+| 🤖 **支援任何 Ollama 模型** | 支援 Llama 3、Mistral、Qwen、DeepSeek、Gemma 等 |
+| 📊 **4 種資料集格式** | SFT、預訓練、對話（ShareGPT）、DPO |
+| ⚡ **並行批次處理** | 幾分鐘內生成數百筆資料 |
+
+### 🔄 資料集擴增
+| 功能 | 說明 |
+|------|------|
+| 📝 **欄位修改** | 使用 AI 驅動的轉換增強現有欄位 |
+| ➕ **新增欄位** | 根據現有資料新增計算欄位 |
+| 👀 **預覽模式** | 在完整處理前先測試樣本 |
+| 🛡️ **失敗復原** | AI 失敗時保留原始資料 |
+
+### 🌐 品質與在地化
+| 功能 | 說明 |
+|------|------|
+| 🔍 **BERT 品質控制** | 過濾大陸用語，確保台灣繁體中文品質 |
+| 🌏 **多語言支援** | 英文與繁體中文（台灣）支援 |
+| ✅ **結構化輸出** | JSON Schema 強制執行，0% 格式錯誤 |
+| 📈 **進度追蹤** | Rich 驅動的即時進度顯示 |
+
+---
 
 ## 🚀 快速開始
 
 ### 前置需求
 
-- Python 3.8+
-- [Ollama](https://ollama.ai/) 已安裝並在本地運行
+- Python 3.9+
+- [Ollama](https://ollama.ai/) 已安裝並執行中
 
-### 安裝步驟
+### 安裝
 
 ```bash
-# 複製專案
-git clone https://github.com/yourusername/ollaforge.git
+# 從 PyPI 安裝（推薦）
+pip install ollaforge
+
+# 或從原始碼安裝
+git clone https://github.com/ollaforge/ollaforge.git
 cd ollaforge
+pip install -e .
 
-# 安裝相依套件
-pip install -r requirements.txt
+# 包含繁體中文品質控制支援
+pip install ollaforge[qc]
 
-# 確認 Ollama 正在運行
-ollama list
+# 包含所有功能
+pip install ollaforge[all]
 ```
 
-### 生成你的第一個資料集
+### 您的第一個資料集
 
 ```bash
-# 互動模式（推薦新手使用）
-python main.py -i
+# 互動模式（推薦初學者使用）
+ollaforge -i
 
-# 或直接生成
-python main.py "Python 程式設計教學" --lang zh-tw --count 100 --output python_sft.jsonl
+# 生成 SFT 資料集
+ollaforge generate "Python 程式設計教學" --count 100 --output python_sft.jsonl
+
+# 繁體中文對話資料集
+ollaforge generate "咖啡點餐對話" --type sft_conv --lang zh-tw --count 100
 ```
+
+### 擴增現有資料集
+
+```bash
+# 處理前先預覽
+ollaforge augment data.jsonl --field output --instruction "增加更多細節" --preview
+
+# 新增欄位
+ollaforge augment data.jsonl --field difficulty --new-field --instruction "評估難度：簡單/中等/困難"
+
+# 互動式擴增精靈
+ollaforge augment data.jsonl -i
+```
+
+---
 
 ## 📖 使用方式
 
-### 互動模式
-
-啟動步驟式精靈：
+### 生成指令
 
 ```bash
-python main.py -i
+ollaforge generate <主題> [選項]
 ```
-
-精靈會引導你完成：
-1. 📝 主題描述
-2. 📊 資料集類型選擇
-3. 🌐 輸出語言
-4. 🔢 生成數量
-5. 🤖 模型選擇
-6. 📄 輸出設定
-
-### 命令列模式
-
-```bash
-python main.py <主題> [選項]
-```
-
-#### 選項說明
 
 | 選項 | 簡寫 | 預設值 | 說明 |
 |------|------|--------|------|
-| `--count` | `-c` | 10 | 生成的資料筆數 |
-| `--model` | `-m` | gpt-oss:20b | 使用的 Ollama 模型 |
-| `--output` | `-o` | dataset.jsonl | 輸出檔案名稱 |
-| `--type` | `-t` | sft | 資料集類型 (sft/pretrain/sft_conv/dpo) |
-| `--lang` | `-l` | en | 輸出語言 (en/zh-tw) |
-| `--qc/--no-qc` | - | --qc | 啟用/停用台灣用語品質管控 |
-| `--qc-confidence` | - | 0.9 | QC 信心度門檻 (0.0-1.0) |
-| `--concurrency` | `-j` | 5 | 並行請求數 (1-20) |
-| `--interactive` | `-i` | - | 啟動互動模式 |
+| `--count` | `-c` | 10 | 生成數量（1-10,000） |
+| `--model` | `-m` | llama3.2 | Ollama 模型名稱 |
+| `--output` | `-o` | dataset.jsonl | 輸出檔名 |
+| `--type` | `-t` | sft | 格式：`sft`、`pretrain`、`sft_conv`、`dpo` |
+| `--lang` | `-l` | en | 語言：`en`、`zh-tw` |
+| `--concurrency` | `-j` | 5 | 並行請求數（1-20） |
+| `--qc/--no-qc` | | --qc | 台灣繁體中文品質控制 |
+| `--interactive` | `-i` | | 啟動精靈模式 |
 
-#### 使用範例
-
+### 擴增指令
 
 ```bash
-# 生成 SFT 訓練資料（繁體中文）
-python main.py "客服對話範例" --lang zh-tw --count 500 --type sft
-
-# 生成預訓練語料
-python main.py "機器學習研究論文" --lang zh-tw --type pretrain --count 1000
-
-# 生成多輪對話
-python main.py "技術支援對話" --lang zh-tw --type sft_conv --output conversations.jsonl
-
-# 生成 DPO 偏好配對
-python main.py "程式碼審查回饋" --lang zh-tw --type dpo --count 200
-
-# 使用特定模型
-python main.py "醫療問答" --model deepseek-r1:14b --lang zh-tw --count 50
+ollaforge augment <輸入檔案> [選項]
 ```
+
+| 選項 | 簡寫 | 預設值 | 說明 |
+|------|------|--------|------|
+| `--field` | `-f` | 必填 | 目標欄位 |
+| `--instruction` | `-I` | 必填 | AI 擴增指令 |
+| `--output` | `-o` | 自動 | 輸出檔案（預設：input_augmented.jsonl） |
+| `--model` | `-m` | llama3.2 | Ollama 模型名稱 |
+| `--new-field` | | false | 建立新欄位而非修改 |
+| `--context` | `-c` | | 額外上下文欄位 |
+| `--preview` | `-p` | | 處理前預覽 |
+| `--concurrency` | `-j` | 5 | 並行請求數 |
+| `--interactive` | `-i` | | 互動模式 |
+
+---
+
+## 🔄 資料集擴增
+
+OllaForge 可以使用 AI 增強現有的 JSONL 資料集。
+
+### 使用案例
+
+- **翻譯**：將欄位翻譯成不同語言
+- **豐富化**：新增難度、類別或情感等元資料
+- **擴展**：將簡短回答擴展為詳細說明
+- **轉換**：轉換格式或風格
+
+### 範例
+
+```bash
+# 將 output 欄位翻譯成中文
+ollaforge augment qa.jsonl -f output -I "翻譯成繁體中文（台灣用語）"
+
+# 新增難度評級
+ollaforge augment problems.jsonl -f difficulty --new-field -I "根據複雜度評級：簡單/中等/困難"
+
+# 擴展簡短回答
+ollaforge augment faq.jsonl -f answer -I "擴展此回答，加入更多細節和範例"
+
+# 使用上下文新增類別欄位
+ollaforge augment articles.jsonl -f category --new-field -c title -c content -I "分類：科技/科學/商業/其他"
+```
+
+---
 
 ## 📋 資料集格式
 
-OllaForge 生成的資料集相容 **HuggingFace** 和 **LLaMA-Factory**。
-
-### SFT（監督式微調）
-
-Alpaca 風格格式，用於指令微調：
-
+### SFT（Alpaca 格式）
 ```json
-{
-  "instruction": "解釋遞迴的概念",
-  "input": "我正在學習程式設計",
-  "output": "遞迴是一種程式設計技巧，函式會呼叫自己本身..."
-}
+{"instruction": "解釋遞迴", "input": "", "output": "遞迴是..."}
 ```
 
 ### 預訓練
-
-原始文字格式，用於持續預訓練：
-
 ```json
-{
-  "text": "機器學習是人工智慧的一個子領域，它使系統能夠從經驗中學習和改進..."
-}
+{"text": "機器學習是人工智慧的一個子領域..."}
 ```
 
 ### SFT 對話（ShareGPT/ChatML）
-
-多輪對話格式：
-
 ```json
 {
   "conversations": [
-    {"role": "system", "content": "你是一個有幫助的程式設計助手。"},
-    {"role": "user", "content": "如何在 Python 中反轉字串？"},
-    {"role": "assistant", "content": "你可以使用切片來反轉字串：`reversed_string = original[::-1]`"},
-    {"role": "user", "content": "用迴圈怎麼做？"},
-    {"role": "assistant", "content": "以下是使用迴圈的方法：\n```python\ndef reverse_string(s):\n    result = ''\n    for char in s:\n        result = char + result\n    return result\n```"}
+    {"role": "system", "content": "你是一個有幫助的助理。"},
+    {"role": "user", "content": "如何反轉字串？"},
+    {"role": "assistant", "content": "使用切片：`s[::-1]`"}
   ]
 }
 ```
 
-### DPO（直接偏好最佳化）
-
-用於 RLHF 訓練的偏好配對：
-
+### DPO（偏好配對）
 ```json
-{
-  "prompt": "寫一個計算階乘的函式",
-  "chosen": "以下是一個具有適當錯誤處理的高效遞迴實作：\n```python\ndef factorial(n):\n    if n < 0:\n        raise ValueError('負數沒有階乘')\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\n```",
-  "rejected": "def f(n): return n*f(n-1) if n else 1"
-}
+{"prompt": "寫階乘函數", "chosen": "def factorial(n)...", "rejected": "def f(n):..."}
 ```
 
-## 🌐 支援語言
+---
 
-| 代碼 | 語言 | 範例 |
-|------|------|------|
-| `en` | English | `--lang en` |
-| `zh-tw` | 繁體中文（台灣） | `--lang zh-tw` |
+## ⚡ 效能優化
 
-## 🔍 繁體中文品質管控 (QC)
+OllaForge 針對本地 LLM 推論進行優化：
 
-當生成繁體中文資料集時（`--lang zh-tw`），OllaForge 內建**品質管控系統**，自動過濾中國大陸用語。
+| 優化項目 | 效益 |
+|----------|------|
+| **結構化 JSON 輸出** | 透過 Ollama 的 Schema 強制執行，0% 格式錯誤 |
+| **小批次大小（5）** | 減少注意力衰減，提升品質 |
+| **並行請求** | 最多 10 個並行批次請求 |
+| **BERT 在 CPU 執行** | 保持 GPU/MPS 給 LLM 生成使用 |
+| **漏斗架構** | 過量請求 → 過濾 → 保留有效資料 |
 
-### 運作原理
+---
 
-- 使用 BERT 分類器（[renhehuang/bert-traditional-chinese-classifier](https://huggingface.co/renhehuang/bert-traditional-chinese-classifier)）
-- 將文字分類為「台灣繁體」或「大陸繁體」
-- 含有大陸用語的資料會自動重新生成
-- 預設信心度門檻：90%
+## 🔍 繁體中文品質控制
 
-### 使用方式
+使用 `--lang zh-tw` 時，OllaForge 會自動過濾大陸用語：
+
+| ❌ 過濾 | ✅ 接受 |
+|---------|---------|
+| 軟件 | 軟體 |
+| 視頻 | 影片 |
+| 程序 | 程式 |
+| 網絡 | 網路 |
+| 信息 | 資訊 |
 
 ```bash
-# 啟用 QC（使用 zh-tw 時預設啟用）
-python main.py "客服對話" --lang zh-tw --qc
+# 啟用品質控制（zh-tw 預設）
+ollaforge generate "對話" --lang zh-tw --qc
 
-# 停用 QC
-python main.py "客服對話" --lang zh-tw --no-qc
-
-# 調整信心度門檻（更嚴格）
-python main.py "客服對話" --lang zh-tw --qc-confidence 0.95
+# 更嚴格的閾值
+ollaforge generate "對話" --lang zh-tw --qc-confidence 0.95
 ```
 
-### 過濾用語範例
-
-| 大陸用語（過濾） | 台灣用語（接受） |
-|------------------|------------------|
-| 軟件 | 軟體 |
-| 程序 | 程式 |
-| 計算機 | 電腦 |
-| 網絡 | 網路 |
-| 界面 | 介面 |
+---
 
 ## 🤖 推薦模型
 
-| 模型 | 大小 | 最適用途 |
-|------|------|----------|
-| `gpt-oss:20b` | 20B | 通用目的（預設）|
-| `deepseek-r1:14b` | 14B | 推理與複雜任務 |
-| `qwen3:14b` | 14B | 多語言支援 |
-| `ministral-3:14b` | 14B | 邊緣部署 |
-| `gemma3:12b` | 12B | 單 GPU 效率 |
+| 模型 | 最適用途 | VRAM |
+|------|----------|------|
+| `llama3.2` | 通用（預設） | 8GB |
+| `qwen2.5:14b` | 多語言、中文 | 16GB |
+| `deepseek-r1:14b` | 推理任務 | 16GB |
+| `gemma2:9b` | 高效、平衡 | 12GB |
+| `mistral:7b` | 快速推論 | 8GB |
 
-## 🏗️ 專案架構
+---
 
-```
-ollaforge/
-├── main.py              # CLI 進入點
-├── ollaforge/
-│   ├── client.py        # Ollama API 通訊
-│   ├── processor.py     # 回應解析與驗證
-│   ├── models.py        # Pydantic 資料模型
-│   ├── interactive.py   # Rich 互動式介面
-│   ├── progress.py      # 進度追蹤
-│   └── file_manager.py  # 檔案 I/O 操作
-└── tests/               # 完整測試套件
-```
+## 🤝 貢獻
 
-## 🧪 開發
+歡迎貢獻！請參閱 [CONTRIBUTING.md](CONTRIBUTING.md) 了解指南。
 
-```bash
-# 執行測試
-pytest tests/ -v
+### 快速開始
 
-# 執行測試並產生覆蓋率報告
-pytest tests/ --cov=ollaforge
+1. Fork 此儲存庫
+2. 建立功能分支（`git checkout -b feature/amazing`）
+3. 為您的變更撰寫測試
+4. 確保所有測試通過（`make check`）
+5. 提交 Pull Request
 
-# 型別檢查
-mypy ollaforge/
-```
+---
 
-## 🤝 貢獻指南
+## 📜 授權
 
-我們歡迎各種貢獻！以下是參與方式：
-
-1. 🍴 Fork 這個專案
-2. 🌿 建立功能分支 (`git checkout -b feature/amazing-feature`)
-3. 💾 提交你的變更 (`git commit -m '新增超棒功能'`)
-4. 📤 推送到分支 (`git push origin feature/amazing-feature`)
-5. 🔃 開啟 Pull Request
-
-### 我們需要幫助的領域
-
-- [ ] 新增更多語言支援（日文、韓文等）
-- [ ] 更多資料集格式範本
-- [ ] 效能最佳化
-- [ ] 文件改進
-- [ ] 測試覆蓋率擴展
-
-## 📄 授權條款
-
-本專案採用 MIT 授權條款 - 詳見 [LICENSE](LICENSE) 檔案。
-
-## 🙏 致謝
-
-- [Ollama](https://ollama.ai/) 讓本地 LLM 變得觸手可及
-- [Rich](https://github.com/Textualize/rich) 提供精美的終端機輸出
-- [Typer](https://typer.tiangolo.com/) 優雅的 CLI 建立工具
-- [Pydantic](https://pydantic.dev/) 資料驗證框架
+MIT 授權 - 詳見 [LICENSE](LICENSE)。
 
 ---
 
 <p align="center">
-  由 OllaForge 團隊用 ❤️ 打造
+  <strong>由 OllaForge 團隊用 ❤️ 製作</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/yourusername/ollaforge/stargazers">⭐ 在 GitHub 上給我們一顆星</a>
+  <a href="https://github.com/ollaforge/ollaforge/issues/new?template=bug_report.md">回報問題</a> •
+  <a href="https://github.com/ollaforge/ollaforge/issues/new?template=feature_request.md">功能建議</a> •
+  <a href="https://github.com/ollaforge/ollaforge/discussions">討論區</a>
 </p>

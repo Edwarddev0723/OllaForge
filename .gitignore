@@ -71,7 +71,7 @@ dmypy.json
 
 # Generated datasets (user should manage these)
 *.jsonl
-!demo_dataset/*.jsonl
+!examples/*.jsonl
 
 # Benchmark results
 .benchmarks/
