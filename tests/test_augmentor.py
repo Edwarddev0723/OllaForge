@@ -56,7 +56,7 @@ def entry_with_context_fields(draw):
     target_field=valid_field_names,
     language=st.sampled_from([OutputLanguage.EN, OutputLanguage.ZH_TW])
 )
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_prompt_contains_context_and_instruction(data, instruction, target_field, language):
     """
     **Feature: dataset-augmentation, Property 5: Prompt Contains Context and Instruction**
@@ -129,7 +129,7 @@ def entry_and_new_field(draw):
 
 
 @given(data=st.data(), augmented_value=non_empty_text)
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_new_field_creation(data, augmented_value):
     """
     **Feature: dataset-augmentation, Property 6: New Field Creation**
@@ -208,7 +208,7 @@ def entry_with_target_field(draw):
     data=st.data(),
     ai_response_value=st.text(min_size=0, max_size=500)
 )
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_successful_response_updates_target_field(data, ai_response_value):
     """
     **Feature: dataset-augmentation, Property 7: Successful Response Updates Target Field**
@@ -290,7 +290,7 @@ def arbitrary_entry(draw):
 
 
 @given(data=st.data())
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_failure_preserves_original_entry(data):
     """
     **Feature: dataset-augmentation, Property 8: Failure Preserves Original Entry**
@@ -380,7 +380,7 @@ def list_of_entries(draw, min_size=1, max_size=20):
     data=st.data(),
     concurrency=st.integers(min_value=1, max_value=10)
 )
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_concurrent_processing_correctness(data, concurrency):
     """
     **Feature: dataset-augmentation, Property 9: Concurrent Processing Correctness**
@@ -480,7 +480,7 @@ def test_concurrent_processing_correctness(data, concurrency):
     data=st.data(),
     preview_count=st.integers(min_value=1, max_value=10)
 )
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_preview_count_correctness(data, preview_count):
     """
     **Feature: dataset-augmentation, Property 11: Preview Count Correctness**

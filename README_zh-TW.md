@@ -13,6 +13,7 @@
   <a href="#-快速開始">快速開始</a> •
   <a href="#-使用方式">使用方式</a> •
   <a href="#️-網頁介面">網頁介面</a> •
+  <a href="#-文件轉資料集">文件轉資料集</a> •
   <a href="#-資料集擴增">資料集擴增</a> •
   <a href="#-資料集格式">資料集格式</a> •
   <a href="#-貢獻">貢獻</a>
@@ -64,6 +65,16 @@
 | ➕ **新增欄位** | 根據現有資料新增計算欄位 |
 | 👀 **預覽模式** | 在完整處理前先測試樣本 |
 | 🛡️ **失敗復原** | AI 失敗時保留原始資料 |
+
+### 📄 文件轉資料集
+
+| 功能 | 說明 |
+|------|------|
+| 📑 **多格式解析** | 支援 Markdown、PDF、HTML、TXT、JSON 和程式碼檔案 |
+| ✂️ **智慧分塊** | 語意邊界感知的文字分割 |
+| 🎯 **4 種輸出格式** | SFT、預訓練、對話、DPO |
+| 📁 **批次處理** | 使用 glob 模式處理整個目錄 |
+| 🔍 **品質控制** | 內建驗證與品質控制過濾 |
 
 ### 📁 多格式支援
 
@@ -152,6 +163,19 @@ ollaforge augment data.csv --field sentiment --new-field --instruction "分析�
 ollaforge convert data.csv data.jsonl
 ```
 
+### 文件轉資料集
+
+```bash
+# 將 Markdown 文件轉換為 SFT 資料集
+ollaforge doc2dataset README.md --type sft --output readme_dataset.jsonl
+
+# 處理目錄中所有 Python 檔案
+ollaforge doc2dataset ./src --pattern "*.py" --type pretrain
+
+# 將 PDF 轉換為繁體中文資料集
+ollaforge doc2dataset manual.pdf --lang zh-tw --qc
+```
+
 ---
 
 ## 📖 使用方式
@@ -189,6 +213,38 @@ ollaforge augment <輸入檔案> [選項]
 | `--context` | `-c` | | 額外上下文欄位 |
 | `--preview` | `-p` | | 處理前預覽 |
 | `--concurrency` | `-j` | 5 | 並行請求數 |
+
+### 文件轉資料集指令
+
+將文件（Markdown、PDF、HTML、TXT、JSON、程式碼檔案）轉換為微調資料集。
+
+```bash
+ollaforge doc2dataset <來源> [選項]
+```
+
+| 選項 | 簡寫 | 預設值 | 說明 |
+|------|------|--------|------|
+| `--output` | `-o` | dataset.jsonl | 輸出檔案路徑 |
+| `--type` | `-t` | sft | 格式：`sft`、`pretrain`、`sft_conv`、`dpo` |
+| `--model` | `-m` | llama3.2 | Ollama 模型名稱 |
+| `--chunk-size` | | 2000 | 區塊大小（字元數，500-10000） |
+| `--chunk-overlap` | | 200 | 區塊重疊（0-1000） |
+| `--count` | `-c` | 3 | 每區塊生成筆數（1-10） |
+| `--lang` | `-l` | en | 語言：`en`、`zh-tw` |
+| `--pattern` | `-p` | | 目錄檔案模式（如 `*.md`） |
+| `--recursive/--no-recursive` | | --recursive | 遞迴處理目錄 |
+| `--qc/--no-qc` | | --qc | 啟用品質控制 |
+
+#### 支援的檔案格式
+
+| 格式 | 副檔名 | 說明 |
+|------|--------|------|
+| Markdown | `.md` | 保留標題結構 |
+| PDF | `.pdf` | 提取所有頁面文字 |
+| HTML | `.html`、`.htm` | 移除標籤，保留文字 |
+| 純文字 | `.txt` | 直接讀取文字 |
+| JSON | `.json` | 提取字串值 |
+| 程式碼 | `.py`、`.js`、`.ts`、`.java`、`.go`、`.rs`、`.c`、`.cpp`、`.rb` | 語言偵測 |
 
 ---
 
@@ -241,6 +297,57 @@ npm run dev
 
 - Swagger UI：http://localhost:8000/docs
 - ReDoc：http://localhost:8000/redoc
+
+---
+
+## 📄 文件轉資料集
+
+OllaForge 可以使用 AI 驅動的內容分析，將各種文件格式轉換為微調資料集。
+
+### 運作方式
+
+1. **解析**：解析文件以提取文字內容
+2. **分塊**：將長文件分割成可管理的區塊，尊重語意邊界
+3. **生成**：AI 分析每個區塊並生成訓練資料項目
+4. **驗證**：根據格式 Schema 驗證輸出，並可選擇性啟用品質控制過濾
+
+### 使用案例
+
+- **文件 → 問答**：將技術文件轉換為問答配對
+- **程式碼 → 教學**：將程式碼檔案轉換為教學內容
+- **文章 → 對話**：從文章建立對話資料集
+- **手冊 → 訓練資料**：從產品手冊生成微調資料
+
+### 範例
+
+```bash
+# 將專案 README 轉換為 SFT 資料集
+ollaforge doc2dataset README.md --type sft --count 5
+
+# 處理資料夾中所有 Markdown 文件
+ollaforge doc2dataset ./docs --pattern "*.md" --type sft_conv
+
+# 將 PDF 手冊轉換為繁體中文輸出
+ollaforge doc2dataset manual.pdf --lang zh-tw --qc
+
+# 從原始碼生成預訓練資料
+ollaforge doc2dataset ./src --pattern "*.py" --type pretrain --chunk-size 1500
+
+# 批次處理 HTML 文件
+ollaforge doc2dataset ./html_docs --pattern "*.html" --type sft --output training_data.jsonl
+```
+
+### 安裝
+
+文件解析需要額外的依賴套件：
+
+```bash
+# 安裝文件解析支援
+pip install ollaforge[docs]
+
+# 或安裝所有功能
+pip install ollaforge[all]
+```
 
 ---
 

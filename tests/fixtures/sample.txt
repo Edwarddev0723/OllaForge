@@ -1,0 +1,7 @@
+This is a sample plain text file.
+
+It contains multiple paragraphs separated by blank lines.
+
+This is the third paragraph with some content.
+
+And this is the final paragraph.

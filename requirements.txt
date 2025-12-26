@@ -8,3 +8,7 @@ pytest>=7.4.0
 # QC module for Traditional Chinese (Taiwan) validation
 transformers>=4.36.0
 torch>=2.0.0
+
+# Document parsing for doc2dataset command
+PyPDF2>=3.0.0
+beautifulsoup4>=4.12.0

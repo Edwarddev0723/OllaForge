@@ -302,3 +302,132 @@ class AugmentationResult(BaseModel):
         if self.total_entries == 0:
             return 0.0
         return (self.success_count / self.total_entries) * 100
+
+
+# ============================================================================
+# Document to Dataset Models
+# ============================================================================
+
+class DocToDatasetConfig(BaseModel):
+    """
+    Configuration for document-to-dataset conversion.
+    
+    This model defines all parameters needed to convert documents into
+    fine-tuning datasets using Ollama LLM.
+    
+    Requirements satisfied:
+    - 4.2: Document path as required argument
+    - 4.3: Dataset type specification (sft, pretrain, sft_conv, dpo)
+    - 4.6: Chunk size configuration (500-10000)
+    - 4.7: Chunk overlap configuration (0-1000)
+    - 4.8: Entries per chunk configuration (1-10)
+    - 4.9: Output language specification (en, zh-tw)
+    - 5.6: Parameter validation before generation
+    """
+    source_path: str = Field(..., description="Source document or directory path")
+    output_file: str = Field("dataset.jsonl", description="Output dataset file path")
+    dataset_type: DatasetType = Field(DatasetType.SFT, description="Dataset type")
+    model: str = Field("llama3.2", description="Ollama model to use")
+    language: OutputLanguage = Field(OutputLanguage.EN, description="Output language")
+    chunk_size: int = Field(2000, ge=500, le=10000, description="Chunk size in characters")
+    chunk_overlap: int = Field(200, ge=0, le=1000, description="Overlap between chunks")
+    entries_per_chunk: int = Field(3, ge=1, le=10, description="Entries to generate per chunk")
+    file_pattern: Optional[str] = Field(None, description="File pattern for directory processing")
+    recursive: bool = Field(True, description="Recursively process directories")
+    qc_enabled: bool = Field(True, description="Enable quality control")
+    qc_confidence: float = Field(0.9, ge=0.0, le=1.0, description="QC confidence threshold")
+    
+    @validator('source_path')
+    def source_path_must_not_be_empty(cls, v):
+        """Validate that source path is not empty."""
+        if not v or not v.strip():
+            raise ValueError('Source path cannot be empty')
+        return v.strip()
+    
+    @validator('output_file')
+    def output_file_must_be_valid(cls, v):
+        """Validate that output file path is not empty."""
+        if not v or not v.strip():
+            raise ValueError('Output file path cannot be empty')
+        return v.strip()
+    
+    @validator('model')
+    def model_must_not_be_empty(cls, v):
+        """Validate that model name is not empty."""
+        if not v or not v.strip():
+            raise ValueError('Model name cannot be empty')
+        return v.strip()
+    
+    @validator('chunk_overlap')
+    def overlap_must_be_less_than_size(cls, v, values):
+        """Validate that chunk overlap is less than chunk size."""
+        if 'chunk_size' in values and v >= values['chunk_size']:
+            raise ValueError('Chunk overlap must be less than chunk size')
+        return v
+
+
+class DocProcessingResult(BaseModel):
+    """
+    Result of processing a single document.
+    
+    This model captures the outcome of processing one document file,
+    including chunk and entry counts and any errors encountered.
+    
+    Requirements satisfied:
+    - 6.4: Per-file progress tracking
+    - 6.6: Individual file failure reporting
+    """
+    source_file: str = Field(..., description="Source file path")
+    chunks_processed: int = Field(..., ge=0, description="Number of chunks processed")
+    entries_generated: int = Field(..., ge=0, description="Number of entries generated")
+    errors: List[str] = Field(default_factory=list, description="Error messages")
+    
+    @property
+    def success(self) -> bool:
+        """Check if processing was successful (no errors)."""
+        return len(self.errors) == 0
+
+
+class BatchProcessingResult(BaseModel):
+    """
+    Result of batch document processing.
+    
+    This model captures the outcome of processing multiple documents,
+    including aggregate statistics and per-file results.
+    
+    Requirements satisfied:
+    - 6.4: Per-file progress display
+    - 6.5: Combined results from all files
+    - 6.6: Failure reporting with continuation
+    """
+    total_files: int = Field(..., ge=0, description="Total number of files")
+    successful_files: int = Field(..., ge=0, description="Successfully processed files")
+    failed_files: int = Field(..., ge=0, description="Failed files")
+    total_entries: int = Field(..., ge=0, description="Total entries generated")
+    output_file: str = Field(..., description="Output file path")
+    duration: float = Field(..., ge=0, description="Processing duration in seconds")
+    file_results: List[DocProcessingResult] = Field(
+        default_factory=list, description="Per-file processing results"
+    )
+    errors: List[str] = Field(default_factory=list, description="Global error messages")
+    
+    @property
+    def success_rate(self) -> float:
+        """Calculate the file success rate as a percentage."""
+        if self.total_files == 0:
+            return 0.0
+        return (self.successful_files / self.total_files) * 100
+    
+    @validator('successful_files')
+    def successful_must_not_exceed_total(cls, v, values):
+        """Validate that successful files don't exceed total."""
+        if 'total_files' in values and v > values['total_files']:
+            raise ValueError('Successful files cannot exceed total files')
+        return v
+    
+    @validator('failed_files')
+    def failed_must_not_exceed_total(cls, v, values):
+        """Validate that failed files don't exceed total."""
+        if 'total_files' in values and v > values['total_files']:
+            raise ValueError('Failed files cannot exceed total files')
+        return v

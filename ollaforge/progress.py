@@ -8,7 +8,7 @@ for the dataset generation process.
 import time
 from typing import List, Optional
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
@@ -57,6 +57,8 @@ class ProgressTracker:
             TaskProgressColumn(),
             TextColumn("•"),
             TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
             console=self.console,
             transient=False
         )

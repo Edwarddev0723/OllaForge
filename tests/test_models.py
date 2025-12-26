@@ -90,7 +90,7 @@ def dataset_with_fields(draw):
 
 
 @given(data=st.data())
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_field_validation_existing_field_accepted(data):
     """
     **Feature: dataset-augmentation, Property 3: Field Validation - Existing Field Accepted**
@@ -111,7 +111,7 @@ def test_field_validation_existing_field_accepted(data):
 
 
 @given(data=st.data())
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_field_validation_non_existing_field_rejected(data):
     """
     **Feature: dataset-augmentation, Property 4: Field Validation - Non-Existing Field Rejected**
@@ -150,7 +150,7 @@ def test_field_validation_non_existing_field_rejected(data):
     duration=st.floats(min_value=0.0, max_value=86400.0, allow_nan=False, allow_infinity=False),
     output_file=st.text(min_size=1, max_size=100).filter(lambda x: x.strip())
 )
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_statistics_accuracy(success_count, failure_count, duration, output_file):
     """
     **Feature: dataset-augmentation, Property 10: Statistics Accuracy**

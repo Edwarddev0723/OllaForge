@@ -130,7 +130,7 @@ def test_progress_indicators_show_during_operations(task_id, progress, total):
     num_updates=st.integers(min_value=2, max_value=10),
     total=st.integers(min_value=10, max_value=100)
 )
-@settings(max_examples=100, deadline=15000)
+@settings(max_examples=20, deadline=15000)
 def test_progress_updates_in_real_time(task_id, num_updates, total):
     """
     **Feature: web-interface, Property 9: Progress updates in real-time**

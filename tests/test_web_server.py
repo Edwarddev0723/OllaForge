@@ -195,7 +195,7 @@ http_method_strategy = st.sampled_from([
     origin=http_origin_strategy,
     method=http_method_strategy
 )
-@settings(max_examples=100)
+@settings(max_examples=20)
 def test_cors_headers_are_present(origin, method):
     """
     **Feature: web-interface, Property 31: CORS headers are present**

@@ -119,8 +119,8 @@ class TestFormatSize:
     )
 )
 @settings(max_examples=20, deadline=60000)
-@patch('ollaforge.web.routes.models.ollama')
-def test_model_information_includes_size(mock_ollama, model_names, model_sizes):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+def test_model_information_includes_size(mock_get_client, model_names, model_sizes):
     """
     **Feature: web-interface, Property 33: Model information includes size**
     **Validates: Requirements 10.2**
@@ -139,7 +139,9 @@ def test_model_information_includes_size(mock_ollama, model_names, model_sizes):
                 create_mock_model(name, size)
                 for name, size in zip(model_names, model_sizes)
             ]
-            mock_ollama.list.return_value = create_mock_ollama_response(mock_models)
+            mock_client = MagicMock()
+            mock_client.list.return_value = create_mock_ollama_response(mock_models)
+            mock_get_client.return_value = mock_client
             
             # Request model list
             response = await client.get("/api/models")
@@ -178,11 +180,11 @@ def test_model_information_includes_size(mock_ollama, model_names, model_sizes):
     model_index=st.integers(min_value=0, max_value=4)
 )
 @settings(max_examples=20, deadline=60000)
-@patch('ollaforge.web.routes.models.ollama')
+@patch('ollaforge.web.routes.models._get_ollama_client')
 @patch('ollaforge.web.routes.models.get_available_models')
 def test_model_validation_before_generation(
     mock_get_models,
-    mock_ollama,
+    mock_get_client,
     existing_models,
     model_index
 ):
@@ -200,7 +202,9 @@ def test_model_validation_before_generation(
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
             # Create mock models
             mock_models = [create_mock_model(name, 1024**3) for name in existing_models]
-            mock_ollama.list.return_value = create_mock_ollama_response(mock_models)
+            mock_client = MagicMock()
+            mock_client.list.return_value = create_mock_ollama_response(mock_models)
+            mock_get_client.return_value = mock_client
             mock_get_models.return_value = existing_models
             
             valid_model = existing_models[model_index]
@@ -232,8 +236,8 @@ def test_model_validation_before_generation(
     error_message=st.text(min_size=1, max_size=100).filter(lambda x: x.strip())
 )
 @settings(max_examples=10, deadline=60000)
-@patch('ollaforge.web.routes.models.ollama')
-def test_ollama_unavailability_shows_clear_error(mock_ollama, error_message):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+def test_ollama_unavailability_shows_clear_error(mock_get_client, error_message):
     """
     **Feature: web-interface, Property 25: Ollama unavailability shows clear error**
     **Validates: Requirements 7.5**
@@ -245,7 +249,9 @@ def test_ollama_unavailability_shows_clear_error(mock_ollama, error_message):
         transport = ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
             # Simulate connection error
-            mock_ollama.list.side_effect = Exception(f"Connection refused: {error_message}")
+            mock_client = MagicMock()
+            mock_client.list.side_effect = Exception(f"Connection refused: {error_message}")
+            mock_get_client.return_value = mock_client
             
             # Request model list
             response = await client.get("/api/models")
@@ -273,8 +279,8 @@ def test_ollama_unavailability_shows_clear_error(mock_ollama, error_message):
 # ============================================================================
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
-async def test_list_models_success(mock_ollama):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+async def test_list_models_success(mock_get_client):
     """
     Test successful model listing.
     
@@ -285,7 +291,9 @@ async def test_list_models_success(mock_ollama):
         create_mock_model("llama3.2", 3 * 1024**3, "2024-01-15T10:30:00Z"),
         create_mock_model("mistral", 7 * 1024**3, "2024-01-10T08:20:00Z"),
     ]
-    mock_ollama.list.return_value = create_mock_ollama_response(mock_models)
+    mock_client = MagicMock()
+    mock_client.list.return_value = create_mock_ollama_response(mock_models)
+    mock_get_client.return_value = mock_client
     
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -305,15 +313,17 @@ async def test_list_models_success(mock_ollama):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
-async def test_list_models_empty(mock_ollama):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+async def test_list_models_empty(mock_get_client):
     """
     Test listing when no models are available.
     
     Requirements satisfied:
     - 10.5: Display instructions for installing Ollama models
     """
-    mock_ollama.list.return_value = create_mock_ollama_response([])
+    mock_client = MagicMock()
+    mock_client.list.return_value = create_mock_ollama_response([])
+    mock_get_client.return_value = mock_client
     
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -327,15 +337,17 @@ async def test_list_models_empty(mock_ollama):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
-async def test_list_models_connection_error(mock_ollama):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+async def test_list_models_connection_error(mock_get_client):
     """
     Test model listing when Ollama is unavailable.
     
     Requirements satisfied:
     - 10.3: Display warning when Ollama service is not available
     """
-    mock_ollama.list.side_effect = Exception("Connection refused")
+    mock_client = MagicMock()
+    mock_client.list.side_effect = Exception("Connection refused")
+    mock_get_client.return_value = mock_client
     
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -349,8 +361,8 @@ async def test_list_models_connection_error(mock_ollama):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
-async def test_get_model_info_success(mock_ollama):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+async def test_get_model_info_success(mock_get_client):
     """
     Test getting info for a specific model.
     
@@ -360,7 +372,9 @@ async def test_get_model_info_success(mock_ollama):
     mock_models = [
         create_mock_model("llama3.2", 3 * 1024**3, "2024-01-15T10:30:00Z"),
     ]
-    mock_ollama.list.return_value = create_mock_ollama_response(mock_models)
+    mock_client = MagicMock()
+    mock_client.list.return_value = create_mock_ollama_response(mock_models)
+    mock_get_client.return_value = mock_client
     
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -375,9 +389,9 @@ async def test_get_model_info_success(mock_ollama):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
+@patch('ollaforge.web.routes.models._get_ollama_client')
 @patch('ollaforge.web.routes.models.get_available_models')
-async def test_get_model_info_not_found(mock_get_models, mock_ollama):
+async def test_get_model_info_not_found(mock_get_models, mock_get_client):
     """
     Test getting info for a non-existent model.
     
@@ -387,7 +401,9 @@ async def test_get_model_info_not_found(mock_get_models, mock_ollama):
     mock_models = [
         create_mock_model("llama3.2", 3 * 1024**3),
     ]
-    mock_ollama.list.return_value = create_mock_ollama_response(mock_models)
+    mock_client = MagicMock()
+    mock_client.list.return_value = create_mock_ollama_response(mock_models)
+    mock_get_client.return_value = mock_client
     mock_get_models.return_value = ["llama3.2"]
     
     transport = ASGITransport(app=app)
@@ -402,15 +418,17 @@ async def test_get_model_info_not_found(mock_get_models, mock_ollama):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
-async def test_get_model_info_connection_error(mock_ollama):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+async def test_get_model_info_connection_error(mock_get_client):
     """
     Test getting model info when Ollama is unavailable.
     
     Requirements satisfied:
     - 10.3: Display warning when Ollama service is not available
     """
-    mock_ollama.list.side_effect = Exception("Connection refused")
+    mock_client = MagicMock()
+    mock_client.list.side_effect = Exception("Connection refused")
+    mock_get_client.return_value = mock_client
     
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -420,8 +438,8 @@ async def test_get_model_info_connection_error(mock_ollama):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
-async def test_validate_model_success(mock_ollama):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+async def test_validate_model_success(mock_get_client):
     """
     Test validating an existing model.
     
@@ -431,7 +449,9 @@ async def test_validate_model_success(mock_ollama):
     mock_models = [
         create_mock_model("llama3.2", 3 * 1024**3),
     ]
-    mock_ollama.list.return_value = create_mock_ollama_response(mock_models)
+    mock_client = MagicMock()
+    mock_client.list.return_value = create_mock_ollama_response(mock_models)
+    mock_get_client.return_value = mock_client
     
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -445,9 +465,9 @@ async def test_validate_model_success(mock_ollama):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
+@patch('ollaforge.web.routes.models._get_ollama_client')
 @patch('ollaforge.web.routes.models.get_available_models')
-async def test_validate_model_not_found(mock_get_models, mock_ollama):
+async def test_validate_model_not_found(mock_get_models, mock_get_client):
     """
     Test validating a non-existent model.
     
@@ -457,7 +477,9 @@ async def test_validate_model_not_found(mock_get_models, mock_ollama):
     mock_models = [
         create_mock_model("llama3.2", 3 * 1024**3),
     ]
-    mock_ollama.list.return_value = create_mock_ollama_response(mock_models)
+    mock_client = MagicMock()
+    mock_client.list.return_value = create_mock_ollama_response(mock_models)
+    mock_get_client.return_value = mock_client
     mock_get_models.return_value = ["llama3.2"]
     
     transport = ASGITransport(app=app)
@@ -468,8 +490,8 @@ async def test_validate_model_not_found(mock_get_models, mock_ollama):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
-async def test_list_models_with_missing_size(mock_ollama):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+async def test_list_models_with_missing_size(mock_get_client):
     """
     Test listing models when some don't have size info.
     """
@@ -477,7 +499,9 @@ async def test_list_models_with_missing_size(mock_ollama):
         create_mock_model("llama3.2", 3 * 1024**3),
         create_mock_model("custom-model"),  # No size
     ]
-    mock_ollama.list.return_value = create_mock_ollama_response(mock_models)
+    mock_client = MagicMock()
+    mock_client.list.return_value = create_mock_ollama_response(mock_models)
+    mock_get_client.return_value = mock_client
     
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -496,12 +520,14 @@ async def test_list_models_with_missing_size(mock_ollama):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.models.ollama')
-async def test_list_models_invalid_response(mock_ollama):
+@patch('ollaforge.web.routes.models._get_ollama_client')
+async def test_list_models_invalid_response(mock_get_client):
     """
     Test handling of invalid Ollama response.
     """
-    mock_ollama.list.return_value = "invalid response"
+    mock_client = MagicMock()
+    mock_client.list.return_value = "invalid response"
+    mock_get_client.return_value = mock_client
     
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:

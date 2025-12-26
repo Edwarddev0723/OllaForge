@@ -622,3 +622,681 @@ def test_cli_with_whitespace_only_topic():
     # Should handle whitespace-only topics appropriately
     # May succeed with trimmed topic or fail with validation error
     assert result.exit_code is not None
+
+
+# ============================================================================
+# doc2dataset Command Tests
+# ============================================================================
+
+
+def test_doc2dataset_help_display():
+    """Test that doc2dataset command displays help information correctly."""
+    result = runner.invoke(app, ["doc2dataset", "--help"])
+    assert result.exit_code == 0
+    assert "Convert documents to fine-tuning datasets" in result.stdout
+    assert "--output" in result.stdout
+    assert "--type" in result.stdout
+    assert "--model" in result.stdout
+    assert "--chunk-size" in result.stdout
+    assert "--chunk-overlap" in result.stdout
+    assert "--count" in result.stdout
+    assert "--lang" in result.stdout
+    assert "--pattern" in result.stdout
+    assert "--recursive" in result.stdout
+
+
+def test_doc2dataset_with_nonexistent_source():
+    """Test doc2dataset with non-existent source file - Requirements 5.1"""
+    result = runner.invoke(app, [
+        "doc2dataset",
+        "/nonexistent/path/to/file.md"
+    ])
+    assert result.exit_code != 0
+    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    assert "Source path not found" in output or "not found" in output.lower()
+
+
+def test_doc2dataset_with_invalid_chunk_size():
+    """Test doc2dataset with invalid chunk size parameter."""
+    import tempfile
+    import os
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test\nSome content")
+        temp_file = f.name
+    
+    try:
+        # Test chunk size too small
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file,
+            "--chunk-size", "100"
+        ])
+        assert result.exit_code != 0
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Chunk size must be at least 500" in output
+        
+        # Test chunk size too large
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file,
+            "--chunk-size", "20000"
+        ])
+        assert result.exit_code != 0
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Chunk size cannot exceed 10,000" in output
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_with_invalid_chunk_overlap():
+    """Test doc2dataset with invalid chunk overlap parameter."""
+    import tempfile
+    import os
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test\nSome content")
+        temp_file = f.name
+    
+    try:
+        # Test negative overlap
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file,
+            "--chunk-overlap", "-10"
+        ])
+        assert result.exit_code != 0
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Chunk overlap cannot be negative" in output
+        
+        # Test overlap too large
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file,
+            "--chunk-overlap", "2000"
+        ])
+        assert result.exit_code != 0
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Chunk overlap cannot exceed 1,000" in output
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_with_invalid_entries_per_chunk():
+    """Test doc2dataset with invalid entries per chunk parameter."""
+    import tempfile
+    import os
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test\nSome content")
+        temp_file = f.name
+    
+    try:
+        # Test count too small
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file,
+            "--count", "0"
+        ])
+        assert result.exit_code != 0
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Entries per chunk must be at least 1" in output
+        
+        # Test count too large
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file,
+            "--count", "20"
+        ])
+        assert result.exit_code != 0
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Entries per chunk cannot exceed 10" in output
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_with_overlap_greater_than_chunk_size():
+    """Test doc2dataset with overlap >= chunk size."""
+    import tempfile
+    import os
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test\nSome content")
+        temp_file = f.name
+    
+    try:
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file,
+            "--chunk-size", "1000",
+            "--chunk-overlap", "1000"
+        ])
+        assert result.exit_code != 0
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Chunk overlap must be less than chunk size" in output
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_with_invalid_dataset_type():
+    """Test doc2dataset with invalid dataset type."""
+    import tempfile
+    import os
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test\nSome content")
+        temp_file = f.name
+    
+    try:
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file,
+            "--type", "invalid_type"
+        ])
+        assert result.exit_code != 0
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Invalid dataset type" in output
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_with_invalid_language():
+    """Test doc2dataset with invalid language."""
+    import tempfile
+    import os
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test\nSome content")
+        temp_file = f.name
+    
+    try:
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file,
+            "--lang", "invalid_lang"
+        ])
+        assert result.exit_code != 0
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Invalid language" in output
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_displays_config():
+    """Test that doc2dataset displays configuration correctly."""
+    import tempfile
+    import os
+    from unittest.mock import patch
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test Document\n\nThis is test content for the document.")
+        temp_file = f.name
+    
+    try:
+        # Mock the Ollama client to avoid actual API calls
+        with patch('ollaforge.doc_generator.ollama') as mock_ollama:
+            mock_ollama.chat.return_value = {
+                'message': {
+                    'content': '[{"instruction": "test", "input": "test", "output": "test"}]'
+                }
+            }
+            
+            result = runner.invoke(app, [
+                "doc2dataset",
+                temp_file,
+                "--type", "sft",
+                "--model", "test-model",
+                "--chunk-size", "1000",
+                "--chunk-overlap", "100",
+                "--count", "2",
+                "--lang", "en"
+            ])
+            
+            # Strip ANSI color codes for comparison
+            import re
+            clean_output = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
+            
+            # Check that configuration is displayed
+            assert "Document to Dataset" in clean_output
+            assert "Source:" in clean_output
+            assert "Output:" in clean_output
+            assert "Type:" in clean_output
+            assert "Model:" in clean_output
+            assert "Chunk size:" in clean_output
+            assert "Chunk overlap:" in clean_output
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_with_empty_directory():
+    """Test doc2dataset with empty directory."""
+    import tempfile
+    import os
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_dir
+        ])
+        
+        # Should exit gracefully with message about no files found
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "No supported files found" in output or result.exit_code == 0
+
+
+def test_doc2dataset_with_unsupported_file():
+    """Test doc2dataset with unsupported file format."""
+    import tempfile
+    import os
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.xyz', delete=False) as f:
+        f.write("Some content")
+        temp_file = f.name
+    
+    try:
+        result = runner.invoke(app, [
+            "doc2dataset",
+            temp_file
+        ])
+        
+        # Should show unsupported format error
+        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        assert "Unsupported format" in output or "No supported files found" in output
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_with_permission_error():
+    """Test doc2dataset with permission error - Requirements 5.2"""
+    import tempfile
+    import os
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a file and make it unreadable
+        temp_file = os.path.join(temp_dir, "test.md")
+        with open(temp_file, 'w') as f:
+            f.write("# Test\nContent")
+        
+        # Make file unreadable
+        os.chmod(temp_file, 0o000)
+        
+        try:
+            result = runner.invoke(app, [
+                "doc2dataset",
+                temp_file
+            ])
+            
+            # Should show permission error
+            assert result.exit_code != 0
+            output = result.stdout + (result.output if hasattr(result, 'output') else '')
+            assert "permission" in output.lower() or "Permission" in output
+        finally:
+            # Restore permissions for cleanup
+            os.chmod(temp_file, 0o644)
+
+
+def test_doc2dataset_ollama_connection_error():
+    """Test doc2dataset with Ollama connection error - Requirements 5.3"""
+    import tempfile
+    import os
+    from unittest.mock import patch
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test Document\n\nThis is test content.")
+        temp_file = f.name
+    
+    try:
+        with patch('ollaforge.doc_generator.ollama') as mock_ollama:
+            from ollaforge.client import OllamaConnectionError
+            mock_ollama.chat.side_effect = Exception("Connection refused")
+            
+            result = runner.invoke(app, [
+                "doc2dataset",
+                temp_file
+            ])
+            
+            # The command should handle the error gracefully
+            # It may show an error or generate no entries
+            assert result.exit_code is not None
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_parameter_validation():
+    """Test doc2dataset parameter validation callbacks."""
+    from ollaforge.cli import (
+        validate_chunk_size,
+        validate_chunk_overlap,
+        validate_entries_per_chunk,
+        validate_source_path,
+    )
+    from typer import BadParameter
+    
+    # Test validate_chunk_size
+    assert validate_chunk_size(500) == 500
+    assert validate_chunk_size(2000) == 2000
+    assert validate_chunk_size(10000) == 10000
+    
+    with pytest.raises(BadParameter):
+        validate_chunk_size(499)
+    
+    with pytest.raises(BadParameter):
+        validate_chunk_size(10001)
+    
+    # Test validate_chunk_overlap
+    assert validate_chunk_overlap(0) == 0
+    assert validate_chunk_overlap(200) == 200
+    assert validate_chunk_overlap(1000) == 1000
+    
+    with pytest.raises(BadParameter):
+        validate_chunk_overlap(-1)
+    
+    with pytest.raises(BadParameter):
+        validate_chunk_overlap(1001)
+    
+    # Test validate_entries_per_chunk
+    assert validate_entries_per_chunk(1) == 1
+    assert validate_entries_per_chunk(5) == 5
+    assert validate_entries_per_chunk(10) == 10
+    
+    with pytest.raises(BadParameter):
+        validate_entries_per_chunk(0)
+    
+    with pytest.raises(BadParameter):
+        validate_entries_per_chunk(11)
+    
+    # Test validate_source_path with non-existent path
+    with pytest.raises(BadParameter):
+        validate_source_path("/nonexistent/path")
+    
+    with pytest.raises(BadParameter):
+        validate_source_path("")
+    
+    with pytest.raises(BadParameter):
+        validate_source_path("   ")
+
+
+# ============================================================================
+# Doc2Dataset Interrupt Handler Tests
+# ============================================================================
+
+
+class TestDoc2DatasetInterruptHandler:
+    """Tests for Doc2DatasetInterruptHandler class - Requirements 5.5"""
+    
+    def test_interrupt_handler_initialization(self):
+        """Test that interrupt handler initializes correctly."""
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        
+        handler = Doc2DatasetInterruptHandler("test_output.jsonl")
+        
+        assert handler.interrupted == False
+        assert handler.get_entries() == []
+        assert handler._output_file == "test_output.jsonl"
+    
+    def test_interrupt_handler_set_entries(self):
+        """Test setting entries in the interrupt handler."""
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        
+        handler = Doc2DatasetInterruptHandler("test_output.jsonl")
+        
+        entries = [
+            {"instruction": "test1", "input": "input1", "output": "output1"},
+            {"instruction": "test2", "input": "input2", "output": "output2"},
+        ]
+        
+        handler.set_entries(entries)
+        
+        assert handler.get_entries() == entries
+        assert len(handler.get_entries()) == 2
+    
+    def test_interrupt_handler_add_entries(self):
+        """Test adding entries to the interrupt handler."""
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        
+        handler = Doc2DatasetInterruptHandler("test_output.jsonl")
+        
+        # Add first batch
+        handler.add_entries([{"instruction": "test1", "input": "input1", "output": "output1"}])
+        assert len(handler.get_entries()) == 1
+        
+        # Add second batch
+        handler.add_entries([
+            {"instruction": "test2", "input": "input2", "output": "output2"},
+            {"instruction": "test3", "input": "input3", "output": "output3"},
+        ])
+        assert len(handler.get_entries()) == 3
+        
+        # Adding empty list should not change anything
+        handler.add_entries([])
+        assert len(handler.get_entries()) == 3
+        
+        # Adding None should not change anything
+        handler.add_entries(None)
+        assert len(handler.get_entries()) == 3
+    
+    def test_interrupt_handler_save_partial_results_empty(self):
+        """Test saving partial results when no entries exist."""
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        
+        handler = Doc2DatasetInterruptHandler("test_output.jsonl")
+        
+        # Should return None when no entries
+        result = handler.save_partial_results()
+        assert result is None
+    
+    def test_interrupt_handler_save_partial_results_with_entries(self):
+        """Test saving partial results with entries - Requirements 5.5"""
+        import tempfile
+        import os
+        import json
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = os.path.join(temp_dir, "test_output.jsonl")
+            handler = Doc2DatasetInterruptHandler(output_file)
+            
+            entries = [
+                {"instruction": "test1", "input": "input1", "output": "output1"},
+                {"instruction": "test2", "input": "input2", "output": "output2"},
+            ]
+            handler.set_entries(entries)
+            
+            # Save partial results
+            result = handler.save_partial_results()
+            
+            # Should return the path to the partial file
+            assert result is not None
+            assert "partial" in result
+            assert result.endswith(".jsonl")
+            
+            # Verify the file was created and contains the entries
+            assert os.path.exists(result)
+            
+            with open(result, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                assert len(lines) == 2
+                
+                # Verify content
+                entry1 = json.loads(lines[0])
+                assert entry1["instruction"] == "test1"
+                
+                entry2 = json.loads(lines[1])
+                assert entry2["instruction"] == "test2"
+    
+    def test_interrupt_handler_save_partial_results_with_pydantic_models(self):
+        """Test saving partial results with Pydantic model entries."""
+        import tempfile
+        import os
+        import json
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        from ollaforge.models import DataEntry
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = os.path.join(temp_dir, "test_output.jsonl")
+            handler = Doc2DatasetInterruptHandler(output_file)
+            
+            # Create Pydantic model entries
+            entries = [
+                DataEntry(instruction="test1", input="input1", output="output1"),
+                DataEntry(instruction="test2", input="input2", output="output2"),
+            ]
+            handler.set_entries(entries)
+            
+            # Save partial results
+            result = handler.save_partial_results()
+            
+            # Should successfully save Pydantic models
+            assert result is not None
+            assert os.path.exists(result)
+            
+            with open(result, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                assert len(lines) == 2
+    
+    def test_interrupt_handler_save_partial_results_filters_none(self):
+        """Test that save_partial_results filters out None entries."""
+        import tempfile
+        import os
+        import json
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = os.path.join(temp_dir, "test_output.jsonl")
+            handler = Doc2DatasetInterruptHandler(output_file)
+            
+            # Mix of valid entries and None
+            entries = [
+                {"instruction": "test1", "input": "input1", "output": "output1"},
+                None,
+                {"instruction": "test2", "input": "input2", "output": "output2"},
+                None,
+            ]
+            handler.set_entries(entries)
+            
+            # Save partial results
+            result = handler.save_partial_results()
+            
+            # Should only save valid entries
+            assert result is not None
+            
+            with open(result, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                assert len(lines) == 2  # Only 2 valid entries
+    
+    def test_interrupt_handler_setup_and_cleanup(self):
+        """Test signal handler setup and cleanup."""
+        import signal
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        
+        handler = Doc2DatasetInterruptHandler("test_output.jsonl")
+        
+        # Get original handler
+        original = signal.getsignal(signal.SIGINT)
+        
+        # Setup should change the handler
+        handler.setup()
+        current = signal.getsignal(signal.SIGINT)
+        assert current != original
+        
+        # Cleanup should restore the original handler
+        handler.cleanup()
+        restored = signal.getsignal(signal.SIGINT)
+        assert restored == original
+    
+    def test_interrupt_handler_interrupted_state(self):
+        """Test that interrupted state is properly tracked."""
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        
+        handler = Doc2DatasetInterruptHandler("test_output.jsonl")
+        
+        # Initially not interrupted
+        assert handler.interrupted == False
+        
+        # Simulate interrupt by calling the handler directly
+        handler._handle_interrupt(None, None)
+        
+        # Should now be interrupted
+        assert handler.interrupted == True
+    
+    def test_interrupt_handler_creates_parent_directory(self):
+        """Test that save_partial_results creates parent directory if needed."""
+        import tempfile
+        import os
+        from ollaforge.cli import Doc2DatasetInterruptHandler
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Use a nested path that doesn't exist
+            output_file = os.path.join(temp_dir, "nested", "dir", "test_output.jsonl")
+            handler = Doc2DatasetInterruptHandler(output_file)
+            
+            entries = [{"instruction": "test", "input": "input", "output": "output"}]
+            handler.set_entries(entries)
+            
+            # Save should create the nested directory
+            result = handler.save_partial_results()
+            
+            assert result is not None
+            assert os.path.exists(result)
+
+
+def test_doc2dataset_interrupt_handling_integration():
+    """Integration test for doc2dataset interrupt handling - Requirements 5.5"""
+    import tempfile
+    import os
+    from unittest.mock import patch, MagicMock
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test Document\n\nThis is test content for the document.")
+        temp_file = f.name
+    
+    try:
+        # Mock the generator to simulate partial processing
+        with patch('ollaforge.doc_generator.ollama') as mock_ollama:
+            mock_ollama.chat.return_value = {
+                'message': {
+                    'content': '[{"instruction": "test", "input": "test", "output": "test"}]'
+                }
+            }
+            
+            result = runner.invoke(app, [
+                "doc2dataset",
+                temp_file,
+                "--type", "sft",
+                "--count", "1"
+            ])
+            
+            # The command should complete (or fail gracefully)
+            # The important thing is that interrupt handling is set up
+            assert result.exit_code is not None
+    finally:
+        os.unlink(temp_file)
+
+
+def test_doc2dataset_partial_save_on_error():
+    """Test that partial results are saved when an error occurs during processing."""
+    import tempfile
+    import os
+    from unittest.mock import patch
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a test file
+        test_file = os.path.join(temp_dir, "test.md")
+        with open(test_file, 'w') as f:
+            f.write("# Test\n\nContent")
+        
+        output_file = os.path.join(temp_dir, "output.jsonl")
+        
+        # Mock to simulate an error after some processing
+        with patch('ollaforge.doc_generator.ollama') as mock_ollama:
+            mock_ollama.chat.side_effect = Exception("Simulated error")
+            
+            result = runner.invoke(app, [
+                "doc2dataset",
+                test_file,
+                "--output", output_file,
+                "--type", "sft"
+            ])
+            
+            # Should handle the error gracefully
+            assert result.exit_code is not None

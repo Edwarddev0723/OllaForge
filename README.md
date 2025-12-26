@@ -13,6 +13,7 @@
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-usage">Usage</a> •
   <a href="#-web-interface">Web Interface</a> •
+  <a href="#-document-to-dataset">Doc2Dataset</a> •
   <a href="#-dataset-augmentation">Augmentation</a> •
   <a href="#-dataset-formats">Formats</a> •
   <a href="#-contributing">Contributing</a>
@@ -65,6 +66,16 @@
 | ➕ **New Field Creation** | Add computed fields based on existing data |
 | 👀 **Preview Mode** | Test augmentation on samples before full processing |
 | 🛡️ **Failure Recovery** | Preserves original data on AI failures |
+
+### 📄 Document to Dataset
+
+| Feature | Description |
+|---------|-------------|
+| 📑 **Multi-Format Parsing** | Markdown, PDF, HTML, TXT, JSON, and code files |
+| ✂️ **Smart Chunking** | Semantic boundary-aware text splitting |
+| 🎯 **4 Output Formats** | SFT, Pre-training, Conversation, DPO |
+| 📁 **Batch Processing** | Process entire directories with glob patterns |
+| 🔍 **Quality Control** | Built-in validation and QC filtering |
 
 ### 📁 Multi-Format Support
 
@@ -153,6 +164,19 @@ ollaforge augment data.csv --field sentiment --new-field --instruction "Analyze 
 ollaforge convert data.csv data.jsonl
 ```
 
+### Convert Documents to Datasets
+
+```bash
+# Convert Markdown documentation to SFT dataset
+ollaforge doc2dataset README.md --type sft --output readme_dataset.jsonl
+
+# Process all Python files in a directory
+ollaforge doc2dataset ./src --pattern "*.py" --type pretrain
+
+# Convert PDF with Traditional Chinese output
+ollaforge doc2dataset manual.pdf --lang zh-tw --qc
+```
+
 ---
 
 ## 📖 Usage
@@ -190,6 +214,57 @@ ollaforge augment <input_file> [options]
 | `--context` | `-c` | | Additional context fields |
 | `--preview` | `-p` | | Preview before full processing |
 | `--concurrency` | `-j` | 5 | Parallel requests |
+
+### Doc2Dataset Command
+
+Convert documents (Markdown, PDF, HTML, TXT, JSON, code files) into fine-tuning datasets.
+
+```bash
+ollaforge doc2dataset <source> [options]
+```
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--output` | `-o` | dataset.jsonl | Output file path |
+| `--type` | `-t` | sft | Format: `sft`, `pretrain`, `sft_conv`, `dpo` |
+| `--model` | `-m` | llama3.2 | Ollama model name |
+| `--chunk-size` | | 2000 | Chunk size in characters (500-10000) |
+| `--chunk-overlap` | | 200 | Overlap between chunks (0-1000) |
+| `--count` | `-c` | 3 | Entries to generate per chunk (1-10) |
+| `--lang` | `-l` | en | Language: `en`, `zh-tw` |
+| `--pattern` | `-p` | | File pattern for directories (e.g., `*.md`) |
+| `--recursive/--no-recursive` | | --recursive | Recursively process directories |
+| `--qc/--no-qc` | | --qc | Enable quality control |
+
+#### Supported File Formats
+
+| Format | Extensions | Description |
+|--------|------------|-------------|
+| Markdown | `.md` | Preserves heading structure |
+| PDF | `.pdf` | Extracts text from all pages |
+| HTML | `.html`, `.htm` | Removes tags, preserves text |
+| Text | `.txt` | Direct text reading |
+| JSON | `.json` | Extracts string values |
+| Code | `.py`, `.js`, `.ts`, `.java`, `.go`, `.rs`, `.c`, `.cpp`, `.rb` | Language detection |
+
+#### Examples
+
+```bash
+# Convert a single Markdown file to SFT dataset
+ollaforge doc2dataset README.md --type sft --output readme_sft.jsonl
+
+# Convert all Python files in a directory
+ollaforge doc2dataset ./src --pattern "*.py" --type pretrain
+
+# Generate conversation data from documentation
+ollaforge doc2dataset docs/ --type sft_conv --lang zh-tw
+
+# Convert PDF with custom chunk settings
+ollaforge doc2dataset manual.pdf --chunk-size 3000 --chunk-overlap 300 --count 5
+
+# Process HTML files with quality control
+ollaforge doc2dataset ./html_docs --pattern "*.html" --qc --lang zh-tw
+```
 
 ---
 
@@ -242,6 +317,57 @@ npm run dev
 
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+
+---
+
+## 📄 Document to Dataset
+
+OllaForge can convert various document formats into fine-tuning datasets using AI-powered content analysis.
+
+### How It Works
+
+1. **Parse**: Documents are parsed to extract text content
+2. **Chunk**: Long documents are split into manageable chunks respecting semantic boundaries
+3. **Generate**: AI analyzes each chunk and generates training data entries
+4. **Validate**: Output is validated against format schemas with optional QC filtering
+
+### Use Cases
+
+- **Documentation → Q&A**: Convert technical docs into question-answer pairs
+- **Code → Tutorials**: Transform code files into instructional content
+- **Articles → Conversations**: Create dialogue datasets from articles
+- **Manuals → Training Data**: Generate fine-tuning data from product manuals
+
+### Examples
+
+```bash
+# Convert project README to SFT dataset
+ollaforge doc2dataset README.md --type sft --count 5
+
+# Process all Markdown docs in a folder
+ollaforge doc2dataset ./docs --pattern "*.md" --type sft_conv
+
+# Convert PDF manual with Traditional Chinese output
+ollaforge doc2dataset manual.pdf --lang zh-tw --qc
+
+# Generate pre-training data from source code
+ollaforge doc2dataset ./src --pattern "*.py" --type pretrain --chunk-size 1500
+
+# Batch process HTML documentation
+ollaforge doc2dataset ./html_docs --pattern "*.html" --type sft --output training_data.jsonl
+```
+
+### Installation
+
+Document parsing requires additional dependencies:
+
+```bash
+# Install with document parsing support
+pip install ollaforge[docs]
+
+# Or install all features
+pip install ollaforge[all]
+```
 
 ---
 

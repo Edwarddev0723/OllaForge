@@ -1003,6 +1003,688 @@ def main(
         console.print("\n[yellow]💡 Use 'ollaforge -i' for interactive mode or 'ollaforge --help' for more options[/yellow]")
 
 
+def validate_chunk_size(value: int) -> int:
+    """Validate chunk size parameter is within acceptable range."""
+    if value < 500:
+        raise typer.BadParameter("Chunk size must be at least 500 characters")
+    if value > 10000:
+        raise typer.BadParameter("Chunk size cannot exceed 10,000 characters")
+    return value
+
+
+def validate_chunk_overlap(value: int) -> int:
+    """Validate chunk overlap parameter is within acceptable range."""
+    if value < 0:
+        raise typer.BadParameter("Chunk overlap cannot be negative")
+    if value > 1000:
+        raise typer.BadParameter("Chunk overlap cannot exceed 1,000 characters")
+    return value
+
+
+def validate_entries_per_chunk(value: int) -> int:
+    """Validate entries per chunk parameter is within acceptable range."""
+    if value < 1:
+        raise typer.BadParameter("Entries per chunk must be at least 1")
+    if value > 10:
+        raise typer.BadParameter("Entries per chunk cannot exceed 10")
+    return value
+
+
+def validate_source_path(value: str) -> str:
+    """Validate source path exists and is readable."""
+    if not value or not value.strip():
+        raise typer.BadParameter("Source path cannot be empty")
+    
+    source_path = Path(value.strip())
+    if not source_path.exists():
+        raise typer.BadParameter(f"Source path not found: {value}")
+    if not os.access(source_path, os.R_OK):
+        raise typer.BadParameter(f"No read permission for: {value}")
+    
+    return value.strip()
+
+
+# Help text for doc2dataset command
+DOC2DATASET_TYPE_HELP = """Dataset type to generate:
+• sft: Supervised Fine-tuning (Alpaca format: instruction/input/output)
+• pretrain: Pre-training (raw text format)
+• sft_conv: SFT Conversation (ShareGPT/ChatML multi-turn format)
+• dpo: Direct Preference Optimization (prompt/chosen/rejected)"""
+
+
+@app.command()
+def doc2dataset(
+    source: str = typer.Argument(
+        ...,
+        help="Source document or directory path",
+        callback=lambda ctx, param, value: validate_source_path(value) if value else value,
+    ),
+    output: str = typer.Option(
+        "dataset.jsonl",
+        "--output", "-o",
+        help="Output dataset file path",
+        callback=lambda ctx, param, value: validate_output_path(value) if value else value,
+    ),
+    dataset_type: str = typer.Option(
+        "sft",
+        "--type", "-t",
+        help=DOC2DATASET_TYPE_HELP,
+        callback=lambda ctx, param, value: validate_dataset_type(value) if value else value,
+    ),
+    model: str = typer.Option(
+        "llama3.2",
+        "--model", "-m",
+        help="Ollama model to use for generation",
+    ),
+    chunk_size: int = typer.Option(
+        2000,
+        "--chunk-size",
+        help="Chunk size in characters (500-10000)",
+        callback=lambda ctx, param, value: validate_chunk_size(value) if value is not None else value,
+    ),
+    chunk_overlap: int = typer.Option(
+        200,
+        "--chunk-overlap",
+        help="Overlap between chunks in characters (0-1000)",
+        callback=lambda ctx, param, value: validate_chunk_overlap(value) if value is not None else value,
+    ),
+    count: int = typer.Option(
+        3,
+        "--count", "-c",
+        help="Number of entries to generate per chunk (1-10)",
+        callback=lambda ctx, param, value: validate_entries_per_chunk(value) if value is not None else value,
+    ),
+    language: str = typer.Option(
+        "en",
+        "--lang", "-l",
+        help=LANGUAGE_HELP,
+        callback=lambda ctx, param, value: validate_language(value) if value is not None else value,
+    ),
+    pattern: Optional[str] = typer.Option(
+        None,
+        "--pattern", "-p",
+        help="File pattern for directory processing (e.g., '*.md')",
+    ),
+    recursive: bool = typer.Option(
+        True,
+        "--recursive/--no-recursive",
+        help="Recursively process directories",
+    ),
+    qc_enabled: bool = typer.Option(
+        True,
+        "--qc/--no-qc",
+        help="Enable quality control filtering",
+    ),
+    qc_confidence: float = typer.Option(
+        0.9,
+        "--qc-confidence",
+        help="QC confidence threshold (0.0-1.0)",
+    ),
+) -> None:
+    """
+    Convert documents to fine-tuning datasets.
+    
+    Supports Markdown, PDF, HTML, TXT, JSON, and code files.
+    Documents are split into chunks and processed by Ollama to generate
+    training data in the specified format.
+    
+    Examples:
+    
+        # Convert a single Markdown file to SFT format
+        ollaforge doc2dataset README.md --type sft
+        
+        # Convert all Python files in a directory
+        ollaforge doc2dataset ./src --pattern "*.py" --type pretrain
+        
+        # Generate conversation data from documentation
+        ollaforge doc2dataset docs/ --type sft_conv --lang zh-tw
+        
+        # Convert PDF with custom chunk settings
+        ollaforge doc2dataset manual.pdf --chunk-size 3000 --chunk-overlap 300
+    """
+    try:
+        # Validate chunk overlap is less than chunk size
+        if chunk_overlap >= chunk_size:
+            console.print("[red]❌ Chunk overlap must be less than chunk size[/red]")
+            raise typer.Exit(1)
+        
+        # Run the document to dataset conversion
+        _run_doc2dataset(
+            source=source,
+            output=output,
+            dataset_type=dataset_type,
+            model=model,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            entries_per_chunk=count,
+            language=language,
+            pattern=pattern,
+            recursive=recursive,
+            qc_enabled=qc_enabled,
+            qc_confidence=qc_confidence,
+        )
+        
+    except KeyboardInterrupt:
+        console.print("\n[yellow]⚠️  Operation cancelled by user[/yellow]")
+        raise typer.Exit(130)
+    except typer.Exit:
+        raise
+    except Exception as e:
+        console.print(f"[red]❌ Unexpected error: {str(e)}[/red]")
+        raise typer.Exit(1)
+
+
+class Doc2DatasetInterruptHandler:
+    """
+    Handler for SIGINT interruption during doc2dataset processing.
+    
+    This class manages the interruption state and partial results saving
+    for the doc2dataset command. It captures SIGINT signals and ensures
+    that any processed entries are saved before the program exits.
+    
+    Requirements satisfied:
+    - 5.5: Save partial results when generation is interrupted
+    """
+    
+    def __init__(self, output_file: str):
+        """
+        Initialize the interrupt handler.
+        
+        Args:
+            output_file: Path to the output file for saving partial results
+        """
+        self._interrupted = False
+        self._output_file = output_file
+        self._entries: List = []
+        self._original_handler = None
+    
+    def setup(self) -> None:
+        """Set up the signal handler for SIGINT."""
+        import signal
+        self._original_handler = signal.signal(signal.SIGINT, self._handle_interrupt)
+    
+    def cleanup(self) -> None:
+        """Restore the original signal handler."""
+        import signal
+        if self._original_handler is not None:
+            signal.signal(signal.SIGINT, self._original_handler)
+            self._original_handler = None
+    
+    def _handle_interrupt(self, signum, frame) -> None:
+        """Handle SIGINT signal."""
+        self._interrupted = True
+        console.print("\n[yellow]⚠️  Interruption detected, saving partial results...[/yellow]")
+    
+    @property
+    def interrupted(self) -> bool:
+        """Check if processing was interrupted."""
+        return self._interrupted
+    
+    def set_entries(self, entries: List) -> None:
+        """
+        Set the current entries list for potential partial save.
+        
+        Args:
+            entries: List of entries to save if interrupted
+        """
+        self._entries = entries
+    
+    def add_entries(self, new_entries: List) -> None:
+        """
+        Add entries to the current collection.
+        
+        Args:
+            new_entries: New entries to add
+        """
+        if new_entries:
+            self._entries.extend(new_entries)
+    
+    def get_entries(self) -> List:
+        """Get the current entries list."""
+        return self._entries
+    
+    def save_partial_results(self) -> Optional[str]:
+        """
+        Save partial results to a timestamped file.
+        
+        Returns:
+            Path to the partial results file, or None if no entries to save
+            
+        Requirements satisfied:
+        - 5.5: Save partial results when generation is interrupted
+        """
+        import json
+        import time
+        
+        if not self._entries:
+            console.print("[yellow]No entries to save.[/yellow]")
+            return None
+        
+        output_path = Path(self._output_file)
+        timestamp = int(time.time())
+        partial_file = output_path.parent / f"{output_path.stem}_partial_{timestamp}.jsonl"
+        
+        # Ensure parent directory exists
+        partial_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            saved_count = 0
+            with open(partial_file, 'w', encoding='utf-8') as f:
+                for entry in self._entries:
+                    if entry is None:
+                        continue
+                    
+                    # Convert entry to dict if needed
+                    if hasattr(entry, 'model_dump'):
+                        entry_dict = entry.model_dump()
+                    elif hasattr(entry, 'dict'):
+                        entry_dict = entry.dict()
+                    elif isinstance(entry, dict):
+                        entry_dict = entry
+                    else:
+                        continue
+                    
+                    f.write(json.dumps(entry_dict, ensure_ascii=False) + '\n')
+                    saved_count += 1
+            
+            console.print(f"[green]✅ Partial results saved to: {partial_file}[/green]")
+            console.print(f"[cyan]📊 Saved {saved_count} entries[/cyan]")
+            return str(partial_file)
+            
+        except Exception as e:
+            console.print(f"[red]❌ Failed to save partial results: {str(e)}[/red]")
+            return None
+
+
+def _run_doc2dataset(
+    source: str,
+    output: str,
+    dataset_type: DatasetType,
+    model: str,
+    chunk_size: int,
+    chunk_overlap: int,
+    entries_per_chunk: int,
+    language: OutputLanguage,
+    pattern: Optional[str],
+    recursive: bool,
+    qc_enabled: bool,
+    qc_confidence: float,
+) -> None:
+    """Execute the document to dataset conversion process."""
+    import time
+    import signal
+    from .doc_parser import (
+        DocumentParserFactory,
+        UnsupportedFormatError,
+        ParsedDocument,
+    )
+    from .chunk_splitter import ChunkSplitter, ChunkConfig, SplitStrategy
+    from .doc_generator import DocumentDatasetGenerator, DocGenerationConfig
+    from .models import DocToDatasetConfig, DocProcessingResult, BatchProcessingResult
+    from .file_manager import (
+        write_jsonl_file,
+        FileOperationError,
+        DiskSpaceError,
+        check_disk_space,
+        estimate_file_size,
+    )
+    from .client import OllamaConnectionError
+    from .batch_processor import BatchProcessor, BatchConfig, aggregate_results
+    
+    start_time = time.time()
+    source_path = Path(source)
+    
+    # Initialize interrupt handler for graceful shutdown
+    interrupt_handler = Doc2DatasetInterruptHandler(output)
+    
+    # Display configuration
+    _display_doc2dataset_config(
+        source=source,
+        output=output,
+        dataset_type=dataset_type,
+        model=model,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        entries_per_chunk=entries_per_chunk,
+        language=language,
+        pattern=pattern,
+        recursive=recursive,
+        qc_enabled=qc_enabled,
+    )
+    
+    # Initialize batch processor
+    batch_config = BatchConfig(
+        recursive=recursive,
+        file_pattern=pattern,
+        continue_on_error=True
+    )
+    batch_processor = BatchProcessor(batch_config)
+    
+    # Collect files to process
+    try:
+        files_to_process = batch_processor.collect_files(source_path)
+    except (FileNotFoundError, UnsupportedFormatError) as e:
+        console.print(f"[red]❌ {str(e)}[/red]")
+        raise typer.Exit(1)
+    
+    if not files_to_process:
+        console.print("[yellow]⚠️  No supported files found to process[/yellow]")
+        console.print(f"[dim]Supported formats: {', '.join(DocumentParserFactory.get_supported_formats())}[/dim]")
+        raise typer.Exit(0)
+    
+    console.print(f"[dim]📁 Found {len(files_to_process)} file(s) to process[/dim]")
+    console.print()
+    
+    # Initialize components
+    chunk_config = ChunkConfig(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        strategy=SplitStrategy.HYBRID,
+    )
+    splitter = ChunkSplitter(chunk_config)
+    
+    gen_config = DocGenerationConfig(
+        dataset_type=dataset_type,
+        model=model,
+        language=language,
+        entries_per_chunk=entries_per_chunk,
+        qc_enabled=qc_enabled,
+        qc_confidence=qc_confidence,
+    )
+    generator = DocumentDatasetGenerator(gen_config)
+    
+    # Set up progress tracking
+    progress_tracker = ProgressTracker(console)
+    
+    # Set up interruption handling using the dedicated handler
+    interrupt_handler.setup()
+    
+    try:
+        # Check disk space
+        try:
+            estimated_size = estimate_file_size(len(files_to_process) * entries_per_chunk * 10)
+            check_disk_space(output, estimated_size)
+        except DiskSpaceError as e:
+            console.print(f"[red]❌ {str(e)}[/red]")
+            raise typer.Exit(1)
+        
+        # Process each file
+        total_files = len(files_to_process)
+        total_chunks = 0
+        
+        for file_idx, file_path in enumerate(files_to_process):
+            if interrupt_handler.interrupted:
+                break
+            
+            file_errors: List[str] = []
+            file_entries_count = 0
+            file_chunks_count = 0
+            
+            console.print(f"[cyan]📄 Processing ({file_idx + 1}/{total_files}): {file_path.name}[/cyan]")
+            
+            try:
+                # Parse document
+                parser = DocumentParserFactory.get_parser(str(file_path))
+                document = parser.parse(str(file_path))
+                
+                # Split into chunks
+                chunks = splitter.split(document)
+                file_chunks_count = len(chunks)
+                total_chunks += file_chunks_count
+                
+                if not chunks:
+                    console.print(f"[dim]  ⚠️  No content to process in {file_path.name}[/dim]")
+                    batch_processor.add_file_result(DocProcessingResult(
+                        source_file=str(file_path),
+                        chunks_processed=0,
+                        entries_generated=0,
+                        errors=["No content to process"]
+                    ))
+                    continue
+                
+                console.print(f"[dim]  📦 Split into {file_chunks_count} chunk(s)[/dim]")
+                
+                # Generate entries from chunks with progress
+                progress_tracker.start_progress(
+                    file_chunks_count,
+                    f"Generating from {file_path.name}"
+                )
+                
+                def on_chunk_progress(completed: int, total: int):
+                    progress_tracker.update_progress(1, f"Chunk {completed}/{total}")
+                
+                try:
+                    entries = generator.generate_from_chunks(chunks, on_chunk_progress)
+                    file_entries_count = len(entries)
+                    batch_processor.add_entries(entries)
+                    # Update interrupt handler with current entries for potential partial save
+                    interrupt_handler.set_entries(batch_processor.get_entries())
+                    
+                except OllamaConnectionError as e:
+                    progress_tracker.stop_progress()
+                    console.print(f"[red]❌ Ollama connection failed: {str(e)}[/red]")
+                    console.print("[yellow]💡 Make sure Ollama is running: ollama serve[/yellow]")
+                    console.print(f"[yellow]💡 Ensure model '{model}' is available: ollama pull {model}[/yellow]")
+                    raise typer.Exit(1)
+                
+                progress_tracker.stop_progress()
+                console.print(f"[green]  ✅ Generated {file_entries_count} entries[/green]")
+                
+            except UnsupportedFormatError as e:
+                file_errors.append(str(e))
+                console.print(f"[yellow]  ⚠️  {str(e)}[/yellow]")
+            except FileNotFoundError as e:
+                file_errors.append(f"File not found: {file_path}")
+                console.print(f"[red]  ❌ File not found: {file_path}[/red]")
+            except PermissionError as e:
+                file_errors.append(f"Permission denied: {file_path}")
+                console.print(f"[red]  ❌ Permission denied: {file_path}[/red]")
+            except Exception as e:
+                file_errors.append(f"Error processing {file_path}: {str(e)}")
+                console.print(f"[red]  ❌ Error: {str(e)}[/red]")
+            
+            batch_processor.add_file_result(DocProcessingResult(
+                source_file=str(file_path),
+                chunks_processed=file_chunks_count,
+                entries_generated=file_entries_count,
+                errors=file_errors
+            ))
+        
+        # Get all collected entries
+        all_entries = batch_processor.get_entries()
+        file_results = batch_processor.get_file_results()
+        
+        # Write output
+        if all_entries:
+            try:
+                # Convert entries to dicts for writing
+                entries_dicts = []
+                for entry in all_entries:
+                    if hasattr(entry, 'model_dump'):
+                        entries_dicts.append(entry.model_dump())
+                    elif hasattr(entry, 'dict'):
+                        entries_dicts.append(entry.dict())
+                    elif isinstance(entry, dict):
+                        entries_dicts.append(entry)
+                
+                write_jsonl_file(entries_dicts, output, overwrite=True)
+                console.print(f"\n[green]✅ Output written to: {output}[/green]")
+            except (DiskSpaceError, FileOperationError) as e:
+                console.print(f"[red]❌ Failed to write output: {str(e)}[/red]")
+                raise typer.Exit(1)
+        else:
+            if not interrupt_handler.interrupted:
+                console.print("\n[yellow]⚠️  No entries were generated[/yellow]")
+                console.print("[yellow]💡 Check if the documents contain processable content[/yellow]")
+        
+        # Calculate results
+        elapsed_time = time.time() - start_time
+        successful_files = sum(1 for r in file_results if not r.errors)
+        failed_files = sum(1 for r in file_results if r.errors)
+        
+        # Display summary
+        _display_doc2dataset_summary(
+            total_files=total_files,
+            successful_files=successful_files,
+            failed_files=failed_files,
+            total_entries=len(all_entries),
+            output_file=output,
+            duration=elapsed_time,
+            interrupted=interrupt_handler.interrupted,
+        )
+        
+    finally:
+        # Restore original signal handler
+        interrupt_handler.cleanup()
+        
+        # Save partial results if interrupted
+        if interrupt_handler.interrupted:
+            interrupt_handler.save_partial_results()
+
+
+def _collect_files_from_directory(
+    directory: Path,
+    pattern: Optional[str],
+    recursive: bool
+) -> List[Path]:
+    """
+    Collect supported files from a directory.
+    
+    This function delegates to the batch_processor module for consistent
+    file collection behavior across the application.
+    
+    Args:
+        directory: Path to the directory to search
+        pattern: Optional glob pattern to filter files
+        recursive: Whether to search subdirectories recursively
+        
+    Returns:
+        List of Path objects for all matching supported files
+        
+    Requirements satisfied:
+    - 6.1: Accept directory path to process all supported files
+    - 6.2: Recursively find all supported document files
+    - 6.3: Filter files by glob pattern
+    """
+    from .batch_processor import collect_supported_files
+    
+    return collect_supported_files(directory, pattern, recursive)
+
+
+def _display_doc2dataset_config(
+    source: str,
+    output: str,
+    dataset_type: DatasetType,
+    model: str,
+    chunk_size: int,
+    chunk_overlap: int,
+    entries_per_chunk: int,
+    language: OutputLanguage,
+    pattern: Optional[str],
+    recursive: bool,
+    qc_enabled: bool,
+) -> None:
+    """Display document to dataset configuration."""
+    type_display = {
+        DatasetType.SFT: "SFT (Alpaca format)",
+        DatasetType.PRETRAIN: "Pre-training (text)",
+        DatasetType.SFT_CONVERSATION: "SFT Conversation (ShareGPT)",
+        DatasetType.DPO: "DPO (Preference pairs)",
+    }
+    lang_display = {
+        OutputLanguage.EN: "English",
+        OutputLanguage.ZH_TW: "繁體中文（台灣）",
+    }
+    
+    console.print(
+        Panel.fit(
+            Text("📚 OllaForge Document to Dataset", style="bold magenta"),
+            border_style="bright_blue",
+        )
+    )
+    console.print(f"📂 Source: {source}")
+    console.print(f"📄 Output: {output}")
+    console.print(f"📊 Type: {type_display.get(dataset_type, dataset_type.value)}")
+    console.print(f"🤖 Model: {model}")
+    console.print(f"📏 Chunk size: {chunk_size} chars")
+    console.print(f"🔗 Chunk overlap: {chunk_overlap} chars")
+    console.print(f"🔢 Entries per chunk: {entries_per_chunk}")
+    console.print(f"🌐 Language: {lang_display.get(language, language.value)}")
+    if pattern:
+        console.print(f"🔍 Pattern: {pattern}")
+    console.print(f"📁 Recursive: {'Yes' if recursive else 'No'}")
+    if language == OutputLanguage.ZH_TW and qc_enabled:
+        console.print("[dim]🔍 QC: Enabled for Taiwan Chinese[/dim]")
+    console.print()
+
+
+def _display_doc2dataset_summary(
+    total_files: int,
+    successful_files: int,
+    failed_files: int,
+    total_entries: int,
+    output_file: str,
+    duration: float,
+    interrupted: bool,
+) -> None:
+    """Display document to dataset processing summary."""
+    console.print()
+    
+    if interrupted:
+        console.print(Panel.fit(
+            Text("⚠️  Processing Interrupted", style="bold yellow"),
+            border_style="yellow",
+        ))
+    else:
+        console.print(Panel.fit(
+            Text("📊 Processing Summary", style="bold green"),
+            border_style="green",
+        ))
+    
+    console.print(f"📁 Files processed: {successful_files}/{total_files}")
+    if failed_files > 0:
+        console.print(f"[yellow]❌ Failed files: {failed_files}[/yellow]")
+    console.print(f"📝 Total entries: {total_entries}")
+    console.print(f"📄 Output: {output_file}")
+    console.print(f"⏱️  Duration: {duration:.1f}s")
+    
+    if total_files > 0:
+        success_rate = (successful_files / total_files) * 100
+        console.print(f"📈 Success rate: {success_rate:.1f}%")
+
+
+def _save_partial_doc2dataset_results(entries: List, output_file: str) -> None:
+    """Save partial results when processing is interrupted."""
+    import json
+    import time
+    
+    if not entries:
+        console.print("[yellow]No entries to save.[/yellow]")
+        return
+    
+    output_path = Path(output_file)
+    timestamp = int(time.time())
+    partial_file = output_path.parent / f"{output_path.stem}_partial_{timestamp}.jsonl"
+    
+    try:
+        with open(partial_file, 'w', encoding='utf-8') as f:
+            for entry in entries:
+                if hasattr(entry, 'model_dump'):
+                    entry_dict = entry.model_dump()
+                elif hasattr(entry, 'dict'):
+                    entry_dict = entry.dict()
+                elif isinstance(entry, dict):
+                    entry_dict = entry
+                else:
+                    continue
+                f.write(json.dumps(entry_dict, ensure_ascii=False) + '\n')
+        
+        console.print(f"[green]✅ Partial results saved to: {partial_file}[/green]")
+        console.print(f"[cyan]📊 Saved {len(entries)} entries[/cyan]")
+    except Exception as e:
+        console.print(f"[red]❌ Failed to save partial results: {str(e)}[/red]")
+
+
 if __name__ == "__main__":
     app()
 

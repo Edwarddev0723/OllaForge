@@ -811,8 +811,8 @@ valid_json_object_strategy = st.dictionaries(
 
 # Strategy for generating invalid JSON strings (not parseable as JSON)
 invalid_json_strategy = st.one_of(
-    # Incomplete JSON objects
-    st.text(min_size=1, max_size=50).filter(
+    # Incomplete JSON objects (exclude newline characters to avoid line count issues)
+    st.text(min_size=1, max_size=50, alphabet=st.characters(blacklist_characters='\r\n')).filter(
         lambda x: x.strip() and not _is_valid_json(x)
     ),
     # Strings that look like JSON but are malformed

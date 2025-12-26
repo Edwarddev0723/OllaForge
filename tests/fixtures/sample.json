@@ -1,0 +1,21 @@
+{
+    "title": "Sample JSON Document",
+    "description": "A sample JSON file for testing",
+    "content": {
+        "introduction": "This is the introduction text.",
+        "sections": [
+            {
+                "name": "Section One",
+                "text": "Content of section one."
+            },
+            {
+                "name": "Section Two",
+                "text": "Content of section two."
+            }
+        ]
+    },
+    "metadata": {
+        "author": "Test Author",
+        "version": "1.0"
+    }
+}
