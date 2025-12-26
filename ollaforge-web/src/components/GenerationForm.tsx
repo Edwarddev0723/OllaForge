@@ -23,7 +23,7 @@ import {
   Button,
   Space,
   Alert,
-  Spin,
+  AutoComplete,
 } from 'antd';
 import { useTranslation } from 'react-i18next';
 import {
@@ -35,7 +35,6 @@ import {
 } from '../services/api';
 
 const { TextArea } = Input;
-const { Option } = Select;
 
 export interface GenerationFormProps {
   /** Callback when form is submitted */
@@ -59,6 +58,32 @@ const DEFAULT_VALUES: GenerationConfig = {
   qc_confidence: 0.9,
 };
 
+/** Common/recommended models as fallback when Ollama is unavailable */
+const FALLBACK_MODELS: ModelInfo[] = [
+  { name: 'llama3.2', size: '3B' },
+  { name: 'llama3.2:1b', size: '1B' },
+  { name: 'llama3.1', size: '8B' },
+  { name: 'llama3.1:70b', size: '70B' },
+  { name: 'llama3.3', size: '70B' },
+  { name: 'qwen2.5', size: '7B' },
+  { name: 'qwen2.5:14b', size: '14B' },
+  { name: 'qwen2.5:32b', size: '32B' },
+  { name: 'qwen2.5:72b', size: '72B' },
+  { name: 'qwen2.5-coder', size: '7B' },
+  { name: 'deepseek-r1:7b', size: '7B' },
+  { name: 'deepseek-r1:14b', size: '14B' },
+  { name: 'deepseek-r1:32b', size: '32B' },
+  { name: 'deepseek-r1:70b', size: '70B' },
+  { name: 'gemma2', size: '9B' },
+  { name: 'gemma2:27b', size: '27B' },
+  { name: 'mistral', size: '7B' },
+  { name: 'mixtral', size: '8x7B' },
+  { name: 'phi3', size: '3.8B' },
+  { name: 'phi3:14b', size: '14B' },
+  { name: 'codellama', size: '7B' },
+  { name: 'codellama:34b', size: '34B' },
+];
+
 /**
  * GenerationForm component for configuring dataset generation.
  */
@@ -73,7 +98,6 @@ export const GenerationForm: React.FC<GenerationFormProps> = ({
 
   // State for models
   const [models, setModels] = useState<ModelInfo[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
 
   // Watch language field for QC options visibility
@@ -83,18 +107,21 @@ export const GenerationForm: React.FC<GenerationFormProps> = ({
   // Fetch available models on mount
   useEffect(() => {
     const fetchModels = async () => {
-      setModelsLoading(true);
       setModelsError(null);
       try {
         const response = await modelsAPI.listModels();
-        setModels(response.models || []);
+        if (response.models && response.models.length > 0) {
+          setModels(response.models);
+        } else {
+          // No models from Ollama, use fallback list
+          setModels(FALLBACK_MODELS);
+          setModelsError('No models found in Ollama. Showing common models - make sure to install them first.');
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to fetch models';
         setModelsError(errorMessage);
-        // Set default model if fetch fails
-        setModels([{ name: 'llama3.2' }]);
-      } finally {
-        setModelsLoading(false);
+        // Use fallback models when Ollama is unavailable
+        setModels(FALLBACK_MODELS);
       }
     };
 
@@ -163,19 +190,24 @@ export const GenerationForm: React.FC<GenerationFormProps> = ({
         rules={[
           { required: true, message: t('generate.modelRequired', 'Model is required') },
         ]}
+        tooltip={t('generate.modelTooltip', 'Select a model or type a custom model name')}
       >
-        <Select
+        <AutoComplete
           placeholder={t('generate.modelPlaceholder')}
-          loading={modelsLoading}
-          notFoundContent={modelsLoading ? <Spin size="small" /> : null}
-        >
-          {models.map((model) => (
-            <Option key={model.name} value={model.name}>
-              {model.name}
-              {model.size && <span style={{ color: '#888', marginLeft: 8 }}>({model.size})</span>}
-            </Option>
-          ))}
-        </Select>
+          options={models.map((model) => ({
+            value: model.name,
+            label: (
+              <span>
+                {model.name}
+                {model.size && <span style={{ color: '#888', marginLeft: 8 }}>({model.size})</span>}
+              </span>
+            ),
+          }))}
+          filterOption={(inputValue, option) =>
+            option?.value.toLowerCase().includes(inputValue.toLowerCase()) ?? false
+          }
+          allowClear
+        />
       </Form.Item>
 
       {modelsError && (
@@ -194,12 +226,14 @@ export const GenerationForm: React.FC<GenerationFormProps> = ({
         label={t('generate.datasetType')}
         rules={[{ required: true }]}
       >
-        <Select>
-          <Option value={DatasetType.SFT}>SFT (Supervised Fine-tuning)</Option>
-          <Option value={DatasetType.PRETRAIN}>Pretrain</Option>
-          <Option value={DatasetType.SFT_CONV}>SFT Conversation</Option>
-          <Option value={DatasetType.DPO}>DPO (Direct Preference Optimization)</Option>
-        </Select>
+        <Select
+          options={[
+            { value: DatasetType.SFT, label: 'SFT (Supervised Fine-tuning)' },
+            { value: DatasetType.PRETRAIN, label: 'Pretrain' },
+            { value: DatasetType.SFT_CONV, label: 'SFT Conversation' },
+            { value: DatasetType.DPO, label: 'DPO (Direct Preference Optimization)' },
+          ]}
+        />
       </Form.Item>
 
       {/* Language */}
@@ -208,10 +242,12 @@ export const GenerationForm: React.FC<GenerationFormProps> = ({
         label={t('generate.language')}
         rules={[{ required: true }]}
       >
-        <Select>
-          <Option value={OutputLanguage.EN}>{t('language.en')}</Option>
-          <Option value={OutputLanguage.ZH_TW}>{t('language.zh-tw')}</Option>
-        </Select>
+        <Select
+          options={[
+            { value: OutputLanguage.EN, label: t('language.en') },
+            { value: OutputLanguage.ZH_TW, label: t('language.zh-tw') },
+          ]}
+        />
       </Form.Item>
 
       {/* QC Options - Only shown for Traditional Chinese */}

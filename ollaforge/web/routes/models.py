@@ -12,6 +12,7 @@ Requirements satisfied:
 - 10.4: Validate model exists before starting generation
 """
 
+import os
 import ollama
 from typing import Optional
 from fastapi import APIRouter, HTTPException
@@ -22,6 +23,12 @@ from ...client import OllamaConnectionError, get_available_models
 
 # Create router
 router = APIRouter(prefix="/api/models", tags=["models"])
+
+
+def _get_ollama_client() -> ollama.Client:
+    """Get ollama client with configured host (lazy initialization)."""
+    host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    return ollama.Client(host=host)
 
 
 def _format_size(size_bytes: Optional[int]) -> Optional[str]:
@@ -62,7 +69,8 @@ def _get_model_details(model_name: str) -> Optional[dict]:
         OllamaConnectionError: If connection to Ollama fails
     """
     try:
-        response = ollama.list()
+        client = _get_ollama_client()
+        response = client.list()
         if not isinstance(response, dict) or 'models' not in response:
             raise OllamaConnectionError("Invalid response from Ollama API")
         
@@ -121,7 +129,8 @@ async def list_models() -> ModelListResponse:
     """
     try:
         # Get raw response from Ollama to extract size info
-        response = ollama.list()
+        client = _get_ollama_client()
+        response = client.list()
         
         if not isinstance(response, dict) or 'models' not in response:
             raise OllamaConnectionError("Invalid response from Ollama API")

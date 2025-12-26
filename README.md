@@ -15,7 +15,6 @@
   <a href="#-web-interface">Web Interface</a> •
   <a href="#-dataset-augmentation">Augmentation</a> •
   <a href="#-dataset-formats">Formats</a> •
-  <a href="#-performance">Performance</a> •
   <a href="#-contributing">Contributing</a>
 </p>
 
@@ -31,22 +30,15 @@
   <a href="https://github.com/ollaforge/ollaforge/stargazers"><img src="https://img.shields.io/github/stars/ollaforge/ollaforge?style=social" alt="GitHub Stars"></a>
 </p>
 
-<p align="center">
-  <a href="https://codecov.io/gh/ollaforge/ollaforge"><img src="https://img.shields.io/codecov/c/github/ollaforge/ollaforge?logo=codecov" alt="Coverage"></a>
-  <a href="https://github.com/ollaforge/ollaforge/issues"><img src="https://img.shields.io/github/issues/ollaforge/ollaforge" alt="Issues"></a>
-  <a href="https://github.com/ollaforge/ollaforge/pulls"><img src="https://img.shields.io/github/issues-pr/ollaforge/ollaforge" alt="Pull Requests"></a>
-  <a href="https://ollama.ai/"><img src="https://img.shields.io/badge/Ollama-Local%20LLM-orange?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PC9zdmc+" alt="Ollama"></a>
-</p>
-
 ---
 
-## � What iis OllaForge?
+## 🎯 What is OllaForge?
 
 **OllaForge** is a high-performance CLI tool that leverages local Ollama models to **generate** and **augment** training datasets for LLM fine-tuning. With structured JSON output, concurrent batch processing, and built-in quality control, it's optimized for both quality and speed.
 
 ### Why OllaForge?
 
-- � **u100% Local & Private** - Your data never leaves your machine
+- 🔒 **100% Local & Private** - Your data never leaves your machine
 - ⚡ **Blazing Fast** - Concurrent batch processing with structured output
 - 🎨 **Flexible** - Generate new datasets or augment existing ones
 - 🌐 **Multilingual** - English & Traditional Chinese with QC validation
@@ -56,8 +48,8 @@
 
 ## ✨ Features
 
-
 ### 🆕 Dataset Generation
+
 | Feature | Description |
 |---------|-------------|
 | 🎯 **Natural Language Topics** | Describe your dataset needs in plain language |
@@ -66,6 +58,7 @@
 | ⚡ **Concurrent Batching** | Generate hundreds of entries in minutes |
 
 ### 🔄 Dataset Augmentation
+
 | Feature | Description |
 |---------|-------------|
 | 📝 **Field Modification** | Enhance existing fields with AI-powered transformations |
@@ -74,6 +67,7 @@
 | 🛡️ **Failure Recovery** | Preserves original data on AI failures |
 
 ### 📁 Multi-Format Support
+
 | Feature | Description |
 |---------|-------------|
 | 📄 **JSONL** | JSON Lines format (default) - one JSON object per line |
@@ -83,6 +77,7 @@
 | 🗃️ **Parquet** | Columnar storage format (requires pandas) |
 
 ### 🌐 Quality & Localization
+
 | Feature | Description |
 |---------|-------------|
 | 🔍 **BERT-based QC** | Filters Mainland Chinese expressions for Taiwan datasets |
@@ -90,13 +85,13 @@
 | ✅ **Structured Output** | JSON schema enforcement for 0% format errors |
 | 📈 **Progress Tracking** | Real-time progress with Rich-powered UI |
 
-### 🖥️ Web Interface
+### 🖥️ Web Interface (🚧 In Development)
+
 | Feature | Description |
 |---------|-------------|
 | 🌐 **Browser-based UI** | No CLI knowledge required - use through your browser |
 | 📊 **Real-time Progress** | WebSocket-powered live progress updates |
 | 🌍 **Bilingual Support** | English and Traditional Chinese interface |
-| 💾 **Configuration Save** | Save and load your favorite settings |
 | 🐳 **Docker Ready** | One-command deployment with Docker Compose |
 
 ---
@@ -156,9 +151,6 @@ ollaforge augment data.csv --field sentiment --new-field --instruction "Analyze 
 
 # Convert between formats
 ollaforge convert data.csv data.jsonl
-
-# Interactive augmentation wizard
-ollaforge augment data.jsonl -i
 ```
 
 ---
@@ -198,22 +190,14 @@ ollaforge augment <input_file> [options]
 | `--context` | `-c` | | Additional context fields |
 | `--preview` | `-p` | | Preview before full processing |
 | `--concurrency` | `-j` | 5 | Parallel requests |
-| `--interactive` | `-i` | | Interactive mode |
 
 ---
 
 ## 🖥️ Web Interface
 
+> ⚠️ **Note: The web interface is currently under active development.** Some features may be incomplete or unstable.
+
 OllaForge provides a modern web interface for users who prefer a graphical UI over command line.
-
-### Features
-
-- **Dataset Generation Page** - Generate datasets with a visual form
-- **Dataset Augmentation Page** - Upload, preview, and augment datasets
-- **Configuration Management** - Save and load your favorite settings
-- **Real-time Progress** - WebSocket-powered live progress updates
-- **Bilingual UI** - English and Traditional Chinese (Taiwan) support
-- **Multi-format Support** - Upload/download in JSONL, JSON, CSV, TSV, Parquet
 
 ### Quick Start with Docker
 
@@ -231,73 +215,39 @@ open http://localhost
 
 ### Manual Setup
 
-**Backend (Python):**
+**Backend:**
 ```bash
-# Install web dependencies
 pip install ollaforge[web]
-
-# Start the API server
 python -m ollaforge.web.server
 # Server runs at http://localhost:8000
 ```
 
-**Frontend (Node.js):**
+**Frontend:**
 ```bash
-# Navigate to frontend directory
 cd ollaforge-web
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 # Frontend runs at http://localhost:5173
 ```
 
-### Web Interface Pages
+### Pages
 
-#### 1. Generate Page (`/generate`)
-Create new datasets from topic descriptions:
-- Enter topic in natural language
-- Select model, count, dataset type, and language
-- View real-time generation progress
-- Preview generated entries before download
-- Download in multiple formats
-
-#### 2. Augment Page (`/augment`)
-Enhance existing datasets:
-- Drag-and-drop file upload (JSONL, JSON, CSV, TSV, Parquet)
-- Select target field and provide AI instructions
-- Preview augmentation on sample entries
-- Process full dataset with progress tracking
-- Download augmented dataset
-
-#### 3. Configuration Page (`/config`)
-Manage saved configurations:
-- View all saved generation/augmentation configs
-- Load configurations to pre-fill forms
-- Delete unused configurations
+| Page | Description |
+|------|-------------|
+| `/generate` | Create new datasets from topic descriptions |
+| `/augment` | Upload and enhance existing datasets |
+| `/config` | Manage saved configurations |
 
 ### API Documentation
 
-The backend provides OpenAPI documentation:
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Allowed CORS origins |
-| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
-| `PORT` | `8000` | Backend server port |
-| `DEBUG` | `false` | Enable debug mode |
 
 ---
 
 ## 🔄 Dataset Augmentation
 
-OllaForge can enhance existing JSONL datasets by modifying or adding fields using AI.
+OllaForge can enhance existing datasets by modifying or adding fields using AI.
 
 ### Use Cases
 
@@ -309,21 +259,17 @@ OllaForge can enhance existing JSONL datasets by modifying or adding fields usin
 ### Examples
 
 ```bash
-# Translate output field to Chinese (JSONL)
+# Translate output field to Chinese
 ollaforge augment qa.jsonl -f output -I "Translate to Traditional Chinese (Taiwan)"
 
-# Add difficulty rating (CSV)
-ollaforge augment problems.csv -f difficulty --new-field -I "Rate: easy/medium/hard based on complexity"
+# Add difficulty rating
+ollaforge augment problems.csv -f difficulty --new-field -I "Rate: easy/medium/hard"
 
-# Expand brief answers (JSON)
-ollaforge augment faq.json -f answer -I "Expand this answer with more detail and examples"
+# Expand brief answers
+ollaforge augment faq.json -f answer -I "Expand with more detail and examples"
 
-# Add category field using context (TSV)
+# Add category using context
 ollaforge augment articles.tsv -f category --new-field -c title -c content -I "Categorize: tech/science/business/other"
-
-# Convert formats
-ollaforge convert data.csv data.parquet  # CSV to Parquet
-ollaforge convert data.jsonl data.json   # JSONL to JSON array
 ```
 
 ### Preview Mode
@@ -333,8 +279,6 @@ Always preview before processing large datasets:
 ```bash
 ollaforge augment large_dataset.jsonl -f output -I "Improve clarity" --preview
 ```
-
-This processes 3 sample entries and shows before/after comparison.
 
 ---
 
@@ -370,15 +314,12 @@ This processes 3 sample entries and shows before/after comparison.
 
 ## ⚡ Performance
 
-OllaForge is optimized for local LLM inference:
-
 | Optimization | Benefit |
 |--------------|---------|
 | **Structured JSON Output** | 0% format errors via Ollama's schema enforcement |
 | **Small Batch Size (5)** | Reduces attention decay, improves quality |
 | **Concurrent Requests** | Up to 10 parallel batch requests |
 | **BERT on CPU** | Keeps GPU/MPS free for LLM generation |
-| **Funnel Architecture** | Over-request → Filter → Keep valid entries |
 
 ### Benchmarks
 
@@ -404,14 +345,6 @@ When using `--lang zh-tw`, OllaForge automatically filters Mainland Chinese expr
 | 網絡 | 網路 |
 | 信息 | 資訊 |
 
-```bash
-# Enable QC (default for zh-tw)
-ollaforge generate "對話" --lang zh-tw --qc
-
-# Stricter threshold
-ollaforge generate "對話" --lang zh-tw --qc-confidence 0.95
-```
-
 ---
 
 ## 🤖 Recommended Models
@@ -426,31 +359,6 @@ ollaforge generate "對話" --lang zh-tw --qc-confidence 0.95
 
 ---
 
-## 🏗️ Project Structure
-
-```
-ollaforge/
-├── ollaforge/              # Core package
-│   ├── __init__.py         # Package exports
-│   ├── cli.py              # CLI commands (generate, augment)
-│   ├── client.py           # Ollama API client
-│   ├── augmentor.py        # Dataset augmentation engine
-│   ├── processor.py        # Response parsing & validation
-│   ├── models.py           # Pydantic data models
-│   ├── qc.py               # Taiwan Chinese QC (BERT)
-│   ├── progress.py         # Progress tracking
-│   ├── file_manager.py     # File I/O operations
-│   └── interactive.py      # Interactive wizard
-├── tests/                  # Test suite (pytest + hypothesis)
-├── docs/                   # Documentation
-├── examples/               # Example datasets
-├── pyproject.toml          # Project configuration
-├── Makefile                # Development commands
-└── README.md               # This file
-```
-
----
-
 ## 🧪 Development
 
 ```bash
@@ -462,31 +370,12 @@ pip install -e ".[dev]"
 # Run tests
 make test
 
-# Run with coverage
-make test-cov
-
 # Lint & format
 make lint
 make format
 
-# Type check
-make typecheck
-
 # All checks
 make check
-```
-
-### Running Tests
-
-```bash
-# All tests
-pytest tests/ -v
-
-# Property-based tests only
-pytest tests/ -v -k "property"
-
-# With coverage report
-pytest tests/ --cov=ollaforge --cov-report=html
 ```
 
 ---
@@ -495,21 +384,11 @@ pytest tests/ --cov=ollaforge --cov-report=html
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### Quick Start
-
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing`)
 3. Write tests for your changes
 4. Ensure all tests pass (`make check`)
 5. Submit a Pull Request
-
-### Areas for Contribution
-
-- 🌐 Additional language support
-- 📊 New dataset formats
-- 🔧 Performance optimizations
-- 📚 Documentation improvements
-- 🐛 Bug fixes
 
 ---
 
@@ -525,17 +404,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 - [Rich](https://github.com/Textualize/rich) - Beautiful terminal UI
 - [Typer](https://typer.tiangolo.com/) - CLI framework
 - [Pydantic](https://pydantic.dev/) - Data validation
-- [Hypothesis](https://hypothesis.readthedocs.io/) - Property-based testing
-
----
-
-## 📊 Star History
-
-<p align="center">
-  <a href="https://star-history.com/#ollaforge/ollaforge&Date">
-    <img src="https://api.star-history.com/svg?repos=ollaforge/ollaforge&type=Date" alt="Star History Chart">
-  </a>
-</p>
 
 ---
 

@@ -97,7 +97,31 @@ interface TaskSubscription {
 // Configuration
 // ============================================================================
 
-const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+/**
+ * Determine the WebSocket base URL based on environment.
+ * 
+ * In Docker/production: Use current origin so nginx can proxy WebSocket
+ * In development: Use localhost:8000 directly
+ */
+const getWsBaseUrl = (): string => {
+  // If explicitly set via environment variable, use that
+  if (import.meta.env.VITE_WS_BASE_URL) {
+    return import.meta.env.VITE_WS_BASE_URL;
+  }
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  
+  // In production (served via nginx), use current origin for WebSocket proxy
+  if (import.meta.env.PROD) {
+    return window.location.origin;
+  }
+  
+  // In development, connect directly to backend
+  return 'http://localhost:8000';
+};
+
+const WS_BASE_URL = getWsBaseUrl();
 
 /**
  * Default reconnection options.

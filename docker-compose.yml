@@ -10,8 +10,6 @@
 #   - Ollama must be running on the host machine (ollama serve)
 #   - Or configure OLLAMA_HOST to point to a remote Ollama instance
 
-version: '3.8'
-
 services:
   # Backend API Server
   backend:
@@ -22,8 +20,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # CORS origins - adjust for production
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:80,http://frontend:80
+      # CORS origins - use "*" to allow all origins (useful for ngrok, etc.)
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
       # Ollama host - use host.docker.internal for local Ollama
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       # Python settings

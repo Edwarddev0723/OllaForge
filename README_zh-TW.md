@@ -15,7 +15,7 @@
   <a href="#️-網頁介面">網頁介面</a> •
   <a href="#-資料集擴增">資料集擴增</a> •
   <a href="#-資料集格式">資料集格式</a> •
-  <a href="#-效能優化">效能優化</a>
+  <a href="#-貢獻">貢獻</a>
 </p>
 
 <p align="center">
@@ -48,6 +48,7 @@
 ## ✨ 功能特色
 
 ### 🆕 資料集生成
+
 | 功能 | 說明 |
 |------|------|
 | 🎯 **自然語言主題** | 用自然語言描述您的資料集需求 |
@@ -56,6 +57,7 @@
 | ⚡ **並行批次處理** | 幾分鐘內生成數百筆資料 |
 
 ### 🔄 資料集擴增
+
 | 功能 | 說明 |
 |------|------|
 | 📝 **欄位修改** | 使用 AI 驅動的轉換增強現有欄位 |
@@ -64,6 +66,7 @@
 | 🛡️ **失敗復原** | AI 失敗時保留原始資料 |
 
 ### 📁 多格式支援
+
 | 功能 | 說明 |
 |------|------|
 | 📄 **JSONL** | JSON Lines 格式（預設）- 每行一個 JSON 物件 |
@@ -73,6 +76,7 @@
 | 🗃️ **Parquet** | 列式儲存格式（需要 pandas） |
 
 ### 🌐 品質與在地化
+
 | 功能 | 說明 |
 |------|------|
 | 🔍 **BERT 品質控制** | 過濾大陸用語，確保台灣繁體中文品質 |
@@ -80,13 +84,13 @@
 | ✅ **結構化輸出** | JSON Schema 強制執行，0% 格式錯誤 |
 | 📈 **進度追蹤** | Rich 驅動的即時進度顯示 |
 
-### 🖥️ 網頁介面
+### 🖥️ 網頁介面（🚧 開發中）
+
 | 功能 | 說明 |
 |------|------|
 | 🌐 **瀏覽器操作** | 無需 CLI 知識，透過瀏覽器即可使用 |
 | 📊 **即時進度** | WebSocket 驅動的即時進度更新 |
 | 🌍 **雙語介面** | 支援英文與繁體中文介面 |
-| 💾 **設定儲存** | 儲存並載入常用設定 |
 | 🐳 **Docker 部署** | 一鍵 Docker Compose 部署 |
 
 ---
@@ -146,9 +150,6 @@ ollaforge augment data.csv --field sentiment --new-field --instruction "分析�
 
 # 格式轉換
 ollaforge convert data.csv data.jsonl
-
-# 互動式擴增精靈
-ollaforge augment data.jsonl -i
 ```
 
 ---
@@ -188,22 +189,14 @@ ollaforge augment <輸入檔案> [選項]
 | `--context` | `-c` | | 額外上下文欄位 |
 | `--preview` | `-p` | | 處理前預覽 |
 | `--concurrency` | `-j` | 5 | 並行請求數 |
-| `--interactive` | `-i` | | 互動模式 |
 
 ---
 
 ## 🖥️ 網頁介面
 
+> ⚠️ **注意：網頁介面目前正在積極開發中。** 部分功能可能尚未完成或不穩定。
+
 OllaForge 提供現代化的網頁介面，讓偏好圖形化操作的使用者無需使用命令列。
-
-### 功能特色
-
-- **資料集生成頁面** - 透過視覺化表單生成資料集
-- **資料集擴增頁面** - 上傳、預覽並擴增資料集
-- **設定管理** - 儲存並載入常用設定
-- **即時進度** - WebSocket 驅動的即時進度更新
-- **雙語介面** - 支援英文與繁體中文（台灣）
-- **多格式支援** - 支援 JSONL、JSON、CSV、TSV、Parquet 上傳/下載
 
 ### Docker 快速啟動
 
@@ -221,73 +214,39 @@ open http://localhost
 
 ### 手動設定
 
-**後端（Python）：**
+**後端：**
 ```bash
-# 安裝網頁相依套件
 pip install ollaforge[web]
-
-# 啟動 API 伺服器
 python -m ollaforge.web.server
 # 伺服器執行於 http://localhost:8000
 ```
 
-**前端（Node.js）：**
+**前端：**
 ```bash
-# 進入前端目錄
 cd ollaforge-web
-
-# 安裝相依套件
 npm install
-
-# 啟動開發伺服器
 npm run dev
 # 前端執行於 http://localhost:5173
 ```
 
-### 網頁介面頁面
+### 頁面說明
 
-#### 1. 生成頁面（`/generate`）
-從主題描述建立新資料集：
-- 使用自然語言輸入主題
-- 選擇模型、數量、資料集類型和語言
-- 檢視即時生成進度
-- 下載前預覽生成的資料
-- 支援多種格式下載
-
-#### 2. 擴增頁面（`/augment`）
-增強現有資料集：
-- 拖放上傳檔案（JSONL、JSON、CSV、TSV、Parquet）
-- 選擇目標欄位並提供 AI 指令
-- 在樣本資料上預覽擴增效果
-- 追蹤完整資料集處理進度
-- 下載擴增後的資料集
-
-#### 3. 設定頁面（`/config`）
-管理已儲存的設定：
-- 檢視所有已儲存的生成/擴增設定
-- 載入設定以預填表單
-- 刪除不需要的設定
+| 頁面 | 說明 |
+|------|------|
+| `/generate` | 從主題描述建立新資料集 |
+| `/augment` | 上傳並增強現有資料集 |
+| `/config` | 管理已儲存的設定 |
 
 ### API 文件
 
-後端提供 OpenAPI 文件：
 - Swagger UI：http://localhost:8000/docs
 - ReDoc：http://localhost:8000/redoc
-
-### 環境變數
-
-| 變數 | 預設值 | 說明 |
-|------|--------|------|
-| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | 允許的 CORS 來源 |
-| `OLLAMA_HOST` | `http://localhost:11434` | Ollama 伺服器網址 |
-| `PORT` | `8000` | 後端伺服器埠號 |
-| `DEBUG` | `false` | 啟用除錯模式 |
 
 ---
 
 ## 🔄 資料集擴增
 
-OllaForge 可以使用 AI 增強現有的 JSONL 資料集。
+OllaForge 可以使用 AI 增強現有資料集。
 
 ### 使用案例
 
@@ -346,15 +305,12 @@ ollaforge augment articles.jsonl -f category --new-field -c title -c content -I 
 
 ## ⚡ 效能優化
 
-OllaForge 針對本地 LLM 推論進行優化：
-
 | 優化項目 | 效益 |
 |----------|------|
 | **結構化 JSON 輸出** | 透過 Ollama 的 Schema 強制執行，0% 格式錯誤 |
 | **小批次大小（5）** | 減少注意力衰減，提升品質 |
 | **並行請求** | 最多 10 個並行批次請求 |
 | **BERT 在 CPU 執行** | 保持 GPU/MPS 給 LLM 生成使用 |
-| **漏斗架構** | 過量請求 → 過濾 → 保留有效資料 |
 
 ---
 
@@ -370,14 +326,6 @@ OllaForge 針對本地 LLM 推論進行優化：
 | 網絡 | 網路 |
 | 信息 | 資訊 |
 
-```bash
-# 啟用品質控制（zh-tw 預設）
-ollaforge generate "對話" --lang zh-tw --qc
-
-# 更嚴格的閾值
-ollaforge generate "對話" --lang zh-tw --qc-confidence 0.95
-```
-
 ---
 
 ## 🤖 推薦模型
@@ -392,11 +340,30 @@ ollaforge generate "對話" --lang zh-tw --qc-confidence 0.95
 
 ---
 
+## 🧪 開發
+
+```bash
+# 複製並設定
+git clone https://github.com/ollaforge/ollaforge.git
+cd ollaforge
+pip install -e ".[dev]"
+
+# 執行測試
+make test
+
+# 程式碼檢查與格式化
+make lint
+make format
+
+# 所有檢查
+make check
+```
+
+---
+
 ## 🤝 貢獻
 
 歡迎貢獻！請參閱 [CONTRIBUTING.md](CONTRIBUTING.md) 了解指南。
-
-### 快速開始
 
 1. Fork 此儲存庫
 2. 建立功能分支（`git checkout -b feature/amazing`）
@@ -409,6 +376,15 @@ ollaforge generate "對話" --lang zh-tw --qc-confidence 0.95
 ## 📜 授權
 
 MIT 授權 - 詳見 [LICENSE](LICENSE)。
+
+---
+
+## 🙏 致謝
+
+- [Ollama](https://ollama.ai/) - 本地 LLM 推論
+- [Rich](https://github.com/Textualize/rich) - 美觀的終端機 UI
+- [Typer](https://typer.tiangolo.com/) - CLI 框架
+- [Pydantic](https://pydantic.dev/) - 資料驗證
 
 ---
 

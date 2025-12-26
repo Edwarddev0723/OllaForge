@@ -8,8 +8,6 @@ ensuring generated content uses authentic Taiwan Traditional Chinese terminology
 Model: renhehuang/bert-traditional-chinese-classifier
 """
 
-import torch
-import torch.nn.functional as F
 from typing import Dict, Any, Optional, List, Tuple
 from rich.console import Console
 
@@ -25,6 +23,19 @@ DEFAULT_CONFIDENCE_THRESHOLD = 0.9
 _model = None
 _tokenizer = None
 _device = None
+_torch = None  # Lazy loaded torch module
+
+
+def _get_torch():
+    """Lazy load torch module."""
+    global _torch
+    if _torch is None:
+        try:
+            import torch
+            _torch = torch
+        except ImportError:
+            return None
+    return _torch
 
 
 def get_device(force_cpu: bool = True) -> str:
@@ -38,6 +49,10 @@ def get_device(force_cpu: bool = True) -> str:
     Returns:
         Device string: "cpu", "mps", or "cuda"
     """
+    torch = _get_torch()
+    if torch is None:
+        return "cpu"
+    
     if force_cpu:
         return "cpu"
     if torch.backends.mps.is_available():
@@ -131,7 +146,6 @@ def chunk_encode(text: str, tokenizer: Any, max_len: int = MAX_LEN, stride: int 
     ]
 
 
-@torch.inference_mode()
 def predict_language(text: str) -> Optional[Dict[str, Any]]:
     """
     Predict whether text is Taiwan Traditional or Mainland Traditional Chinese.
@@ -142,24 +156,31 @@ def predict_language(text: str) -> Optional[Dict[str, Any]]:
     Returns:
         Dictionary with prediction results, or None if model not available
     """
+    torch = _get_torch()
+    if torch is None:
+        return None
+    
+    import torch.nn.functional as F
+    
     model, tokenizer, device = load_qc_model()
     
     if model is None or tokenizer is None:
         return None
     
     try:
-        chunks = chunk_encode(text, tokenizer)
-        probs_all = []
-        
-        for ch in chunks:
-            logits = model(
-                input_ids=ch["input_ids"].to(device),
-                attention_mask=ch["attention_mask"].to(device)
-            ).logits
-            probs_all.append(F.softmax(logits, dim=-1).cpu())
-        
-        avg = torch.cat(probs_all, 0).mean(0)
-        label_id = int(avg.argmax())
+        with torch.inference_mode():
+            chunks = chunk_encode(text, tokenizer)
+            probs_all = []
+            
+            for ch in chunks:
+                logits = model(
+                    input_ids=ch["input_ids"].to(device),
+                    attention_mask=ch["attention_mask"].to(device)
+                ).logits
+                probs_all.append(F.softmax(logits, dim=-1).cpu())
+            
+            avg = torch.cat(probs_all, 0).mean(0)
+            label_id = int(avg.argmax())
         
         return {
             "text_preview": (text[:100] + "...") if len(text) > 100 else text,

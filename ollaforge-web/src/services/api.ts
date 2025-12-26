@@ -111,7 +111,28 @@ export interface ApiError {
 // API Client Configuration
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+/**
+ * Determine the API base URL based on environment.
+ * 
+ * In Docker/production: Use relative path so nginx can proxy requests
+ * In development: Use localhost:8000 directly
+ */
+const getApiBaseUrl = (): string => {
+  // If explicitly set via environment variable, use that
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  
+  // In production (served via nginx), use relative path for proxy
+  if (import.meta.env.PROD) {
+    return '';  // Empty string means relative to current origin
+  }
+  
+  // In development, connect directly to backend
+  return 'http://localhost:8000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Create and configure the Axios instance.

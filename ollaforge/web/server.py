@@ -72,10 +72,12 @@ HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
 
 # CORS configuration
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://localhost:5173,http://localhost:8080"
-).split(",")
+# Use "*" to allow all origins, or comma-separated list of allowed origins
+_cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:8080")
+if _cors_env.strip() == "*":
+    CORS_ORIGINS = ["*"]
+else:
+    CORS_ORIGINS = [origin.strip() for origin in _cors_env.split(",") if origin.strip()]
 
 # Ollama configuration
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -86,9 +88,11 @@ OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 # ============================================================================
 
 # Socket.IO server for WebSocket communication
+# Allow all origins when CORS_ORIGINS contains "*"
+_sio_cors = '*' if '*' in CORS_ORIGINS or DEBUG else CORS_ORIGINS
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins='*' if DEBUG else CORS_ORIGINS,
+    cors_allowed_origins=_sio_cors,
     logger=DEBUG,
     engineio_logger=DEBUG
 )
