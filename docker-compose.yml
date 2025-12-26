@@ -1,0 +1,75 @@
+# OllaForge Docker Compose Configuration
+# 
+# Usage:
+#   Development:  docker-compose up
+#   Production:   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Build:        docker-compose build
+#   Stop:         docker-compose down
+#
+# Prerequisites:
+#   - Ollama must be running on the host machine (ollama serve)
+#   - Or configure OLLAMA_HOST to point to a remote Ollama instance
+
+version: '3.8'
+
+services:
+  # Backend API Server
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ollaforge-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # CORS origins - adjust for production
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:80,http://frontend:80
+      # Ollama host - use host.docker.internal for local Ollama
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      # Python settings
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount data directory for temporary files
+      - ollaforge-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    # For macOS/Windows, use host.docker.internal
+    # For Linux, you may need to use --add-host=host.docker.internal:host-gateway
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: ./ollaforge-web
+      dockerfile: Dockerfile
+      args:
+        # API URL for the frontend build
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+        - VITE_WS_URL=${VITE_WS_URL:-http://localhost:8000}
+    container_name: ollaforge-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  ollaforge-data:
+    driver: local
+
+networks:
+  default:
+    name: ollaforge-network

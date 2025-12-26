@@ -12,6 +12,7 @@
   <a href="#-功能特色">功能特色</a> •
   <a href="#-快速開始">快速開始</a> •
   <a href="#-使用方式">使用方式</a> •
+  <a href="#️-網頁介面">網頁介面</a> •
   <a href="#-資料集擴增">資料集擴增</a> •
   <a href="#-資料集格式">資料集格式</a> •
   <a href="#-效能優化">效能優化</a>
@@ -78,6 +79,15 @@
 | 🌏 **多語言支援** | 英文與繁體中文（台灣）支援 |
 | ✅ **結構化輸出** | JSON Schema 強制執行，0% 格式錯誤 |
 | 📈 **進度追蹤** | Rich 驅動的即時進度顯示 |
+
+### 🖥️ 網頁介面
+| 功能 | 說明 |
+|------|------|
+| 🌐 **瀏覽器操作** | 無需 CLI 知識，透過瀏覽器即可使用 |
+| 📊 **即時進度** | WebSocket 驅動的即時進度更新 |
+| 🌍 **雙語介面** | 支援英文與繁體中文介面 |
+| 💾 **設定儲存** | 儲存並載入常用設定 |
+| 🐳 **Docker 部署** | 一鍵 Docker Compose 部署 |
 
 ---
 
@@ -179,6 +189,99 @@ ollaforge augment <輸入檔案> [選項]
 | `--preview` | `-p` | | 處理前預覽 |
 | `--concurrency` | `-j` | 5 | 並行請求數 |
 | `--interactive` | `-i` | | 互動模式 |
+
+---
+
+## 🖥️ 網頁介面
+
+OllaForge 提供現代化的網頁介面，讓偏好圖形化操作的使用者無需使用命令列。
+
+### 功能特色
+
+- **資料集生成頁面** - 透過視覺化表單生成資料集
+- **資料集擴增頁面** - 上傳、預覽並擴增資料集
+- **設定管理** - 儲存並載入常用設定
+- **即時進度** - WebSocket 驅動的即時進度更新
+- **雙語介面** - 支援英文與繁體中文（台灣）
+- **多格式支援** - 支援 JSONL、JSON、CSV、TSV、Parquet 上傳/下載
+
+### Docker 快速啟動
+
+```bash
+# 複製儲存庫
+git clone https://github.com/ollaforge/ollaforge.git
+cd ollaforge
+
+# 使用 Docker Compose 啟動（需要主機上執行 Ollama）
+docker-compose up -d
+
+# 開啟網頁介面
+open http://localhost
+```
+
+### 手動設定
+
+**後端（Python）：**
+```bash
+# 安裝網頁相依套件
+pip install ollaforge[web]
+
+# 啟動 API 伺服器
+python -m ollaforge.web.server
+# 伺服器執行於 http://localhost:8000
+```
+
+**前端（Node.js）：**
+```bash
+# 進入前端目錄
+cd ollaforge-web
+
+# 安裝相依套件
+npm install
+
+# 啟動開發伺服器
+npm run dev
+# 前端執行於 http://localhost:5173
+```
+
+### 網頁介面頁面
+
+#### 1. 生成頁面（`/generate`）
+從主題描述建立新資料集：
+- 使用自然語言輸入主題
+- 選擇模型、數量、資料集類型和語言
+- 檢視即時生成進度
+- 下載前預覽生成的資料
+- 支援多種格式下載
+
+#### 2. 擴增頁面（`/augment`）
+增強現有資料集：
+- 拖放上傳檔案（JSONL、JSON、CSV、TSV、Parquet）
+- 選擇目標欄位並提供 AI 指令
+- 在樣本資料上預覽擴增效果
+- 追蹤完整資料集處理進度
+- 下載擴增後的資料集
+
+#### 3. 設定頁面（`/config`）
+管理已儲存的設定：
+- 檢視所有已儲存的生成/擴增設定
+- 載入設定以預填表單
+- 刪除不需要的設定
+
+### API 文件
+
+後端提供 OpenAPI 文件：
+- Swagger UI：http://localhost:8000/docs
+- ReDoc：http://localhost:8000/redoc
+
+### 環境變數
+
+| 變數 | 預設值 | 說明 |
+|------|--------|------|
+| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | 允許的 CORS 來源 |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama 伺服器網址 |
+| `PORT` | `8000` | 後端伺服器埠號 |
+| `DEBUG` | `false` | 啟用除錯模式 |
 
 ---
 

@@ -1,0 +1,131 @@
+/* Global App Styles */
+
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+}
+
+/* Ensure full height layout */
+#root {
+  min-height: 100vh;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Page content container */
+.page-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Form styles */
+.form-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Progress display styles */
+.progress-container {
+  margin: 24px 0;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+/* Dataset preview styles */
+.dataset-preview {
+  margin-top: 24px;
+}
+
+.dataset-preview .ant-table {
+  font-size: 13px;
+}
+
+/* File upload area */
+.upload-area {
+  margin-bottom: 24px;
+}
+
+/* Language selector in header */
+.language-selector {
+  margin-left: auto;
+}
+
+.language-selector .ant-select-selector {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.language-selector .ant-select-selection-item {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.language-selector .ant-select-arrow {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+.language-selector:hover .ant-select-selector {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.language-selector.ant-select-focused .ant-select-selector {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+
+/* Error message styles */
+.error-container {
+  padding: 16px;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+/* Success message styles */
+.success-container {
+  padding: 16px;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+/* Card hover effect */
+.hoverable-card {
+  transition: box-shadow 0.3s ease;
+}
+
+.hoverable-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ant-layout-content {
+    padding: 16px !important;
+  }
+
+  .form-container {
+    padding: 0 16px;
+  }
+}

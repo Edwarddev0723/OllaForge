@@ -1,0 +1,75 @@
+# OllaForge Production Docker Compose Override
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This file contains production-specific overrides:
+#   - Resource limits
+#   - Production environment variables
+#   - Logging configuration
+#   - SSL/TLS configuration (when using reverse proxy)
+
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      # Production CORS - update with your domain
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://your-domain.com}
+      # Ollama host for production
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      args:
+        # Production API URL - update with your domain
+        - VITE_API_URL=${VITE_API_URL:-https://api.your-domain.com}
+        - VITE_WS_URL=${VITE_WS_URL:-https://api.your-domain.com}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Include Ollama in the stack
+  # Uncomment if you want to run Ollama in Docker
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollaforge-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   restart: unless-stopped
+
+# volumes:
+#   ollama-data:
+#     driver: local

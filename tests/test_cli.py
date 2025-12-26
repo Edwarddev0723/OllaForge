@@ -123,7 +123,9 @@ def test_cli_with_invalid_count():
         "--count", "0"
     ])
     assert result.exit_code != 0
-    assert "Count must be at least 1" in result.stdout
+    # Error message may be in stdout or output depending on Typer version
+    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    assert "Count must be at least 1" in output
 
 
 def test_cli_with_missing_topic():
@@ -566,7 +568,8 @@ def test_cli_with_zero_count_edge_case():
     ])
     
     assert result.exit_code != 0
-    assert "Count must be at least 1" in result.stdout
+    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    assert "Count must be at least 1" in output
 
 
 def test_cli_with_negative_count():
@@ -578,7 +581,8 @@ def test_cli_with_negative_count():
     ])
     
     assert result.exit_code != 0
-    assert "Count must be at least 1" in result.stdout
+    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    assert "Count must be at least 1" in output
 
 
 def test_cli_with_extremely_large_count():
@@ -590,7 +594,8 @@ def test_cli_with_extremely_large_count():
     ])
     
     assert result.exit_code != 0
-    assert "Count cannot exceed 10,000" in result.stdout
+    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    assert "Count cannot exceed 10,000" in output
 
 
 def test_cli_with_empty_model_name():

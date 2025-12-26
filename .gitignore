@@ -93,3 +93,5 @@ Thumbs.db
 *.log
 logs/
 *.pyc
+/.hypothesis
+/.hypothesis

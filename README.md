@@ -12,6 +12,7 @@
   <a href="#-features">Features</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-usage">Usage</a> •
+  <a href="#-web-interface">Web Interface</a> •
   <a href="#-dataset-augmentation">Augmentation</a> •
   <a href="#-dataset-formats">Formats</a> •
   <a href="#-performance">Performance</a> •
@@ -88,6 +89,15 @@
 | 🌏 **Multi-language** | English and Traditional Chinese (Taiwan) support |
 | ✅ **Structured Output** | JSON schema enforcement for 0% format errors |
 | 📈 **Progress Tracking** | Real-time progress with Rich-powered UI |
+
+### 🖥️ Web Interface
+| Feature | Description |
+|---------|-------------|
+| 🌐 **Browser-based UI** | No CLI knowledge required - use through your browser |
+| 📊 **Real-time Progress** | WebSocket-powered live progress updates |
+| 🌍 **Bilingual Support** | English and Traditional Chinese interface |
+| 💾 **Configuration Save** | Save and load your favorite settings |
+| 🐳 **Docker Ready** | One-command deployment with Docker Compose |
 
 ---
 
@@ -189,6 +199,99 @@ ollaforge augment <input_file> [options]
 | `--preview` | `-p` | | Preview before full processing |
 | `--concurrency` | `-j` | 5 | Parallel requests |
 | `--interactive` | `-i` | | Interactive mode |
+
+---
+
+## 🖥️ Web Interface
+
+OllaForge provides a modern web interface for users who prefer a graphical UI over command line.
+
+### Features
+
+- **Dataset Generation Page** - Generate datasets with a visual form
+- **Dataset Augmentation Page** - Upload, preview, and augment datasets
+- **Configuration Management** - Save and load your favorite settings
+- **Real-time Progress** - WebSocket-powered live progress updates
+- **Bilingual UI** - English and Traditional Chinese (Taiwan) support
+- **Multi-format Support** - Upload/download in JSONL, JSON, CSV, TSV, Parquet
+
+### Quick Start with Docker
+
+```bash
+# Clone the repository
+git clone https://github.com/ollaforge/ollaforge.git
+cd ollaforge
+
+# Start with Docker Compose (requires Ollama running on host)
+docker-compose up -d
+
+# Access the web interface
+open http://localhost
+```
+
+### Manual Setup
+
+**Backend (Python):**
+```bash
+# Install web dependencies
+pip install ollaforge[web]
+
+# Start the API server
+python -m ollaforge.web.server
+# Server runs at http://localhost:8000
+```
+
+**Frontend (Node.js):**
+```bash
+# Navigate to frontend directory
+cd ollaforge-web
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+# Frontend runs at http://localhost:5173
+```
+
+### Web Interface Pages
+
+#### 1. Generate Page (`/generate`)
+Create new datasets from topic descriptions:
+- Enter topic in natural language
+- Select model, count, dataset type, and language
+- View real-time generation progress
+- Preview generated entries before download
+- Download in multiple formats
+
+#### 2. Augment Page (`/augment`)
+Enhance existing datasets:
+- Drag-and-drop file upload (JSONL, JSON, CSV, TSV, Parquet)
+- Select target field and provide AI instructions
+- Preview augmentation on sample entries
+- Process full dataset with progress tracking
+- Download augmented dataset
+
+#### 3. Configuration Page (`/config`)
+Manage saved configurations:
+- View all saved generation/augmentation configs
+- Load configurations to pre-fill forms
+- Delete unused configurations
+
+### API Documentation
+
+The backend provides OpenAPI documentation:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Allowed CORS origins |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
+| `PORT` | `8000` | Backend server port |
+| `DEBUG` | `false` | Enable debug mode |
 
 ---
 
