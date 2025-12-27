@@ -220,6 +220,11 @@ LANGUAGE_INFO = {
         "description": "使用繁體中文（台灣用語）生成內容",
         "color": "red",
     },
+    OutputLanguage.ZH_CN: {
+        "name": "🇨🇳 简体中文（中国大陆）",
+        "description": "使用简体中文（中国大陆用语）生成内容，符合当地文化习惯",
+        "color": "yellow",
+    },
 }
 
 

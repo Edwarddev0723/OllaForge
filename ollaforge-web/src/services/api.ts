@@ -26,6 +26,7 @@ export type DatasetType = (typeof DatasetType)[keyof typeof DatasetType];
 export const OutputLanguage = {
   EN: 'en',
   ZH_TW: 'zh-tw',
+  ZH_CN: 'zh-cn',
 } as const;
 
 export type OutputLanguage = (typeof OutputLanguage)[keyof typeof OutputLanguage];
@@ -61,6 +62,14 @@ export interface AugmentUploadResponse {
   entry_count: number;
   fields: string[];
   preview: Record<string, unknown>[];
+  source_type?: 'file' | 'huggingface';
+}
+
+export interface HuggingFaceLoadRequest {
+  dataset_name: string;
+  config_name?: string;
+  split?: string;
+  max_entries?: number;
 }
 
 export interface AugmentPreviewRequest {
@@ -276,6 +285,19 @@ export const augmentationAPI = {
         'Content-Type': 'multipart/form-data',
       },
       timeout: 60000, // 60 second timeout for uploads
+    });
+    return response.data;
+  },
+
+  /**
+   * Load a dataset from HuggingFace Hub.
+   *
+   * @param request - HuggingFace load request
+   * @returns Promise with file info and preview
+   */
+  loadHuggingFaceDataset: async (request: HuggingFaceLoadRequest): Promise<AugmentUploadResponse> => {
+    const response = await apiClient.post<AugmentUploadResponse>('/api/augment/huggingface', request, {
+      timeout: 120000, // 2 minute timeout for HuggingFace downloads
     });
     return response.data;
   },

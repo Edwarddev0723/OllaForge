@@ -43,6 +43,18 @@
     "title": "資料集擴增",
     "upload": "上傳資料集",
     "uploadHint": "點擊或拖曳檔案上傳（支援 JSONL、JSON、CSV、TSV、Parquet）",
+    "uploadTab": "📁 上傳檔案",
+    "huggingfaceTab": "🤗 HuggingFace",
+    "hfDatasetName": "資料集名稱",
+    "hfDatasetNameRequired": "資料集名稱為必填",
+    "hfDatasetNameInvalid": "格式錯誤，請使用：username/dataset-name",
+    "hfDatasetNameHint": "例如：renhehuang/govQA-database-zhtw",
+    "hfSplit": "資料分割",
+    "hfConfig": "設定（選填）",
+    "hfConfigPlaceholder": "留空使用預設值",
+    "hfMaxEntries": "最大筆數（選填）",
+    "hfMaxEntriesHint": "限制載入的資料筆數",
+    "hfLoad": "從 HuggingFace 載入",
     "uploadSuccess": "檔案上傳成功",
     "clearFile": "清除",
     "entryCount": "資料筆數",
@@ -139,6 +151,7 @@
   "language": {
     "en": "English",
     "zh-tw": "繁體中文",
+    "zh-cn": "简体中文",
     "select": "選擇語言"
   },
   "footer": {

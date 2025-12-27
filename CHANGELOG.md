@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Simplified Chinese (zh-cn) Language Support** - Full support for Simplified Chinese with cultural guidelines
+  - New `zh-cn` language option for all generation modes
+  - Vocabulary conversion from Taiwan to Mainland Chinese terms
+  - Cultural and ideological guidelines specific to China
+  - Updated CLI, interactive mode, and web interface
+
+- **HuggingFace Dataset Integration** - Direct loading and augmentation of HuggingFace datasets
+  - New `hf_loader` module for HuggingFace Hub integration
+  - Augment HuggingFace datasets directly without downloading
+  - Support for dataset splits (`--hf-split`) and configurations (`--hf-config`)
+  - Entry limit option (`--max-entries`) for large datasets
+  - Web API endpoint for HuggingFace dataset loading
+
+### Enhanced
+- Augment command now accepts HuggingFace dataset identifiers (e.g., `username/dataset-name`)
+- Updated documentation with upgrade instructions and new feature examples
+- Web interface with HuggingFace dataset loading tab
+
 ## [1.2.0] - 2024-12-18
 
 ### Added
@@ -94,9 +113,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 1.3.0 | TBD | Simplified Chinese support, HuggingFace integration |
+| 1.2.0 | 2024-12-18 | Multi-format support (CSV, JSON, TSV, Parquet) |
 | 1.1.0 | 2024-12-18 | Dataset augmentation, property-based testing |
 | 1.0.0 | 2024-12-16 | Initial release |
 
-[Unreleased]: https://github.com/ollaforge/ollaforge/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/ollaforge/ollaforge/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/ollaforge/ollaforge/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ollaforge/ollaforge/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ollaforge/ollaforge/releases/tag/v1.0.0

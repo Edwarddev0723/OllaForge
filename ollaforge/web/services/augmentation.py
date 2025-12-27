@@ -134,6 +134,53 @@ class AugmentationService:
         """
         return self.uploaded_files.get(file_id)
     
+    async def store_huggingface_dataset(
+        self,
+        entries: List[Dict[str, Any]],
+        fields: List[str],
+        dataset_name: str,
+        split: str = "train",
+    ) -> Dict[str, Any]:
+        """
+        Store a HuggingFace dataset for augmentation.
+        
+        Args:
+            entries: List of dataset entries
+            fields: List of field names
+            dataset_name: HuggingFace dataset identifier
+            split: Dataset split name
+            
+        Returns:
+            Dict containing:
+                - file_id: Unique identifier for the dataset
+                - entry_count: Number of entries
+                - fields: List of field names
+                - preview: First 3 entries for preview
+        """
+        # Generate unique file ID
+        file_id = f"hf_{uuid.uuid4().hex[:12]}"
+        
+        # Store dataset info (no file path needed for HuggingFace datasets)
+        self.uploaded_files[file_id] = {
+            "file_path": None,  # No local file
+            "filename": f"{dataset_name.replace('/', '_')}_{split}",
+            "entries": entries,
+            "fields": fields,
+            "entry_count": len(entries),
+            "uploaded_at": datetime.utcnow().isoformat(),
+            "source": "huggingface",
+            "dataset_name": dataset_name,
+            "split": split,
+        }
+        
+        # Return response
+        return {
+            "file_id": file_id,
+            "entry_count": len(entries),
+            "fields": fields,
+            "preview": entries[:3]  # First 3 entries for preview
+        }
+    
     def validate_field(
         self,
         file_id: str,

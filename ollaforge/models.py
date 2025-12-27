@@ -49,6 +49,7 @@ class OutputLanguage(str, Enum):
     """
     EN = "en"           # English
     ZH_TW = "zh-tw"     # 繁體中文（台灣用語）
+    ZH_CN = "zh-cn"     # 简体中文（中国大陆用语）
 
 
 class GenerationConfig(BaseModel):

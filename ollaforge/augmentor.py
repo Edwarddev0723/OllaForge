@@ -89,6 +89,8 @@ def create_augmentation_prompt(
     lang_instruction = ""
     if language == OutputLanguage.ZH_TW:
         lang_instruction = "\n\n請使用繁體中文（台灣用語）回應。"
+    elif language == OutputLanguage.ZH_CN:
+        lang_instruction = "\n\n请使用简体中文（中国大陆用语）回应，内容须符合中国文化习惯与价值观。"
     
     system_prompt = f"""You are a data augmentation assistant. Your task is to generate or modify the "{target_field}" field based on the given instruction and context.
 

@@ -34,13 +34,15 @@ from ..models import (
     GenerationResponse,
     TaskStatus,
     TaskStatusEnum,
-    ErrorResponse
+    ErrorResponse,
+    HuggingFaceLoadRequest
 )
 from ..services.augmentation import AugmentationService
 from .websocket import ws_manager
 from ...client import OllamaConnectionError, OllamaGenerationError
 from ...file_manager import FileOperationError
 from ...formats import write_file, FileFormat
+from ...hf_loader import load_huggingface_dataset, HuggingFaceLoaderError, is_huggingface_dataset
 
 
 # Create router
@@ -121,7 +123,8 @@ async def upload_dataset(
             file_id=result["file_id"],
             entry_count=result["entry_count"],
             fields=result["fields"],
-            preview=result["preview"]
+            preview=result["preview"],
+            source_type="file"
         )
         
     except FileOperationError as e:
@@ -138,6 +141,106 @@ async def upload_dataset(
             detail={
                 "error": "UploadError",
                 "message": f"Failed to process uploaded file: {str(e)}"
+            }
+        )
+
+
+@router.post("/huggingface", response_model=AugmentUploadResponse, responses={
+    400: {"model": ErrorResponse, "description": "Invalid dataset name or configuration"},
+    404: {"model": ErrorResponse, "description": "Dataset not found on HuggingFace"},
+    503: {"model": ErrorResponse, "description": "HuggingFace service unavailable"}
+},
+    summary="Load HuggingFace Dataset",
+    description="""
+Load a dataset directly from HuggingFace Hub for augmentation.
+
+### Usage
+
+Provide a HuggingFace dataset identifier in the format `username/dataset-name`.
+
+### Examples
+
+- `renhehuang/govQA-database-zhtw`
+- `squad`
+- `glue` (with config_name: "mrpc")
+
+Returns the same response as file upload, with a file_id that can be used
+for subsequent augmentation operations.
+"""
+)
+async def load_huggingface_dataset_endpoint(
+    request: HuggingFaceLoadRequest
+) -> AugmentUploadResponse:
+    """
+    Load a dataset from HuggingFace Hub.
+    
+    Args:
+        request: HuggingFace dataset load request
+        
+    Returns:
+        AugmentUploadResponse with file_id, fields, and preview
+        
+    Raises:
+        HTTPException 400: If dataset cannot be loaded
+        HTTPException 404: If dataset not found
+    """
+    try:
+        # Load dataset from HuggingFace
+        entries, fields = load_huggingface_dataset(
+            dataset_name=request.dataset_name,
+            config_name=request.config_name,
+            split=request.split,
+            max_entries=request.max_entries,
+        )
+        
+        if not entries:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "EmptyDataset",
+                    "message": f"Dataset '{request.dataset_name}' is empty or has no entries in split '{request.split}'"
+                }
+            )
+        
+        # Store in augmentation service
+        result = await augmentation_service.store_huggingface_dataset(
+            entries=entries,
+            fields=fields,
+            dataset_name=request.dataset_name,
+            split=request.split,
+        )
+        
+        return AugmentUploadResponse(
+            file_id=result["file_id"],
+            entry_count=result["entry_count"],
+            fields=result["fields"],
+            preview=result["preview"],
+            source_type="huggingface"
+        )
+        
+    except HuggingFaceLoaderError as e:
+        # Check if it's a "not found" error
+        if "not found" in str(e).lower():
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "DatasetNotFound",
+                    "message": str(e)
+                }
+            )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "HuggingFaceError",
+                "message": str(e)
+            }
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "LoadError",
+                "message": f"Failed to load HuggingFace dataset: {str(e)}"
             }
         )
 

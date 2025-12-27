@@ -12,3 +12,10 @@ torch>=2.0.0
 # Document parsing for doc2dataset command
 PyPDF2>=3.0.0
 beautifulsoup4>=4.12.0
+
+# Multi-format dataset support
+pandas>=2.0.0
+pyarrow>=14.0.0
+
+# HuggingFace datasets support
+datasets>=2.14.0

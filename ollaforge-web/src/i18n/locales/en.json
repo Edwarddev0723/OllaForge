@@ -43,6 +43,18 @@
     "title": "Dataset Augmentation",
     "upload": "Upload Dataset",
     "uploadHint": "Click or drag file to upload (JSONL, JSON, CSV, TSV, Parquet)",
+    "uploadTab": "📁 Upload File",
+    "huggingfaceTab": "🤗 HuggingFace",
+    "hfDatasetName": "Dataset Name",
+    "hfDatasetNameRequired": "Dataset name is required",
+    "hfDatasetNameInvalid": "Invalid format. Use: username/dataset-name",
+    "hfDatasetNameHint": "e.g., renhehuang/govQA-database-zhtw",
+    "hfSplit": "Split",
+    "hfConfig": "Configuration (Optional)",
+    "hfConfigPlaceholder": "Leave empty for default",
+    "hfMaxEntries": "Max Entries (Optional)",
+    "hfMaxEntriesHint": "Limit the number of entries to load",
+    "hfLoad": "Load from HuggingFace",
     "uploadSuccess": "File Uploaded Successfully",
     "clearFile": "Clear",
     "entryCount": "Entries",
@@ -139,6 +151,7 @@
   "language": {
     "en": "English",
     "zh-tw": "繁體中文",
+    "zh-cn": "简体中文",
     "select": "Select Language"
   },
   "footer": {

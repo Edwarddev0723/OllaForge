@@ -88,6 +88,7 @@ class AugmentUploadResponse(BaseModel):
     entry_count: int = Field(..., description="Total number of entries in the dataset")
     fields: List[str] = Field(..., description="List of available field names")
     preview: List[Dict[str, Any]] = Field(..., description="Preview of first few entries")
+    source_type: str = Field("file", description="Source type: 'file' or 'huggingface'")
     
     class Config:
         json_schema_extra = {
@@ -97,7 +98,28 @@ class AugmentUploadResponse(BaseModel):
                 "fields": ["instruction", "input", "output"],
                 "preview": [
                     {"instruction": "Translate", "input": "Hello", "output": "Bonjour"}
-                ]
+                ],
+                "source_type": "file"
+            }
+        }
+
+
+class HuggingFaceLoadRequest(BaseModel):
+    """
+    Request to load a HuggingFace dataset.
+    """
+    dataset_name: str = Field(..., description="HuggingFace dataset identifier (e.g., 'renhehuang/govQA-database-zhtw')")
+    config_name: Optional[str] = Field(None, description="Dataset configuration name")
+    split: str = Field("train", description="Dataset split to load")
+    max_entries: Optional[int] = Field(None, ge=1, le=100000, description="Maximum number of entries to load")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "dataset_name": "renhehuang/govQA-database-zhtw",
+                "config_name": None,
+                "split": "train",
+                "max_entries": 1000
             }
         }
 

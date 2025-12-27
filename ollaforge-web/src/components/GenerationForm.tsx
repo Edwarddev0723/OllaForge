@@ -246,6 +246,7 @@ export const GenerationForm: React.FC<GenerationFormProps> = ({
           options={[
             { value: OutputLanguage.EN, label: t('language.en') },
             { value: OutputLanguage.ZH_TW, label: t('language.zh-tw') },
+            { value: OutputLanguage.ZH_CN, label: t('language.zh-cn') },
           ]}
         />
       </Form.Item>

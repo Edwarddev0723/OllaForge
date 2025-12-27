@@ -3,6 +3,7 @@
  *
  * Provides drag-and-drop file upload functionality with:
  * - Support for JSONL, JSON, CSV, TSV, Parquet formats
+ * - Support for HuggingFace dataset loading
  * - File information display after upload
  * - Field list display from uploaded dataset
  * - Preview of first few entries
@@ -20,20 +21,28 @@ import {
   Alert,
   Spin,
   Divider,
+  Input,
+  Button,
+  Tabs,
+  Form,
+  InputNumber,
+  Select,
 } from 'antd';
 import {
   InboxOutlined,
   FileOutlined,
   CheckCircleOutlined,
   DeleteOutlined,
+  CloudDownloadOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { UploadProps } from 'antd';
-import { augmentationAPI, type AugmentUploadResponse } from '../services/api';
+import { augmentationAPI, type AugmentUploadResponse, type HuggingFaceLoadRequest } from '../services/api';
 import { DatasetPreview } from './DatasetPreview';
 
 const { Dragger } = Upload;
 const { Text, Title } = Typography;
+const { TabPane } = Tabs;
 
 /** Supported file extensions */
 const SUPPORTED_EXTENSIONS = ['.jsonl', '.json', '.csv', '.tsv', '.parquet'];
@@ -62,6 +71,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('file');
+  const [hfForm] = Form.useForm();
 
   /**
    * Validate file before upload.
@@ -109,11 +120,32 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   /**
+   * Handle HuggingFace dataset loading.
+   */
+  const handleHuggingFaceLoad = async (values: HuggingFaceLoadRequest): Promise<void> => {
+    setUploading(true);
+    setError(null);
+    setFileName(values.dataset_name);
+
+    try {
+      const response = await augmentationAPI.loadHuggingFaceDataset(values);
+      onUploadSuccess(response);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load HuggingFace dataset';
+      setError(errorMessage);
+      setFileName(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  /**
    * Handle file removal/clear.
    */
   const handleClear = () => {
     setFileName(null);
     setError(null);
+    hfForm.resetFields();
     onClear();
   };
 
@@ -155,6 +187,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
   // Show upload result if we have a response
   if (uploadResponse) {
+    const isHuggingFace = uploadResponse.source_type === 'huggingface';
+    
     return (
       <Card
         title={
@@ -175,10 +209,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           {/* File Info */}
           <div>
             <Space>
-              <FileOutlined />
+              {isHuggingFace ? <CloudDownloadOutlined /> : <FileOutlined />}
               <Text strong>{fileName}</Text>
-              <Tag color={getFileTypeColor(fileName || '')}>
-                {fileName?.split('.').pop()?.toUpperCase()}
+              <Tag color={isHuggingFace ? 'gold' : getFileTypeColor(fileName || '')}>
+                {isHuggingFace ? '🤗 HuggingFace' : fileName?.split('.').pop()?.toUpperCase()}
               </Tag>
             </Space>
           </div>
@@ -227,13 +261,73 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   return (
     <div className="file-upload">
       <Spin spinning={uploading} tip={t('common.loading')}>
-        <Dragger {...uploadProps}>
-          <p className="ant-upload-drag-icon">
-            <InboxOutlined />
-          </p>
-          <p className="ant-upload-text">{t('augment.upload')}</p>
-          <p className="ant-upload-hint">{t('augment.uploadHint')}</p>
-        </Dragger>
+        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+          <TabPane tab={t('augment.uploadTab', '📁 Upload File')} key="file">
+            <Dragger {...uploadProps}>
+              <p className="ant-upload-drag-icon">
+                <InboxOutlined />
+              </p>
+              <p className="ant-upload-text">{t('augment.upload')}</p>
+              <p className="ant-upload-hint">{t('augment.uploadHint')}</p>
+            </Dragger>
+          </TabPane>
+          
+          <TabPane tab={t('augment.huggingfaceTab', '🤗 HuggingFace')} key="huggingface">
+            <Form
+              form={hfForm}
+              layout="vertical"
+              onFinish={handleHuggingFaceLoad}
+              initialValues={{ split: 'train' }}
+            >
+              <Form.Item
+                name="dataset_name"
+                label={t('augment.hfDatasetName', 'Dataset Name')}
+                rules={[
+                  { required: true, message: t('augment.hfDatasetNameRequired', 'Dataset name is required') },
+                  { pattern: /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/, message: t('augment.hfDatasetNameInvalid', 'Invalid format. Use: username/dataset-name') }
+                ]}
+                extra={t('augment.hfDatasetNameHint', 'e.g., renhehuang/govQA-database-zhtw')}
+              >
+                <Input 
+                  placeholder="username/dataset-name" 
+                  prefix={<CloudDownloadOutlined />}
+                />
+              </Form.Item>
+              
+              <Form.Item
+                name="split"
+                label={t('augment.hfSplit', 'Split')}
+              >
+                <Select>
+                  <Select.Option value="train">train</Select.Option>
+                  <Select.Option value="test">test</Select.Option>
+                  <Select.Option value="validation">validation</Select.Option>
+                </Select>
+              </Form.Item>
+              
+              <Form.Item
+                name="config_name"
+                label={t('augment.hfConfig', 'Configuration (Optional)')}
+              >
+                <Input placeholder={t('augment.hfConfigPlaceholder', 'Leave empty for default')} />
+              </Form.Item>
+              
+              <Form.Item
+                name="max_entries"
+                label={t('augment.hfMaxEntries', 'Max Entries (Optional)')}
+                extra={t('augment.hfMaxEntriesHint', 'Limit the number of entries to load')}
+              >
+                <InputNumber min={1} max={100000} style={{ width: '100%' }} />
+              </Form.Item>
+              
+              <Form.Item>
+                <Button type="primary" htmlType="submit" loading={uploading} block>
+                  {t('augment.hfLoad', 'Load from HuggingFace')}
+                </Button>
+              </Form.Item>
+            </Form>
+          </TabPane>
+        </Tabs>
       </Spin>
 
       {error && (

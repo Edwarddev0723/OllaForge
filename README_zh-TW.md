@@ -91,9 +91,18 @@
 | 功能 | 說明 |
 |------|------|
 | 🔍 **BERT 品質控制** | 過濾大陸用語，確保台灣繁體中文品質 |
-| 🌏 **多語言支援** | 英文與繁體中文（台灣）支援 |
+| 🌏 **多語言支援** | 英文、繁體中文（台灣）與簡體中文（中國大陸）支援 |
 | ✅ **結構化輸出** | JSON Schema 強制執行，0% 格式錯誤 |
 | 📈 **進度追蹤** | Rich 驅動的即時進度顯示 |
+
+### 🤗 HuggingFace 整合
+
+| 功能 | 說明 |
+|------|------|
+| 📥 **直接載入** | 直接從 HuggingFace Hub 載入資料集 |
+| 🔄 **擴增 HF 資料集** | 無需下載即可擴增任何 HuggingFace 資料集 |
+| ⚙️ **分割與配置支援** | 指定資料集分割和配置 |
+| 📊 **大型資料集處理** | 限制載入筆數以提升處理效率 |
 
 ### 🖥️ 網頁介面（🚧 開發中）
 
@@ -130,8 +139,24 @@ pip install ollaforge[qc]
 # 包含多格式支援（CSV、Parquet 等）
 pip install ollaforge[formats]
 
+# 包含 HuggingFace 資料集支援
+pip install ollaforge[hf]
+
 # 包含所有功能
 pip install ollaforge[all]
+```
+
+### 升級現有安裝
+
+```bash
+# 升級至最新版本
+pip install --upgrade ollaforge
+
+# 升級並包含所有功能
+pip install --upgrade ollaforge[all]
+
+# 強制重新安裝（如遇問題時使用）
+pip install --force-reinstall ollaforge
 ```
 
 ### 您的第一個資料集
@@ -158,6 +183,9 @@ ollaforge augment data.jsonl --field difficulty --new-field --instruction "評�
 
 # 處理 CSV 檔案
 ollaforge augment data.csv --field sentiment --new-field --instruction "分析情感：正面/負面/中性"
+
+# 直接擴增 HuggingFace 資料集
+ollaforge augment renhehuang/govQA-database-zhtw --field answer --instruction "翻譯成英文" --output translated.jsonl
 
 # 格式轉換
 ollaforge convert data.csv data.jsonl
@@ -192,7 +220,7 @@ ollaforge generate <主題> [選項]
 | `--model` | `-m` | llama3.2 | Ollama 模型名稱 |
 | `--output` | `-o` | dataset.jsonl | 輸出檔名 |
 | `--type` | `-t` | sft | 格式：`sft`、`pretrain`、`sft_conv`、`dpo` |
-| `--lang` | `-l` | en | 語言：`en`、`zh-tw` |
+| `--lang` | `-l` | en | 語言：`en`、`zh-tw`、`zh-cn` |
 | `--concurrency` | `-j` | 5 | 並行請求數（1-20） |
 | `--qc/--no-qc` | | --qc | 台灣繁體中文品質控制 |
 | `--interactive` | `-i` | | 啟動精靈模式 |
@@ -200,7 +228,7 @@ ollaforge generate <主題> [選項]
 ### 擴增指令
 
 ```bash
-ollaforge augment <輸入檔案> [選項]
+ollaforge augment <輸入檔案或HuggingFace資料集> [選項]
 ```
 
 | 選項 | 簡寫 | 預設值 | 說明 |
@@ -209,10 +237,18 @@ ollaforge augment <輸入檔案> [選項]
 | `--instruction` | `-I` | 必填 | AI 擴增指令 |
 | `--output` | `-o` | 自動 | 輸出檔案（預設：input_augmented.jsonl） |
 | `--model` | `-m` | llama3.2 | Ollama 模型名稱 |
+| `--lang` | `-l` | en | 語言：`en`、`zh-tw`、`zh-cn` |
 | `--new-field` | | false | 建立新欄位而非修改 |
 | `--context` | `-c` | | 額外上下文欄位 |
 | `--preview` | `-p` | | 處理前預覽 |
+| `--preview-count` | | 3 | 預覽筆數（1-10） |
 | `--concurrency` | `-j` | 5 | 並行請求數 |
+| `--input-format` | | 自動 | 輸入格式：jsonl、json、csv、tsv、parquet |
+| `--output-format` | | 自動 | 輸出格式：jsonl、json、csv、tsv、parquet |
+| `--hf-split` | | train | HuggingFace 資料集分割 |
+| `--hf-config` | | | HuggingFace 資料集配置名稱 |
+| `--max-entries` | | | 最大載入筆數（適用於大型資料集） |
+| `--force` | `-y` | | 覆寫輸出檔案不需確認 |
 
 ### 文件轉資料集指令
 
@@ -230,7 +266,7 @@ ollaforge doc2dataset <來源> [選項]
 | `--chunk-size` | | 2000 | 區塊大小（字元數，500-10000） |
 | `--chunk-overlap` | | 200 | 區塊重疊（0-1000） |
 | `--count` | `-c` | 3 | 每區塊生成筆數（1-10） |
-| `--lang` | `-l` | en | 語言：`en`、`zh-tw` |
+| `--lang` | `-l` | en | 語言：`en`、`zh-tw`、`zh-cn` |
 | `--pattern` | `-p` | | 目錄檔案模式（如 `*.md`） |
 | `--recursive/--no-recursive` | | --recursive | 遞迴處理目錄 |
 | `--qc/--no-qc` | | --qc | 啟用品質控制 |

@@ -13,6 +13,7 @@ interface LanguageOption {
 const languages: LanguageOption[] = [
   { code: 'en', label: 'English' },
   { code: 'zh-TW', label: '繁體中文' },
+  { code: 'zh-CN', label: '简体中文' },
 ];
 
 const LanguageSelector: React.FC = () => {

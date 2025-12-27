@@ -92,9 +92,18 @@
 | Feature | Description |
 |---------|-------------|
 | 🔍 **BERT-based QC** | Filters Mainland Chinese expressions for Taiwan datasets |
-| 🌏 **Multi-language** | English and Traditional Chinese (Taiwan) support |
+| 🌏 **Multi-language** | English, Traditional Chinese (Taiwan), and Simplified Chinese (China) |
 | ✅ **Structured Output** | JSON schema enforcement for 0% format errors |
 | 📈 **Progress Tracking** | Real-time progress with Rich-powered UI |
+
+### 🤗 HuggingFace Integration
+
+| Feature | Description |
+|---------|-------------|
+| 📥 **Direct Loading** | Load datasets directly from HuggingFace Hub |
+| 🔄 **Augment HF Datasets** | Augment any HuggingFace dataset without downloading |
+| ⚙️ **Split & Config Support** | Specify dataset splits and configurations |
+| 📊 **Large Dataset Handling** | Limit entries for efficient processing |
 
 ### 🖥️ Web Interface (🚧 In Development)
 
@@ -131,8 +140,24 @@ pip install ollaforge[qc]
 # With multi-format support (CSV, Parquet, etc.)
 pip install ollaforge[formats]
 
+# With HuggingFace datasets support
+pip install ollaforge[hf]
+
 # With all features
 pip install ollaforge[all]
+```
+
+### Upgrade Existing Installation
+
+```bash
+# Upgrade to latest version
+pip install --upgrade ollaforge
+
+# Upgrade with all features
+pip install --upgrade ollaforge[all]
+
+# Force reinstall (if having issues)
+pip install --force-reinstall ollaforge
 ```
 
 ### Your First Dataset
@@ -159,6 +184,9 @@ ollaforge augment data.jsonl --field difficulty --new-field --instruction "Rate 
 
 # Work with CSV files
 ollaforge augment data.csv --field sentiment --new-field --instruction "Analyze sentiment: positive/negative/neutral"
+
+# Augment HuggingFace dataset directly
+ollaforge augment renhehuang/govQA-database-zhtw --field answer --instruction "Translate to English" --output translated.jsonl
 
 # Convert between formats
 ollaforge convert data.csv data.jsonl
@@ -193,7 +221,7 @@ ollaforge generate <topic> [options]
 | `--model` | `-m` | llama3.2 | Ollama model name |
 | `--output` | `-o` | dataset.jsonl | Output filename |
 | `--type` | `-t` | sft | Format: `sft`, `pretrain`, `sft_conv`, `dpo` |
-| `--lang` | `-l` | en | Language: `en`, `zh-tw` |
+| `--lang` | `-l` | en | Language: `en`, `zh-tw`, `zh-cn` |
 | `--concurrency` | `-j` | 5 | Parallel requests (1-20) |
 | `--qc/--no-qc` | | --qc | Taiwan Chinese QC filter |
 | `--interactive` | `-i` | | Launch wizard mode |
@@ -201,7 +229,7 @@ ollaforge generate <topic> [options]
 ### Augment Command
 
 ```bash
-ollaforge augment <input_file> [options]
+ollaforge augment <input_file_or_hf_dataset> [options]
 ```
 
 | Option | Short | Default | Description |
@@ -210,10 +238,18 @@ ollaforge augment <input_file> [options]
 | `--instruction` | `-I` | required | AI instruction for augmentation |
 | `--output` | `-o` | auto | Output file (default: input_augmented.jsonl) |
 | `--model` | `-m` | llama3.2 | Ollama model name |
+| `--lang` | `-l` | en | Language: `en`, `zh-tw`, `zh-cn` |
 | `--new-field` | | false | Create new field instead of modifying |
 | `--context` | `-c` | | Additional context fields |
 | `--preview` | `-p` | | Preview before full processing |
+| `--preview-count` | | 3 | Number of entries to preview (1-10) |
 | `--concurrency` | `-j` | 5 | Parallel requests |
+| `--input-format` | | auto | Input format: jsonl, json, csv, tsv, parquet |
+| `--output-format` | | auto | Output format: jsonl, json, csv, tsv, parquet |
+| `--hf-split` | | train | HuggingFace dataset split to use |
+| `--hf-config` | | | HuggingFace dataset configuration name |
+| `--max-entries` | | | Maximum entries to load (for large datasets) |
+| `--force` | `-y` | | Overwrite output without confirmation |
 
 ### Doc2Dataset Command
 
@@ -231,7 +267,7 @@ ollaforge doc2dataset <source> [options]
 | `--chunk-size` | | 2000 | Chunk size in characters (500-10000) |
 | `--chunk-overlap` | | 200 | Overlap between chunks (0-1000) |
 | `--count` | `-c` | 3 | Entries to generate per chunk (1-10) |
-| `--lang` | `-l` | en | Language: `en`, `zh-tw` |
+| `--lang` | `-l` | en | Language: `en`, `zh-tw`, `zh-cn` |
 | `--pattern` | `-p` | | File pattern for directories (e.g., `*.md`) |
 | `--recursive/--no-recursive` | | --recursive | Recursively process directories |
 | `--qc/--no-qc` | | --qc | Enable quality control |

@@ -142,7 +142,8 @@ DATASET_TYPE_HELP = """Dataset type to generate:
 
 LANGUAGE_HELP = """Output language for generated content:
 • en: English (default)
-• zh-tw: 繁體中文（台灣用語）"""
+• zh-tw: 繁體中文（台灣用語）
+• zh-cn: 简体中文（中国大陆用语）"""
 
 
 @app.command()
@@ -284,6 +285,7 @@ def _display_config(config: GenerationConfig, concurrency: int) -> None:
     lang_display = {
         OutputLanguage.EN: "English",
         OutputLanguage.ZH_TW: "繁體中文（台灣）",
+        OutputLanguage.ZH_CN: "简体中文（中国大陆）",
     }
 
     console.print(
@@ -473,11 +475,19 @@ def _run_generation(config: GenerationConfig, concurrency: int) -> None:
 
 
 def validate_input_file(value: str) -> str:
-    """Validate input file exists and is readable."""
+    """Validate input file exists and is readable, or is a HuggingFace dataset identifier."""
     if not value or not value.strip():
         raise typer.BadParameter("Input file path cannot be empty")
     
-    input_path = Path(value.strip())
+    value = value.strip()
+    
+    # Check if it's a HuggingFace dataset identifier
+    from .hf_loader import is_huggingface_dataset
+    if is_huggingface_dataset(value):
+        return value  # Return as-is for HuggingFace datasets
+    
+    # Otherwise, validate as a local file
+    input_path = Path(value)
     if not input_path.exists():
         raise typer.BadParameter(f"Input file not found: {value}")
     if not input_path.is_file():
@@ -485,7 +495,7 @@ def validate_input_file(value: str) -> str:
     if not os.access(input_path, os.R_OK):
         raise typer.BadParameter(f"No read permission for file: {value}")
     
-    return value.strip()
+    return value
 
 
 def validate_field_name(value: str) -> str:
@@ -528,7 +538,7 @@ Supported formats: jsonl, json, csv, tsv, parquet"""
 def augment(
     input_file: str = typer.Argument(
         ...,
-        help="Source JSONL file to augment",
+        help="Source dataset file or HuggingFace dataset name (e.g., 'renhehuang/govQA-database-zhtw')",
         callback=lambda ctx, param, value: validate_input_file(value) if value else value,
     ),
     field: str = typer.Option(
@@ -616,14 +626,35 @@ def augment(
         "--output-format",
         help="Output file format (auto-detected if not specified): jsonl, json, csv, tsv, parquet",
     ),
+    hf_split: str = typer.Option(
+        "train",
+        "--hf-split",
+        help="HuggingFace dataset split to use (default: train)",
+    ),
+    hf_config: Optional[str] = typer.Option(
+        None,
+        "--hf-config",
+        help="HuggingFace dataset configuration name",
+    ),
+    max_entries: Optional[int] = typer.Option(
+        None,
+        "--max-entries",
+        help="Maximum number of entries to load (for large datasets)",
+    ),
 ) -> None:
     """
     Augment an existing dataset by modifying or adding fields using AI.
 
+    Supports local files (JSONL, JSON, CSV, TSV, Parquet) and HuggingFace datasets.
+
     Examples:
 
-        # Augment the 'output' field with translation
+        # Augment a local file
         ollaforge augment data.jsonl --field output --instruction "Translate to English"
+
+        # Augment a HuggingFace dataset
+        ollaforge augment renhehuang/govQA-database-zhtw --field answer \\
+            --instruction "Translate to English" --output translated.jsonl
 
         # Add a new 'difficulty' field using context from other fields
         ollaforge augment data.jsonl --field difficulty --new-field \\
@@ -632,6 +663,9 @@ def augment(
 
         # Preview before full processing
         ollaforge augment data.jsonl --field output -I "Improve grammar" --preview
+
+        # Load specific split from HuggingFace
+        ollaforge augment username/dataset --hf-split test --field text -I "Summarize"
     """
     try:
         # Handle interactive mode
@@ -643,8 +677,17 @@ def augment(
             # Unpack interactive result and continue with augmentation
             input_file, field, instruction, output, model, concurrency, new_field, context, preview, language = result
         
+        # Check if input is a HuggingFace dataset
+        from .hf_loader import is_huggingface_dataset
+        is_hf_dataset = is_huggingface_dataset(input_file)
+        
         # Generate default output filename if not specified
-        output_file = _generate_output_filename(input_file, output)
+        if is_hf_dataset:
+            # For HuggingFace datasets, use dataset name as base
+            dataset_name = input_file.replace('/', '_')
+            output_file = output or f"{dataset_name}_augmented.jsonl"
+        else:
+            output_file = _generate_output_filename(input_file, output)
         
         # Check for existing output file
         if not force and _check_output_exists(output_file):
@@ -668,6 +711,9 @@ def augment(
             force=force,
             input_format=input_format,
             output_format=output_format,
+            hf_split=hf_split,
+            hf_config=hf_config,
+            max_entries=max_entries,
         )
         
     except KeyboardInterrupt:
@@ -711,6 +757,9 @@ def _run_augmentation(
     force: bool,
     input_format: Optional[str] = None,
     output_format: Optional[str] = None,
+    hf_split: str = "train",
+    hf_config: Optional[str] = None,
+    max_entries: Optional[int] = None,
 ) -> None:
     """Execute the augmentation process."""
     from .augmentor import DatasetAugmentor
@@ -724,8 +773,12 @@ def _run_augmentation(
         estimate_file_size,
     )
     from .formats import FileFormat, FormatError
+    from .hf_loader import is_huggingface_dataset, load_huggingface_dataset, HuggingFaceLoaderError
     import json
     import signal
+    
+    # Check if input is a HuggingFace dataset
+    is_hf_dataset = is_huggingface_dataset(input_file)
     
     # Create augmentation config
     config = AugmentationConfig(
@@ -743,13 +796,22 @@ def _run_augmentation(
     # Initialize augmentor
     augmentor = DatasetAugmentor(config)
     
-    # Validate file formats
-    if input_format:
-        try:
-            input_fmt = FileFormat(input_format.lower())
-        except ValueError:
-            console.print(f"[red]❌ Invalid input format: {input_format}[/red]")
-            console.print(f"[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+    # Validate file formats (only for local files)
+    if not is_hf_dataset:
+        if input_format:
+            try:
+                input_fmt = FileFormat(input_format.lower())
+            except ValueError:
+                console.print(f"[red]❌ Invalid input format: {input_format}[/red]")
+                console.print(f"[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+                raise typer.Exit(1)
+        else:
+            input_fmt = None
+        
+        # Validate input file format
+        is_supported, message = validate_file_format(input_file)
+        if not is_supported and not input_format:
+            console.print(f"[red]❌ {message}[/red]")
             raise typer.Exit(1)
     else:
         input_fmt = None
@@ -764,12 +826,6 @@ def _run_augmentation(
     else:
         output_fmt = None
     
-    # Validate input file format
-    is_supported, message = validate_file_format(input_file)
-    if not is_supported and not input_format:
-        console.print(f"[red]❌ {message}[/red]")
-        raise typer.Exit(1)
-    
     # Load dataset and display info
     console.print(Panel.fit(
         Text("🔧 OllaForge Dataset Augmentor", style="bold magenta"),
@@ -777,13 +833,33 @@ def _run_augmentation(
     ))
     
     try:
-        entries, field_names = augmentor.load_dataset()
+        if is_hf_dataset:
+            # Load from HuggingFace
+            console.print(f"[cyan]🤗 Loading from HuggingFace: {input_file}[/cyan]")
+            entries, field_names = load_huggingface_dataset(
+                dataset_name=input_file,
+                config_name=hf_config,
+                split=hf_split,
+                max_entries=max_entries,
+            )
+        else:
+            # Load from local file
+            entries, field_names = augmentor.load_dataset()
+    except HuggingFaceLoaderError as e:
+        console.print(f"[red]❌ HuggingFace error: {str(e)}[/red]")
+        raise typer.Exit(1)
     except FileOperationError as e:
         console.print(f"[red]❌ {str(e)}[/red]")
         raise typer.Exit(1)
     
     # Display dataset info (Requirement 1.4)
-    console.print(f"📂 Input: {input_file}")
+    if is_hf_dataset:
+        console.print(f"🤗 Dataset: {input_file}")
+        console.print(f"📂 Split: {hf_split}")
+        if hf_config:
+            console.print(f"⚙️  Config: {hf_config}")
+    else:
+        console.print(f"📂 Input: {input_file}")
     console.print(f"📊 Entries: {len(entries)}")
     console.print(f"📋 Fields: {', '.join(field_names)}")
     console.print(f"🎯 Target field: {field}")
@@ -1594,6 +1670,7 @@ def _display_doc2dataset_config(
     lang_display = {
         OutputLanguage.EN: "English",
         OutputLanguage.ZH_TW: "繁體中文（台灣）",
+        OutputLanguage.ZH_CN: "简体中文（中国大陆）",
     }
     
     console.print(
