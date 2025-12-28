@@ -6,8 +6,9 @@ hypothesis>=6.90.0
 pytest>=7.4.0
 
 # QC module for Traditional Chinese (Taiwan) validation
-transformers>=4.36.0
+transformers>=4.36.0,<4.57.0
 torch>=2.0.0
+huggingface-hub>=0.34.0,<1.0.0
 
 # Document parsing for doc2dataset command
 PyPDF2>=3.0.0

@@ -23,6 +23,7 @@ from .models import (
 )
 from .formats import FileFormat
 from .progress import ProgressTracker
+from .file_manager import FileOperationError, DiskSpaceError
 
 # Initialize Rich console for beautiful output
 console = Console()
