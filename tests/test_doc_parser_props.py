@@ -23,6 +23,7 @@ from ollaforge.doc_parser import (
 # Test Fixtures and Helpers
 # ============================================================================
 
+
 class DummyParser(BaseParser):
     """A dummy parser for testing factory registration."""
 
@@ -31,9 +32,7 @@ class DummyParser(BaseParser):
 
     def parse(self, file_path: str) -> ParsedDocument:
         return ParsedDocument(
-            content="dummy content",
-            doc_type=self.doc_type,
-            source_path=file_path
+            content="dummy content", doc_type=self.doc_type, source_path=file_path
         )
 
     def supports(self, file_path: str) -> bool:
@@ -59,34 +58,38 @@ def reset_factory():
 
 # Strategy for generating valid file extensions (with leading dot)
 valid_extensions = st.text(
-    alphabet=st.characters(whitelist_categories=('L', 'N')),
-    min_size=1,
-    max_size=10
-).map(lambda x: '.' + x.lower())
+    alphabet=st.characters(whitelist_categories=("L", "N")), min_size=1, max_size=10
+).map(lambda x: "." + x.lower())
 
 # Strategy for generating unsupported file extensions
 # These are extensions that won't be registered in the factory
 unsupported_extensions = st.text(
-    alphabet=st.characters(whitelist_categories=('L', 'N')),
-    min_size=1,
-    max_size=10
-).map(lambda x: '.' + x.lower() + '_unsupported')
+    alphabet=st.characters(whitelist_categories=("L", "N")), min_size=1, max_size=10
+).map(lambda x: "." + x.lower() + "_unsupported")
+
 
 # Strategy for generating file paths with specific extensions
 def file_path_with_extension(ext: str) -> st.SearchStrategy[str]:
     """Generate a file path with the given extension."""
     # Generate a filename (without extension) that doesn't start with a dot
     # to avoid issues with hidden files and extension detection
-    return st.text(
-        alphabet=st.characters(whitelist_categories=('L', 'N'), whitelist_characters='_-'),
-        min_size=1,
-        max_size=50
-    ).filter(lambda x: x.strip() and not x.startswith('.')).map(lambda x: x + ext)
+    return (
+        st.text(
+            alphabet=st.characters(
+                whitelist_categories=("L", "N"), whitelist_characters="_-"
+            ),
+            min_size=1,
+            max_size=50,
+        )
+        .filter(lambda x: x.strip() and not x.startswith("."))
+        .map(lambda x: x + ext)
+    )
 
 
 # ============================================================================
 # Property Tests
 # ============================================================================
+
 
 @given(data=st.data())
 @settings(max_examples=20)
@@ -105,12 +108,14 @@ def test_unsupported_format_error_contains_supported_formats(data):
     """
     # Generate 1-5 supported extensions and register them
     num_supported = data.draw(st.integers(min_value=1, max_value=5))
-    supported_exts = data.draw(st.lists(
-        valid_extensions,
-        min_size=num_supported,
-        max_size=num_supported,
-        unique=True
-    ))
+    supported_exts = data.draw(
+        st.lists(
+            valid_extensions,
+            min_size=num_supported,
+            max_size=num_supported,
+            unique=True,
+        )
+    )
 
     # Register parsers for supported extensions
     for ext in supported_exts:
@@ -131,18 +136,21 @@ def test_unsupported_format_error_contains_supported_formats(data):
     error = exc_info.value
 
     # Verify the error contains the list of supported formats
-    assert error.supported_formats is not None, \
-        "Error should contain supported_formats list"
+    assert (
+        error.supported_formats is not None
+    ), "Error should contain supported_formats list"
 
     # Verify all registered formats are in the error's supported_formats
     for ext in supported_exts:
-        normalized_ext = ext.lower() if ext.startswith('.') else '.' + ext.lower()
-        assert normalized_ext in error.supported_formats, \
-            f"Supported format '{normalized_ext}' should be in error.supported_formats: {error.supported_formats}"
+        normalized_ext = ext.lower() if ext.startswith(".") else "." + ext.lower()
+        assert (
+            normalized_ext in error.supported_formats
+        ), f"Supported format '{normalized_ext}' should be in error.supported_formats: {error.supported_formats}"
 
     # Verify the unsupported extension is mentioned in the error message
-    assert unsupported_ext in error.message or unsupported_ext in str(error), \
-        f"Error message should mention the unsupported extension '{unsupported_ext}'"
+    assert unsupported_ext in error.message or unsupported_ext in str(
+        error
+    ), f"Error message should mention the unsupported extension '{unsupported_ext}'"
 
 
 @given(data=st.data())
@@ -160,8 +168,9 @@ def test_unsupported_format_error_with_empty_registry(data):
     file_path = data.draw(file_path_with_extension(ext))
 
     # Factory should be empty (cleared by fixture)
-    assert len(DocumentParserFactory.get_supported_formats()) == 0, \
-        "Factory should be empty for this test"
+    assert (
+        len(DocumentParserFactory.get_supported_formats()) == 0
+    ), "Factory should be empty for this test"
 
     # Attempting to get a parser should raise UnsupportedFormatError
     with pytest.raises(UnsupportedFormatError) as exc_info:
@@ -170,10 +179,12 @@ def test_unsupported_format_error_with_empty_registry(data):
     error = exc_info.value
 
     # Verify the error contains an empty supported_formats list
-    assert error.supported_formats is not None, \
-        "Error should contain supported_formats list"
-    assert len(error.supported_formats) == 0, \
-        f"supported_formats should be empty, got: {error.supported_formats}"
+    assert (
+        error.supported_formats is not None
+    ), "Error should contain supported_formats list"
+    assert (
+        len(error.supported_formats) == 0
+    ), f"supported_formats should be empty, got: {error.supported_formats}"
 
 
 @given(data=st.data())
@@ -190,12 +201,14 @@ def test_supported_format_returns_parser(data):
     """
     # Generate 1-5 supported extensions and register them
     num_supported = data.draw(st.integers(min_value=1, max_value=5))
-    supported_exts = data.draw(st.lists(
-        valid_extensions,
-        min_size=num_supported,
-        max_size=num_supported,
-        unique=True
-    ))
+    supported_exts = data.draw(
+        st.lists(
+            valid_extensions,
+            min_size=num_supported,
+            max_size=num_supported,
+            unique=True,
+        )
+    )
 
     # Register parsers for supported extensions
     parsers = {}
@@ -225,10 +238,11 @@ import tempfile  # noqa: E402
 
 # Strategy for generating Markdown content
 markdown_content = st.text(
-    alphabet=st.characters(whitelist_categories=('L', 'N', 'P', 'Z')),
+    alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z")),
     min_size=1,
-    max_size=500
+    max_size=500,
 )
+
 
 # Strategy for generating Markdown with headings
 @st.composite
@@ -239,26 +253,32 @@ def markdown_with_headings(draw):
 
     for _i in range(num_sections):
         level = draw(st.integers(min_value=1, max_value=6))
-        title = draw(st.text(
-            alphabet=st.characters(whitelist_categories=('L', 'N'), whitelist_characters=' '),
-            min_size=1,
-            max_size=30
-        ).filter(lambda x: x.strip()))
-        content = draw(st.text(
-            alphabet=st.characters(whitelist_categories=('L', 'N', 'P', 'Z')),
-            min_size=0,
-            max_size=100
-        ))
+        title = draw(
+            st.text(
+                alphabet=st.characters(
+                    whitelist_categories=("L", "N"), whitelist_characters=" "
+                ),
+                min_size=1,
+                max_size=30,
+            ).filter(lambda x: x.strip())
+        )
+        content = draw(
+            st.text(
+                alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z")),
+                min_size=0,
+                max_size=100,
+            )
+        )
         sections.append(f"{'#' * level} {title}\n\n{content}")
 
-    return '\n\n'.join(sections)
+    return "\n\n".join(sections)
 
 
 # Strategy for generating plain text content
 plain_text_content = st.text(
-    alphabet=st.characters(whitelist_categories=('L', 'N', 'P', 'Z')),
+    alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z")),
     min_size=1,
-    max_size=500
+    max_size=500,
 )
 
 
@@ -272,16 +292,20 @@ def json_content(draw):
     data = {}
 
     for _i in range(num_fields):
-        key = draw(st.text(
-            alphabet=st.characters(whitelist_categories=('L',)),
-            min_size=1,
-            max_size=10
-        ))
-        value = draw(st.text(
-            alphabet=st.characters(whitelist_categories=('L', 'N', 'P', 'Z')),
-            min_size=1,
-            max_size=50
-        ))
+        key = draw(
+            st.text(
+                alphabet=st.characters(whitelist_categories=("L",)),
+                min_size=1,
+                max_size=10,
+            )
+        )
+        value = draw(
+            st.text(
+                alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z")),
+                min_size=1,
+                max_size=50,
+            )
+        )
         data[key] = value
 
     return json.dumps(data, ensure_ascii=False)
@@ -291,17 +315,19 @@ def json_content(draw):
 @st.composite
 def python_code_content(draw):
     """Generate simple Python code content."""
-    func_name = draw(st.text(
-        alphabet=st.characters(whitelist_categories=('L',)),
-        min_size=1,
-        max_size=20
-    ).filter(lambda x: x.isidentifier()))
+    func_name = draw(
+        st.text(
+            alphabet=st.characters(whitelist_categories=("L",)), min_size=1, max_size=20
+        ).filter(lambda x: x.isidentifier())
+    )
 
-    body = draw(st.text(
-        alphabet=st.characters(whitelist_categories=('L', 'N')),
-        min_size=1,
-        max_size=50
-    ))
+    body = draw(
+        st.text(
+            alphabet=st.characters(whitelist_categories=("L", "N")),
+            min_size=1,
+            max_size=50,
+        )
+    )
 
     return f'''def {func_name}():
     """A sample function."""
@@ -323,7 +349,9 @@ def test_markdown_parser_extracts_content(content):
     from ollaforge.doc_parser import DocumentType, MarkdownParser
 
     # Create a temporary file with the content
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8"
+    ) as f:
         f.write(content)
         temp_path = f.name
 
@@ -332,21 +360,21 @@ def test_markdown_parser_extracts_content(content):
         doc = parser.parse(temp_path)
 
         # Verify document type
-        assert doc.doc_type == DocumentType.MARKDOWN, \
-            f"Expected MARKDOWN type, got {doc.doc_type}"
+        assert (
+            doc.doc_type == DocumentType.MARKDOWN
+        ), f"Expected MARKDOWN type, got {doc.doc_type}"
 
         # Verify content is extracted (not empty if source is not empty)
         if content.strip():
-            assert doc.content.strip(), \
-                "Extracted content should not be empty for non-empty source"
+            assert (
+                doc.content.strip()
+            ), "Extracted content should not be empty for non-empty source"
 
         # Verify sections are created
-        assert len(doc.sections) > 0, \
-            "At least one section should be created"
+        assert len(doc.sections) > 0, "At least one section should be created"
 
         # Verify source path is set
-        assert doc.source_path, \
-            "Source path should be set"
+        assert doc.source_path, "Source path should be set"
 
     finally:
         os.unlink(temp_path)
@@ -365,7 +393,9 @@ def test_text_parser_extracts_content(content):
     from ollaforge.doc_parser import DocumentType, TextParser
 
     # Create a temporary file with the content
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".txt", delete=False, encoding="utf-8"
+    ) as f:
         f.write(content)
         temp_path = f.name
 
@@ -374,16 +404,17 @@ def test_text_parser_extracts_content(content):
         doc = parser.parse(temp_path)
 
         # Verify document type
-        assert doc.doc_type == DocumentType.TEXT, \
-            f"Expected TEXT type, got {doc.doc_type}"
+        assert (
+            doc.doc_type == DocumentType.TEXT
+        ), f"Expected TEXT type, got {doc.doc_type}"
 
         # Verify content matches source (text parser should preserve content exactly)
-        assert doc.content == content, \
-            "Extracted content should match source content exactly"
+        assert (
+            doc.content == content
+        ), "Extracted content should match source content exactly"
 
         # Verify sections are created
-        assert len(doc.sections) > 0, \
-            "At least one section should be created"
+        assert len(doc.sections) > 0, "At least one section should be created"
 
     finally:
         os.unlink(temp_path)
@@ -404,7 +435,9 @@ def test_json_parser_extracts_strings(content):
     from ollaforge.doc_parser import DocumentType, JSONParser
 
     # Create a temporary file with the content
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False, encoding="utf-8"
+    ) as f:
         f.write(content)
         temp_path = f.name
 
@@ -413,8 +446,9 @@ def test_json_parser_extracts_strings(content):
         doc = parser.parse(temp_path)
 
         # Verify document type
-        assert doc.doc_type == DocumentType.JSON, \
-            f"Expected JSON type, got {doc.doc_type}"
+        assert (
+            doc.doc_type == DocumentType.JSON
+        ), f"Expected JSON type, got {doc.doc_type}"
 
         # Parse the original JSON to get string values
         original_data = json.loads(content)
@@ -436,8 +470,9 @@ def test_json_parser_extracts_strings(content):
 
         # Verify all original strings are in extracted content
         for s in original_strings:
-            assert s in doc.content, \
-                f"String '{s}' from source should be in extracted content"
+            assert (
+                s in doc.content
+            ), f"String '{s}' from source should be in extracted content"
 
     finally:
         os.unlink(temp_path)
@@ -456,7 +491,9 @@ def test_code_parser_extracts_content(content):
     from ollaforge.doc_parser import CodeParser, DocumentType
 
     # Create a temporary file with the content
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".py", delete=False, encoding="utf-8"
+    ) as f:
         f.write(content)
         temp_path = f.name
 
@@ -465,20 +502,22 @@ def test_code_parser_extracts_content(content):
         doc = parser.parse(temp_path)
 
         # Verify document type
-        assert doc.doc_type == DocumentType.CODE, \
-            f"Expected CODE type, got {doc.doc_type}"
+        assert (
+            doc.doc_type == DocumentType.CODE
+        ), f"Expected CODE type, got {doc.doc_type}"
 
         # Verify content matches source
-        assert doc.content == content, \
-            "Extracted content should match source code exactly"
+        assert (
+            doc.content == content
+        ), "Extracted content should match source code exactly"
 
         # Verify language is detected
-        assert doc.metadata.get('language') == 'python', \
-            f"Expected language 'python', got {doc.metadata.get('language')}"
+        assert (
+            doc.metadata.get("language") == "python"
+        ), f"Expected language 'python', got {doc.metadata.get('language')}"
 
         # Verify sections are created
-        assert len(doc.sections) > 0, \
-            "At least one section should be created"
+        assert len(doc.sections) > 0, "At least one section should be created"
 
     finally:
         os.unlink(temp_path)
@@ -497,23 +536,29 @@ def test_html_parser_removes_tags(data):
     from ollaforge.doc_parser import DocumentType, HTMLParser
 
     # Generate text content
-    text_content = data.draw(st.text(
-        alphabet=st.characters(whitelist_categories=('L', 'N', 'P'), whitelist_characters=' '),
-        min_size=1,
-        max_size=100
-    ).filter(lambda x: x.strip()))
+    text_content = data.draw(
+        st.text(
+            alphabet=st.characters(
+                whitelist_categories=("L", "N", "P"), whitelist_characters=" "
+            ),
+            min_size=1,
+            max_size=100,
+        ).filter(lambda x: x.strip())
+    )
 
     # Wrap in HTML
-    html_content = f'''<!DOCTYPE html>
+    html_content = f"""<!DOCTYPE html>
 <html>
 <head><title>Test</title></head>
 <body>
 <p>{text_content}</p>
 </body>
-</html>'''
+</html>"""
 
     # Create a temporary file with the content
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".html", delete=False, encoding="utf-8"
+    ) as f:
         f.write(html_content)
         temp_path = f.name
 
@@ -522,21 +567,26 @@ def test_html_parser_removes_tags(data):
         doc = parser.parse(temp_path)
 
         # Verify document type
-        assert doc.doc_type == DocumentType.HTML, \
-            f"Expected HTML type, got {doc.doc_type}"
+        assert (
+            doc.doc_type == DocumentType.HTML
+        ), f"Expected HTML type, got {doc.doc_type}"
 
         # Verify text content is extracted (compare stripped versions since HTML parser strips whitespace)
         stripped_text = text_content.strip()
-        assert stripped_text in doc.content, \
-            f"Text content '{stripped_text}' should be in extracted content"
+        assert (
+            stripped_text in doc.content
+        ), f"Text content '{stripped_text}' should be in extracted content"
 
         # Verify HTML tags are removed
-        assert '<p>' not in doc.content, \
-            "HTML tags should be removed from extracted content"
-        assert '<html>' not in doc.content, \
-            "HTML tags should be removed from extracted content"
-        assert '</body>' not in doc.content, \
-            "HTML tags should be removed from extracted content"
+        assert (
+            "<p>" not in doc.content
+        ), "HTML tags should be removed from extracted content"
+        assert (
+            "<html>" not in doc.content
+        ), "HTML tags should be removed from extracted content"
+        assert (
+            "</body>" not in doc.content
+        ), "HTML tags should be removed from extracted content"
 
     finally:
         os.unlink(temp_path)

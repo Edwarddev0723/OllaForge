@@ -14,7 +14,9 @@ from ollaforge.progress import ProgressTracker
 
 @given(
     total_count=st.integers(min_value=1, max_value=1000),
-    advance_steps=st.lists(st.integers(min_value=1, max_value=10), min_size=1, max_size=50)
+    advance_steps=st.lists(
+        st.integers(min_value=1, max_value=10), min_size=1, max_size=50
+    ),
 )
 def test_progress_tracking_updates(total_count, advance_steps):
     """
@@ -70,10 +72,18 @@ def test_progress_tracking_updates(total_count, advance_steps):
     success_count=st.integers(min_value=0, max_value=1000),
     total_requested=st.integers(min_value=1, max_value=1000),
     duration=st.floats(min_value=0.1, max_value=3600.0),
-    output_file=st.text(alphabet=st.characters(whitelist_categories=('Lu', 'Ll', 'Nd'), whitelist_characters='.-_'), min_size=1, max_size=50).filter(lambda x: x.strip()),
-    error_count=st.integers(min_value=0, max_value=20)
+    output_file=st.text(
+        alphabet=st.characters(
+            whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters=".-_"
+        ),
+        min_size=1,
+        max_size=50,
+    ).filter(lambda x: x.strip()),
+    error_count=st.integers(min_value=0, max_value=20),
 )
-def test_summary_information_completeness(success_count, total_requested, duration, output_file, error_count):
+def test_summary_information_completeness(
+    success_count, total_requested, duration, output_file, error_count
+):
     """
     **Feature: ollama-cli-generator, Property 13: Summary information completeness**
     **Validates: Requirements 4.3**
@@ -98,7 +108,7 @@ def test_summary_information_completeness(success_count, total_requested, durati
         total_requested=total_requested,
         output_file=output_file.strip(),
         duration=duration,
-        errors=errors
+        errors=errors,
     )
 
     # Display summary
@@ -109,12 +119,14 @@ def test_summary_information_completeness(success_count, total_requested, durati
 
     # Verify all required information is present in the summary
     assert str(total_requested) in output  # Total requested count
-    assert str(success_count) in output    # Successful entry count
-    assert f"{duration:.2f}s" in output    # Duration with proper formatting
-    assert output_file.strip() in output   # Output file path
+    assert str(success_count) in output  # Successful entry count
+    assert f"{duration:.2f}s" in output  # Duration with proper formatting
+    assert output_file.strip() in output  # Output file path
 
     # Verify success rate is displayed
-    expected_rate = (success_count / total_requested) * 100 if total_requested > 0 else 0
+    expected_rate = (
+        (success_count / total_requested) * 100 if total_requested > 0 else 0
+    )
     assert f"{expected_rate:.1f}%" in output
 
     # If there are errors, verify error count is displayed

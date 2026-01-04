@@ -23,7 +23,7 @@ from ollaforge.models import DatasetType, OutputLanguage
 @given(
     topic=st.text(min_size=1).filter(lambda x: x.strip()),
     model=st.text(min_size=1).filter(lambda x: x.strip()),
-    count=st.integers(min_value=1, max_value=10)
+    count=st.integers(min_value=1, max_value=10),
 )
 def test_ollama_api_connection_establishment(topic, model, count):
     """
@@ -33,14 +33,14 @@ def test_ollama_api_connection_establishment(topic, model, count):
     For any generation request, the system should attempt to establish connection
     with Ollama API on localhost:11434.
     """
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock successful generation
         mock_ollama.chat.return_value = {
-            'message': {
-                'content': '{"instruction": "test", "input": "test", "output": "test"}'
+            "message": {
+                "content": '{"instruction": "test", "input": "test", "output": "test"}'
             }
         }
 
@@ -65,7 +65,7 @@ def test_ollama_api_connection_establishment(topic, model, count):
 
 @given(
     topic=st.text(min_size=1).filter(lambda x: x.strip()),
-    model=st.text(min_size=1).filter(lambda x: x.strip())
+    model=st.text(min_size=1).filter(lambda x: x.strip()),
 )
 def test_json_format_prompt_engineering(topic, model):
     """
@@ -74,14 +74,14 @@ def test_json_format_prompt_engineering(topic, model):
 
     For any request sent to Ollama, the prompt should include instructions for JSON output format.
     """
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock successful generation
         mock_ollama.chat.return_value = {
-            'message': {
-                'content': '{"instruction": "test", "input": "test", "output": "test"}'
+            "message": {
+                "content": '{"instruction": "test", "input": "test", "output": "test"}'
             }
         }
 
@@ -94,20 +94,24 @@ def test_json_format_prompt_engineering(topic, model):
 
             # Get the call arguments
             call_args = mock_ollama.chat.call_args
-            messages = call_args[1]['messages'] if 'messages' in call_args[1] else call_args[0][1]
+            messages = (
+                call_args[1]["messages"]
+                if "messages" in call_args[1]
+                else call_args[0][1]
+            )
 
             # Verify system message contains JSON format instructions
             system_message = None
             for msg in messages:
-                if msg['role'] == 'system':
-                    system_message = msg['content']
+                if msg["role"] == "system":
+                    system_message = msg["content"]
                     break
 
             assert system_message is not None
-            assert 'JSON' in system_message or 'json' in system_message
-            assert 'instruction' in system_message
-            assert 'input' in system_message
-            assert 'output' in system_message
+            assert "JSON" in system_message or "json" in system_message
+            assert "instruction" in system_message
+            assert "input" in system_message
+            assert "output" in system_message
 
         except Exception:
             # If mocking fails, that's acceptable for this property test
@@ -116,7 +120,7 @@ def test_json_format_prompt_engineering(topic, model):
 
 @given(
     topic=st.text(min_size=1).filter(lambda x: x.strip()),
-    model=st.text(min_size=1).filter(lambda x: x.strip())
+    model=st.text(min_size=1).filter(lambda x: x.strip()),
 )
 def test_api_error_handling(topic, model):
     """
@@ -126,7 +130,7 @@ def test_api_error_handling(topic, model):
     For any API timeout or connection error, the system should handle the error
     gracefully and continue processing.
     """
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Test 1: Connection failure should raise OllamaConnectionError
         mock_ollama.list.side_effect = ConnectionError("Connection refused")
 
@@ -143,7 +147,7 @@ def test_api_error_handling(topic, model):
 
         # Test 2: Generation errors should be handled gracefully
         mock_ollama.reset_mock()
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
         mock_ollama.chat.side_effect = Exception("API timeout")
 
         try:
@@ -160,9 +164,9 @@ def test_api_error_handling(topic, model):
 
 def test_connection_test_function():
     """Test the connection test function specifically."""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Test successful connection
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
         _test_ollama_connection()  # Should not raise
 
         # Test connection failure
@@ -177,36 +181,35 @@ def test_system_prompt_creation():
     prompt = _create_system_prompt_single(topic, DatasetType.SFT, OutputLanguage.EN)
 
     assert topic in prompt
-    assert 'JSON' in prompt or 'json' in prompt
-    assert 'instruction' in prompt
-    assert 'input' in prompt
-    assert 'output' in prompt
+    assert "JSON" in prompt or "json" in prompt
+    assert "instruction" in prompt
+    assert "input" in prompt
+    assert "output" in prompt
 
 
 def test_user_prompt_creation():
     """Test user prompt creation."""
     topic = "test topic"
     entry_number = 5
-    prompt = _create_user_prompt(topic, entry_number, DatasetType.SFT, OutputLanguage.EN)
+    prompt = _create_user_prompt(
+        topic, entry_number, DatasetType.SFT, OutputLanguage.EN
+    )
 
     assert topic in prompt
     assert str(entry_number) in prompt
-    assert 'JSON' in prompt or 'json' in prompt
+    assert "JSON" in prompt or "json" in prompt
 
 
 def test_get_available_models():
     """Test getting available models."""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Test successful model listing
         mock_ollama.list.return_value = {
-            'models': [
-                {'name': 'llama3'},
-                {'name': 'mistral'}
-            ]
+            "models": [{"name": "llama3"}, {"name": "mistral"}]
         }
 
         models = get_available_models()
-        assert models == ['llama3', 'mistral']
+        assert models == ["llama3", "mistral"]
 
         # Test connection failure
         mock_ollama.list.side_effect = ConnectionError("Connection refused")
@@ -216,9 +219,10 @@ def test_get_available_models():
 
 # Edge case tests for Requirements 6.3 and 6.5
 
+
 def test_connection_timeout_handling():
     """Test API timeout handling - Requirements 2.5"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock timeout error
         mock_ollama.list.side_effect = Exception("Request timeout")
 
@@ -228,9 +232,9 @@ def test_connection_timeout_handling():
 
 def test_model_not_found_error():
     """Test model not found error handling."""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock model not found error
         mock_ollama.chat.side_effect = Exception("model 'nonexistent' not found")
@@ -241,15 +245,23 @@ def test_model_not_found_error():
 
 def test_generation_with_network_interruption():
     """Test generation with network interruption."""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock network interruption during generation
         mock_ollama.chat.side_effect = [
-            {'message': {'content': '{"instruction": "test1", "input": "test1", "output": "test1"}'}},
+            {
+                "message": {
+                    "content": '{"instruction": "test1", "input": "test1", "output": "test1"}'
+                }
+            },
             ConnectionError("Network unreachable"),
-            {'message': {'content': '{"instruction": "test3", "input": "test3", "output": "test3"}'}}
+            {
+                "message": {
+                    "content": '{"instruction": "test3", "input": "test3", "output": "test3"}'
+                }
+            },
         ]
 
         # Should handle network interruption gracefully
@@ -262,15 +274,15 @@ def test_generation_with_network_interruption():
 
 def test_generation_with_malformed_api_response():
     """Test generation with malformed API responses."""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock malformed responses
         mock_ollama.chat.side_effect = [
-            {'invalid': 'response'},  # Missing 'message' key
-            {'message': {}},  # Missing 'content' key
-            {'message': {'content': 'valid response'}}
+            {"invalid": "response"},  # Missing 'message' key
+            {"message": {}},  # Missing 'content' key
+            {"message": {"content": "valid response"}},
         ]
 
         # Should handle malformed responses gracefully
@@ -282,12 +294,12 @@ def test_generation_with_malformed_api_response():
 
 def test_generation_with_empty_responses():
     """Test generation with empty responses from API."""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock empty responses
-        mock_ollama.chat.return_value = {'message': {'content': ''}}
+        mock_ollama.chat.return_value = {"message": {"content": ""}}
 
         # Should handle empty responses
         result = generate_data("test topic", "llama3", 2)
@@ -296,19 +308,19 @@ def test_generation_with_empty_responses():
         assert isinstance(result, list)
         assert len(result) == 2
         for entry in result:
-            assert 'raw_content' in entry
-            assert entry['raw_content'] == ''
+            assert "raw_content" in entry
+            assert entry["raw_content"] == ""
 
 
 def test_connection_with_different_error_types():
     """Test connection handling with various error types."""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Test different connection error types
         error_types = [
             ConnectionError("Connection refused"),
             Exception("connection timeout"),
             Exception("Connection reset by peer"),
-            Exception("Network is unreachable")
+            Exception("Network is unreachable"),
         ]
 
         for error in error_types:
@@ -320,9 +332,9 @@ def test_connection_with_different_error_types():
 
 def test_generation_with_api_rate_limiting():
     """Test generation with API rate limiting."""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock rate limiting error
         mock_ollama.chat.side_effect = Exception("Rate limit exceeded")
@@ -339,11 +351,11 @@ def test_generation_with_api_rate_limiting():
 def test_system_prompt_with_special_characters():
     """Test system prompt creation with special characters in topic."""
     special_topics = [
-        "topic with \"quotes\"",
+        'topic with "quotes"',
         "topic with 'apostrophes'",
         "topic with\nnewlines",
         "topic with\ttabs",
-        "topic with unicode: 🚀 🎉 ñ ü"
+        "topic with unicode: 🚀 🎉 ñ ü",
     ]
 
     for topic in special_topics:
@@ -352,13 +364,15 @@ def test_system_prompt_with_special_characters():
         # Should handle special characters without crashing
         assert isinstance(prompt, str)
         assert len(prompt) > 0
-        assert topic in prompt or topic.replace('\n', ' ').replace('\t', ' ') in prompt
+        assert topic in prompt or topic.replace("\n", " ").replace("\t", " ") in prompt
 
 
 def test_user_prompt_with_edge_cases():
     """Test user prompt creation with edge cases."""
     # Test with very large entry numbers
-    prompt = _create_user_prompt("test topic", 999999, DatasetType.SFT, OutputLanguage.EN)
+    prompt = _create_user_prompt(
+        "test topic", 999999, DatasetType.SFT, OutputLanguage.EN
+    )
     assert "999999" in prompt
 
     # Test with zero entry number
@@ -372,9 +386,10 @@ def test_user_prompt_with_edge_cases():
 
 # Additional edge case tests for Requirements 6.3 and 6.5
 
+
 def test_connection_with_system_resource_exhaustion():
     """Test connection handling when system resources are exhausted - Requirements 6.3"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock resource exhaustion errors
         resource_errors = [
             OSError("Too many open files"),
@@ -391,15 +406,15 @@ def test_connection_with_system_resource_exhaustion():
 
 def test_generation_with_extremely_large_responses():
     """Test generation with extremely large model responses - Requirements 6.3"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock extremely large response
         large_content = "x" * 1000000  # 1MB response
         mock_ollama.chat.return_value = {
-            'message': {
-                'content': f'{{"instruction": "{large_content}", "input": "test", "output": "test"}}'
+            "message": {
+                "content": f'{{"instruction": "{large_content}", "input": "test", "output": "test"}}'
             }
         }
 
@@ -411,9 +426,9 @@ def test_generation_with_extremely_large_responses():
 
 def test_generation_with_memory_pressure():
     """Test generation under memory pressure - Requirements 6.3"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock memory error during generation
         mock_ollama.chat.side_effect = MemoryError("Out of memory")
@@ -429,7 +444,7 @@ def test_generation_with_memory_pressure():
 
 def test_connection_with_dns_resolution_failure():
     """Test connection with DNS resolution failures - Requirements 6.5"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock DNS resolution failure
         mock_ollama.list.side_effect = OSError("Name or service not known")
 
@@ -439,16 +454,32 @@ def test_connection_with_dns_resolution_failure():
 
 def test_generation_with_partial_response_corruption():
     """Test generation with partially corrupted responses - Requirements 6.4"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock responses with various corruption patterns
         corrupted_responses = [
-            {'message': {'content': '{"instruction": "test", "input": "test", "output": "test"'}},  # Missing closing brace
-            {'message': {'content': '{"instruction": "test", "input": "test", "output":'}},  # Incomplete
-            {'message': {'content': 'Some text before {"instruction": "test", "input": "test", "output": "test"} some text after'}},  # Extra text
-            {'message': {'content': '{"instruction": "test", "input": "test", "output": "test"}\n{"extra": "json"}'}},  # Multiple JSON objects
+            {
+                "message": {
+                    "content": '{"instruction": "test", "input": "test", "output": "test"'
+                }
+            },  # Missing closing brace
+            {
+                "message": {
+                    "content": '{"instruction": "test", "input": "test", "output":'
+                }
+            },  # Incomplete
+            {
+                "message": {
+                    "content": 'Some text before {"instruction": "test", "input": "test", "output": "test"} some text after'
+                }
+            },  # Extra text
+            {
+                "message": {
+                    "content": '{"instruction": "test", "input": "test", "output": "test"}\n{"extra": "json"}'
+                }
+            },  # Multiple JSON objects
         ]
 
         for corrupted_response in corrupted_responses:
@@ -458,12 +489,12 @@ def test_generation_with_partial_response_corruption():
             result = generate_data("test topic", "llama3", 1)
             assert isinstance(result, list)
             assert len(result) == 1
-            assert 'raw_content' in result[0]
+            assert "raw_content" in result[0]
 
 
 def test_generation_with_api_version_mismatch():
     """Test generation with API version mismatches - Requirements 6.5"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock API version mismatch error
         mock_ollama.list.side_effect = Exception("API version not supported")
 
@@ -473,9 +504,9 @@ def test_generation_with_api_version_mismatch():
 
 def test_generation_with_model_loading_timeout():
     """Test generation with model loading timeouts - Requirements 6.5"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock model loading timeout
         mock_ollama.chat.side_effect = Exception("Model loading timeout")
@@ -486,9 +517,9 @@ def test_generation_with_model_loading_timeout():
 
 def test_generation_with_context_window_overflow():
     """Test generation with context window overflow - Requirements 6.4"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock context window overflow error
         mock_ollama.chat.side_effect = Exception("Context length exceeded")
@@ -499,18 +530,18 @@ def test_generation_with_context_window_overflow():
 
 def test_get_available_models_with_malformed_response():
     """Test getting available models with malformed API response - Requirements 6.4"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Test with missing 'models' key
-        mock_ollama.list.return_value = {'invalid': 'response'}
+        mock_ollama.list.return_value = {"invalid": "response"}
 
         with pytest.raises(OllamaConnectionError):
             get_available_models()
 
         # Test with malformed model entries
         mock_ollama.list.return_value = {
-            'models': [
-                {'invalid': 'entry'},  # Missing 'name' key
-                {'name': 'valid_model'},
+            "models": [
+                {"invalid": "entry"},  # Missing 'name' key
+                {"name": "valid_model"},
                 None,  # Null entry
             ]
         }
@@ -519,7 +550,7 @@ def test_get_available_models_with_malformed_response():
         try:
             models = get_available_models()
             # Should return at least the valid model
-            assert 'valid_model' in models
+            assert "valid_model" in models
         except OllamaConnectionError:
             # This is also acceptable - graceful error handling
             pass
@@ -530,7 +561,9 @@ def test_prompt_creation_with_extremely_long_topics():
     # Test with very long topic
     long_topic = "a" * 100000  # 100KB topic
 
-    system_prompt = _create_system_prompt_single(long_topic, DatasetType.SFT, OutputLanguage.EN)
+    system_prompt = _create_system_prompt_single(
+        long_topic, DatasetType.SFT, OutputLanguage.EN
+    )
     assert isinstance(system_prompt, str)
     assert len(system_prompt) > 0
 
@@ -541,15 +574,23 @@ def test_prompt_creation_with_extremely_long_topics():
 
 def test_generation_with_concurrent_requests():
     """Test generation with concurrent request simulation - Requirements 6.5"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock responses that simulate concurrent access issues
         mock_ollama.chat.side_effect = [
-            {'message': {'content': '{"instruction": "test1", "input": "test1", "output": "test1"}'}},
+            {
+                "message": {
+                    "content": '{"instruction": "test1", "input": "test1", "output": "test1"}'
+                }
+            },
             Exception("Server busy, try again later"),
-            {'message': {'content': '{"instruction": "test3", "input": "test3", "output": "test3"}'}},
+            {
+                "message": {
+                    "content": '{"instruction": "test3", "input": "test3", "output": "test3"}'
+                }
+            },
         ]
 
         # Should handle server busy errors
@@ -560,7 +601,7 @@ def test_generation_with_concurrent_requests():
 
 def test_connection_with_firewall_blocking():
     """Test connection when firewall blocks access - Requirements 6.5"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock firewall blocking
         mock_ollama.list.side_effect = ConnectionError("Connection blocked by firewall")
 
@@ -570,14 +611,18 @@ def test_connection_with_firewall_blocking():
 
 def test_generation_with_model_crash_recovery():
     """Test generation with model crash and recovery - Requirements 6.5"""
-    with patch('ollaforge.client.ollama') as mock_ollama:
+    with patch("ollaforge.client.ollama") as mock_ollama:
         # Mock successful connection test
-        mock_ollama.list.return_value = {'models': []}
+        mock_ollama.list.return_value = {"models": []}
 
         # Mock model crash followed by recovery
         mock_ollama.chat.side_effect = [
             Exception("Model process crashed"),
-            {'message': {'content': '{"instruction": "test2", "input": "test2", "output": "test2"}'}},
+            {
+                "message": {
+                    "content": '{"instruction": "test2", "input": "test2", "output": "test2"}'
+                }
+            },
         ]
 
         # Should handle model crashes gracefully

@@ -157,7 +157,10 @@ def display_model_selection() -> str:
     # Show popular models
     popular_models = [
         ("gpt-oss:20b", "GPT-OSS 20B - Default model, great performance"),
-        ("deepseek-r1:14b", "DeepSeek-R1 - Open reasoning model, O3/Gemini 2.5 Pro level"),
+        (
+            "deepseek-r1:14b",
+            "DeepSeek-R1 - Open reasoning model, O3/Gemini 2.5 Pro level",
+        ),
         ("qwen3:14b", "Qwen3 - Latest gen with dense and MoE models"),
         ("ministral-3:14b", "Ministral 3 - Designed for edge deployment"),
         ("gemma3:12b", "Gemma3 - Most capable model on single GPU"),
@@ -263,6 +266,7 @@ def display_language_selection() -> OutputLanguage:
 # Configuration Summary & Confirmation
 # ============================================================================
 
+
 def display_config_summary(config: GenerationConfig, concurrency: int = 5) -> bool:
     """
     Display a summary of the configuration and ask for confirmation.
@@ -284,18 +288,30 @@ def display_config_summary(config: GenerationConfig, concurrency: int = 5) -> bo
     table.add_column("Value", style="white", width=50)
 
     table.add_row("📝 Topic", f"[bold]{config.topic}[/bold]")
-    table.add_row("📊 Dataset Type", f"[{info['color']}]{info['name']}[/{info['color']}]")
-    table.add_row("🌐 Language", f"[{lang_info['color']}]{lang_info['name']}[/{lang_info['color']}]")
+    table.add_row(
+        "📊 Dataset Type", f"[{info['color']}]{info['name']}[/{info['color']}]"
+    )
+    table.add_row(
+        "🌐 Language",
+        f"[{lang_info['color']}]{lang_info['name']}[/{lang_info['color']}]",
+    )
 
     # Show QC settings for Traditional Chinese with funnel mode info
     if config.language == OutputLanguage.ZH_TW:
         if config.qc_enabled:
             # Calculate over-request amount
             from ollaforge.qc import QualityController
+
             qc = QualityController(enabled=True, estimated_pass_rate=0.7)
             request_count = qc.calculate_request_count(config.count)
-            table.add_row("🔍 QC", f"[bold green]Enabled[/bold green] (confidence ≥ {config.qc_confidence:.0%})")
-            table.add_row("🔄 Funnel Mode", f"[dim]Will request ~{request_count} entries to get {config.count} valid[/dim]")
+            table.add_row(
+                "🔍 QC",
+                f"[bold green]Enabled[/bold green] (confidence ≥ {config.qc_confidence:.0%})",
+            )
+            table.add_row(
+                "🔄 Funnel Mode",
+                f"[dim]Will request ~{request_count} entries to get {config.count} valid[/dim]",
+            )
         else:
             table.add_row("🔍 QC", "[dim]Disabled[/dim]")
 
@@ -321,6 +337,7 @@ def display_config_summary(config: GenerationConfig, concurrency: int = 5) -> bo
 # ============================================================================
 # Interactive Wizard
 # ============================================================================
+
 
 def run_interactive_wizard() -> Optional[tuple[GenerationConfig, int]]:
     """
@@ -382,17 +399,23 @@ def run_interactive_wizard() -> Optional[tuple[GenerationConfig, int]]:
         qc_confidence = 0.9
         if language == OutputLanguage.ZH_TW:
             console.print("\n[bold cyan]🔍 Quality Control Settings[/bold cyan]")
-            console.print("[dim]QC uses a BERT model to filter out Mainland Chinese expressions[/dim]\n")
+            console.print(
+                "[dim]QC uses a BERT model to filter out Mainland Chinese expressions[/dim]\n"
+            )
             qc_enabled = Confirm.ask(
                 "[bold]Enable Taiwan Chinese QC?[/bold]",
                 default=True,
             )
             if qc_enabled:
-                console.print("[dim]Higher confidence = stricter filtering (0.9 recommended)[/dim]")
-                qc_confidence = float(Prompt.ask(
-                    "[bold]QC confidence threshold (0.0-1.0)[/bold]",
-                    default="0.9",
-                ))
+                console.print(
+                    "[dim]Higher confidence = stricter filtering (0.9 recommended)[/dim]"
+                )
+                qc_confidence = float(
+                    Prompt.ask(
+                        "[bold]QC confidence threshold (0.0-1.0)[/bold]",
+                        default="0.9",
+                    )
+                )
                 qc_confidence = max(0.0, min(1.0, qc_confidence))
 
         # Advanced settings
@@ -434,6 +457,7 @@ def run_interactive_wizard() -> Optional[tuple[GenerationConfig, int]]:
 # ============================================================================
 # Quick Menu
 # ============================================================================
+
 
 def display_main_menu() -> str:
     """
@@ -492,6 +516,7 @@ def display_main_menu() -> str:
 # ============================================================================
 # Help Display
 # ============================================================================
+
 
 def display_help() -> None:
     """Display comprehensive help information."""
@@ -555,6 +580,7 @@ python main.py "code review" -t dpo -c 50
 # Status Displays
 # ============================================================================
 
+
 def display_generation_start(config: GenerationConfig) -> None:
     """Display a nice header when generation starts."""
     info = DATASET_TYPE_INFO[config.dataset_type]
@@ -565,9 +591,9 @@ def display_generation_start(config: GenerationConfig) -> None:
     content.append("Topic: ", style="dim")
     content.append(f"{config.topic}\n", style="bold")
     content.append("Type: ", style="dim")
-    content.append(f"{info['name']}\n", style=info['color'])
+    content.append(f"{info['name']}\n", style=info["color"])
     content.append("Language: ", style="dim")
-    content.append(f"{lang_info['name']}\n", style=lang_info['color'])
+    content.append(f"{lang_info['name']}\n", style=lang_info["color"])
 
     # Show QC status for Traditional Chinese
     if config.language == OutputLanguage.ZH_TW:
@@ -637,6 +663,7 @@ def display_error(message: str, hint: Optional[str] = None) -> None:
 # Entry Point for Interactive Mode
 # ============================================================================
 
+
 def main_interactive() -> Optional[tuple[GenerationConfig, int]]:
     """
     Main entry point for interactive mode.
@@ -662,8 +689,12 @@ def main_interactive() -> Optional[tuple[GenerationConfig, int]]:
             continue
 
         elif action == "generate":
-            console.print("[yellow]Use command-line arguments for quick generation:[/yellow]")
-            console.print("[dim]python main.py \"your topic\" --count 50 --type sft[/dim]\n")
+            console.print(
+                "[yellow]Use command-line arguments for quick generation:[/yellow]"
+            )
+            console.print(
+                '[dim]python main.py "your topic" --count 50 --type sft[/dim]\n'
+            )
             Prompt.ask("[dim]Press Enter to continue...[/dim]", default="")
             continue
 
@@ -673,6 +704,7 @@ def main_interactive() -> Optional[tuple[GenerationConfig, int]]:
 # ============================================================================
 # Augmentation Interactive Wizard
 # ============================================================================
+
 
 def display_file_selection(prompt_text: str = "Enter JSONL file path") -> Optional[str]:
     """
@@ -713,7 +745,9 @@ def display_file_selection(prompt_text: str = "Enter JSONL file path") -> Option
         return file_path
 
 
-def display_field_selection(field_names: list[str], allow_new: bool = True) -> tuple[str, bool]:
+def display_field_selection(
+    field_names: list[str], allow_new: bool = True
+) -> tuple[str, bool]:
     """
     Display available fields and let user select one or create new.
 
@@ -752,7 +786,11 @@ def display_field_selection(field_names: list[str], allow_new: bool = True) -> t
 
     while True:
         choice = Prompt.ask(
-            "[bold]Select field number or 'N' for new[/bold]" if allow_new else "[bold]Select field number[/bold]",
+            (
+                "[bold]Select field number or 'N' for new[/bold]"
+                if allow_new
+                else "[bold]Select field number[/bold]"
+            ),
             default="1",
         )
 
@@ -770,10 +808,16 @@ def display_field_selection(field_names: list[str], allow_new: bool = True) -> t
         except ValueError:
             pass
 
-        console.print(f"[red]Invalid choice. Enter 1-{len(field_names)}" + (" or 'N'" if allow_new else "") + "[/red]")
+        console.print(
+            f"[red]Invalid choice. Enter 1-{len(field_names)}"
+            + (" or 'N'" if allow_new else "")
+            + "[/red]"
+        )
 
 
-def display_context_field_selection(field_names: list[str], target_field: str) -> list[str]:
+def display_context_field_selection(
+    field_names: list[str], target_field: str
+) -> list[str]:
     """
     Let user select context fields to include in augmentation prompt.
 
@@ -840,8 +884,7 @@ def display_context_field_selection(field_names: list[str], target_field: str) -
 
 
 def display_augmentation_preview(
-    preview_results: list[tuple[dict, dict]],
-    target_field: str
+    preview_results: list[tuple[dict, dict]], target_field: str
 ) -> bool:
     """
     Display preview results and ask for confirmation.
@@ -854,10 +897,12 @@ def display_augmentation_preview(
         True if user confirms, False to retry with different instruction
     """
     console.print()
-    console.print(Panel.fit(
-        Text("🔍 Preview Results", style="bold cyan"),
-        border_style="cyan",
-    ))
+    console.print(
+        Panel.fit(
+            Text("🔍 Preview Results", style="bold cyan"),
+            border_style="cyan",
+        )
+    )
     console.print()
 
     for i, (original, augmented) in enumerate(preview_results, 1):
@@ -880,7 +925,7 @@ def display_augmentation_preview(
 
     return Confirm.ask(
         "[bold green]✓ Results look good? Proceed with full augmentation?[/bold green]",
-        default=True
+        default=True,
     )
 
 
@@ -916,9 +961,18 @@ def display_augmentation_config_summary(
 
     table.add_row("📂 Input File", f"[bold]{input_file}[/bold]")
     table.add_row("📊 Entries", f"[bold yellow]{entry_count}[/bold yellow]")
-    table.add_row("🎯 Target Field", f"[bold]{target_field}[/bold]" + (" [cyan](new)[/cyan]" if is_new_field else ""))
-    table.add_row("📝 Instruction", f"{instruction[:50]}{'...' if len(instruction) > 50 else ''}")
-    table.add_row("🌐 Language", f"[{lang_info['color']}]{lang_info['name']}[/{lang_info['color']}]")
+    table.add_row(
+        "🎯 Target Field",
+        f"[bold]{target_field}[/bold]"
+        + (" [cyan](new)[/cyan]" if is_new_field else ""),
+    )
+    table.add_row(
+        "📝 Instruction", f"{instruction[:50]}{'...' if len(instruction) > 50 else ''}"
+    )
+    table.add_row(
+        "🌐 Language",
+        f"[{lang_info['color']}]{lang_info['name']}[/{lang_info['color']}]",
+    )
     table.add_row("🤖 Model", f"[bold green]{model}[/bold green]")
     table.add_row("📄 Output", f"[bold]{output_file}[/bold]")
     table.add_row("⚡ Concurrency", f"{concurrency} parallel requests")
@@ -940,7 +994,9 @@ def display_augmentation_config_summary(
     return Confirm.ask("[bold green]🚀 Start augmentation?[/bold green]", default=True)
 
 
-def augment_interactive() -> Optional[tuple[str, str, str, str, str, int, bool, list[str], bool, OutputLanguage]]:
+def augment_interactive() -> (
+    Optional[tuple[str, str, str, str, str, int, bool, list[str], bool, OutputLanguage]]
+):
     """
     Run the interactive augmentation wizard.
 
@@ -990,7 +1046,9 @@ def augment_interactive() -> Optional[tuple[str, str, str, str, str, int, bool, 
             console.print(f"[red]❌ {str(e)}[/red]")
             return None
 
-        console.print(f"[green]✓ Loaded {len(entries)} entries with {len(field_names)} fields[/green]\n")
+        console.print(
+            f"[green]✓ Loaded {len(entries)} entries with {len(field_names)} fields[/green]\n"
+        )
 
         if not entries:
             console.print("[red]❌ Dataset is empty[/red]")
@@ -1000,15 +1058,23 @@ def augment_interactive() -> Optional[tuple[str, str, str, str, str, int, bool, 
         console.print("[bold cyan]🎯 Step 2/6: Select Target Field[/bold cyan]")
         console.print("[dim]Choose a field to augment or create a new one[/dim]\n")
 
-        target_field, is_new_field = display_field_selection(field_names, allow_new=True)
-        console.print(f"\n[green]✓ Selected field: {target_field}" + (" (new)" if is_new_field else "") + "[/green]\n")
+        target_field, is_new_field = display_field_selection(
+            field_names, allow_new=True
+        )
+        console.print(
+            f"\n[green]✓ Selected field: {target_field}"
+            + (" (new)" if is_new_field else "")
+            + "[/green]\n"
+        )
 
         # Step 3: Instruction input (with retry loop for preview)
         instruction = None
         preview_confirmed = False
 
         while not preview_confirmed:
-            console.print("[bold cyan]📝 Step 3/6: Enter Augmentation Instruction[/bold cyan]")
+            console.print(
+                "[bold cyan]📝 Step 3/6: Enter Augmentation Instruction[/bold cyan]"
+            )
             console.print("[dim]Describe how the AI should augment this field[/dim]\n")
 
             console.print("[dim]Examples:[/dim]")
@@ -1030,16 +1096,22 @@ def augment_interactive() -> Optional[tuple[str, str, str, str, str, int, bool, 
 
             # Step 4: Context field selection
             console.print("[bold cyan]📎 Step 4/6: Select Context Fields[/bold cyan]")
-            console.print("[dim]Choose which fields to include as context for the AI[/dim]\n")
+            console.print(
+                "[dim]Choose which fields to include as context for the AI[/dim]\n"
+            )
 
             context_fields = display_context_field_selection(field_names, target_field)
             if context_fields:
-                console.print(f"\n[green]✓ Context fields: {', '.join(context_fields)}[/green]\n")
+                console.print(
+                    f"\n[green]✓ Context fields: {', '.join(context_fields)}[/green]\n"
+                )
             else:
                 console.print("\n[dim]No context fields selected[/dim]\n")
 
             # Step 5: Model and output configuration
-            console.print("[bold cyan]🤖 Step 5/6: Model & Output Settings[/bold cyan]\n")
+            console.print(
+                "[bold cyan]🤖 Step 5/6: Model & Output Settings[/bold cyan]\n"
+            )
 
             model = display_model_selection()
             console.print()
@@ -1050,7 +1122,9 @@ def augment_interactive() -> Optional[tuple[str, str, str, str, str, int, bool, 
 
             # Output file
             input_path = Path(input_file)
-            default_output = str(input_path.parent / f"{input_path.stem}_augmented{input_path.suffix}")
+            default_output = str(
+                input_path.parent / f"{input_path.stem}_augmented{input_path.suffix}"
+            )
             output_file = Prompt.ask(
                 "[bold]Output filename[/bold]",
                 default=default_output,
@@ -1094,16 +1168,23 @@ def augment_interactive() -> Optional[tuple[str, str, str, str, str, int, bool, 
                 preview_results = augmentor.preview(entries)
             except Exception as e:
                 console.print(f"[red]❌ Preview failed: {str(e)}[/red]")
-                if Confirm.ask("[yellow]Try again with different instruction?[/yellow]", default=True):
+                if Confirm.ask(
+                    "[yellow]Try again with different instruction?[/yellow]",
+                    default=True,
+                ):
                     continue
                 return None
 
             # Display preview and ask for confirmation
-            preview_confirmed = display_augmentation_preview(preview_results, target_field)
+            preview_confirmed = display_augmentation_preview(
+                preview_results, target_field
+            )
 
             if not preview_confirmed:
                 # Requirement 7.4: Allow modifying instruction and retry
-                if Confirm.ask("[yellow]Modify instruction and try again?[/yellow]", default=True):
+                if Confirm.ask(
+                    "[yellow]Modify instruction and try again?[/yellow]", default=True
+                ):
                     console.print()
                     continue
                 else:
@@ -1172,26 +1253,43 @@ def main_interactive_router() -> None:
             choice = Prompt.ask(
                 "[bold]What would you like to do?[/bold]",
                 choices=["1", "2", "3"],
-                default="1"
+                default="1",
             )
 
             if choice == "1":
                 # Generation mode
-                console.print("\n[green]🆕 Entering Dataset Generation Mode...[/green]\n")
+                console.print(
+                    "\n[green]🆕 Entering Dataset Generation Mode...[/green]\n"
+                )
                 result = main_interactive()
                 if result is not None:
                     config, concurrency = result
                     from .cli import _run_generation
+
                     _run_generation(config, concurrency)
                 break
 
             elif choice == "2":
                 # Augmentation mode
-                console.print("\n[blue]🔄 Entering Dataset Augmentation Mode...[/blue]\n")
+                console.print(
+                    "\n[blue]🔄 Entering Dataset Augmentation Mode...[/blue]\n"
+                )
                 result = augment_interactive()
                 if result is not None:
-                    input_file, field, instruction, output, model, concurrency, new_field, context, preview, language = result
+                    (
+                        input_file,
+                        field,
+                        instruction,
+                        output,
+                        model,
+                        concurrency,
+                        new_field,
+                        context,
+                        preview,
+                        language,
+                    ) = result  # type: ignore[misc]
                     from .cli import _run_augmentation
+
                     _run_augmentation(
                         input_file=input_file,
                         output_file=output,
@@ -1217,4 +1315,6 @@ def main_interactive_router() -> None:
             break
         except Exception as e:
             console.print(f"\n[red]❌ Error: {str(e)}[/red]")
-            console.print("[yellow]Please try again or press Ctrl+C to exit.[/yellow]\n")
+            console.print(
+                "[yellow]Please try again or press Ctrl+C to exit.[/yellow]\n"
+            )

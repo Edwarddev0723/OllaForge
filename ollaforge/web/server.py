@@ -29,21 +29,19 @@ from .routes.websocket import ws_manager
 # Logging Configuration
 # ============================================================================
 
+
 def setup_logging():
     """Configure logging based on environment."""
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     log_format = os.getenv(
-        "LOG_FORMAT",
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        "LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
     # Configure root logger
     logging.basicConfig(
         level=getattr(logging, log_level, logging.INFO),
         format=log_format,
-        handlers=[
-            logging.StreamHandler()
-        ]
+        handlers=[logging.StreamHandler()],
     )
 
     # Set specific loggers
@@ -72,7 +70,9 @@ PORT = int(os.getenv("PORT", "8000"))
 
 # CORS configuration
 # Use "*" to allow all origins, or comma-separated list of allowed origins
-_cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:8080")
+_cors_env = os.getenv(
+    "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:8080"
+)
 if _cors_env.strip() == "*":
     CORS_ORIGINS = ["*"]
 else:
@@ -88,12 +88,12 @@ OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 # Socket.IO server for WebSocket communication
 # Allow all origins when CORS_ORIGINS contains "*"
-_sio_cors = '*' if '*' in CORS_ORIGINS or DEBUG else CORS_ORIGINS
+_sio_cors = "*" if "*" in CORS_ORIGINS or DEBUG else CORS_ORIGINS
 sio = socketio.AsyncServer(
-    async_mode='asgi',
+    async_mode="asgi",
     cors_allowed_origins=_sio_cors,
     logger=DEBUG,
-    engineio_logger=DEBUG
+    engineio_logger=DEBUG,
 )
 
 # Initialize WebSocket manager with Socket.IO server
@@ -103,6 +103,7 @@ ws_manager.set_sio(sio)
 # ============================================================================
 # Application Lifespan
 # ============================================================================
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -167,33 +168,24 @@ Concurrent requests are processed independently.
     openapi_tags=[
         {
             "name": "generation",
-            "description": "Dataset generation operations - create new training datasets from topic descriptions"
+            "description": "Dataset generation operations - create new training datasets from topic descriptions",
         },
         {
             "name": "augmentation",
-            "description": "Dataset augmentation operations - modify or add fields to existing datasets"
+            "description": "Dataset augmentation operations - modify or add fields to existing datasets",
         },
         {
             "name": "models",
-            "description": "Ollama model management - list and validate available models"
+            "description": "Ollama model management - list and validate available models",
         },
         {
             "name": "tasks",
-            "description": "Task management - monitor and control background tasks"
+            "description": "Task management - monitor and control background tasks",
         },
-        {
-            "name": "health",
-            "description": "Health check and API information endpoints"
-        }
+        {"name": "health", "description": "Health check and API information endpoints"},
     ],
-    contact={
-        "name": "OllaForge",
-        "url": "https://github.com/ollaforge/ollaforge"
-    },
-    license_info={
-        "name": "MIT",
-        "url": "https://opensource.org/licenses/MIT"
-    }
+    contact={"name": "OllaForge", "url": "https://github.com/ollaforge/ollaforge"},
+    license_info={"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
 )
 
 
@@ -237,7 +229,12 @@ app.include_router(tasks_router)
 
 
 # Health check endpoint
-@app.get("/health", tags=["health"], summary="Health Check", description="Check if the API server is running and healthy.")
+@app.get(
+    "/health",
+    tags=["health"],
+    summary="Health Check",
+    description="Check if the API server is running and healthy.",
+)
 async def health_check():
     """
     Health check endpoint.
@@ -249,11 +246,16 @@ async def health_check():
         "status": "healthy",
         "service": "ollaforge-api",
         "version": "1.0.0",
-        "debug": DEBUG
+        "debug": DEBUG,
     }
 
 
-@app.get("/", tags=["health"], summary="API Information", description="Get basic information about the API.")
+@app.get(
+    "/",
+    tags=["health"],
+    summary="API Information",
+    description="Get basic information about the API.",
+)
 async def root():
     """
     Root endpoint with API information.
@@ -266,7 +268,7 @@ async def root():
         "description": "API for dataset generation and augmentation using local Ollama models",
         "docs": "/docs",
         "redoc": "/redoc",
-        "openapi": "/openapi.json"
+        "openapi": "/openapi.json",
     }
 
 
@@ -275,11 +277,7 @@ async def root():
 # ============================================================================
 
 # Create ASGI application with Socket.IO
-socket_app = socketio.ASGIApp(
-    sio,
-    app,
-    socketio_path="/socket.io"
-)
+socket_app = socketio.ASGIApp(sio, app, socketio_path="/socket.io")
 
 
 # ============================================================================
@@ -311,10 +309,7 @@ async def subscribe(sid: str, data: dict):
     task_id = data.get("task_id")
     if task_id:
         success = ws_manager.subscribe(sid, task_id)
-        await sio.emit("subscribed", {
-            "task_id": task_id,
-            "success": success
-        }, to=sid)
+        await sio.emit("subscribed", {"task_id": task_id, "success": success}, to=sid)
         logger.debug(f"Client {sid} subscribed to task {task_id}: {success}")
 
 
@@ -330,10 +325,7 @@ async def unsubscribe(sid: str, data: dict):
     task_id = data.get("task_id")
     if task_id:
         success = ws_manager.unsubscribe(sid, task_id)
-        await sio.emit("unsubscribed", {
-            "task_id": task_id,
-            "success": success
-        }, to=sid)
+        await sio.emit("unsubscribed", {"task_id": task_id, "success": success}, to=sid)
         logger.debug(f"Client {sid} unsubscribed from task {task_id}: {success}")
 
 
@@ -354,5 +346,5 @@ if __name__ == "__main__":
         port=PORT,
         reload=DEBUG,
         log_level=log_level,
-        access_log=DEBUG
+        access_log=DEBUG,
     )

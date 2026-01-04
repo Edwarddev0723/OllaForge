@@ -37,6 +37,7 @@ class SplitStrategy(Enum):
     - SEMANTIC: Split at semantic boundaries (paragraphs, headings, code blocks)
     - HYBRID: Combine fixed-size with semantic awareness (default)
     """
+
     FIXED_SIZE = "fixed_size"
     SEMANTIC = "semantic"
     HYBRID = "hybrid"
@@ -59,6 +60,7 @@ class ChunkConfig:
     - 2.5: Configurable chunk size (default: 2000 characters)
     - 2.6: Configurable overlap between chunks (default: 200 characters)
     """
+
     chunk_size: int = 2000
     chunk_overlap: int = 200
     strategy: SplitStrategy = SplitStrategy.HYBRID
@@ -92,6 +94,7 @@ class TextChunk:
         end_char: Ending character position in the original document
         metadata: Additional metadata (source section, document info, etc.)
     """
+
     content: str
     index: int
     start_char: int
@@ -196,13 +199,15 @@ class ChunkSplitter:
             chunk_content = text[start:end]
 
             # Create chunk
-            chunks.append(TextChunk(
-                content=chunk_content,
-                index=index,
-                start_char=start,
-                end_char=end,
-                metadata={'strategy': 'fixed_size'}
-            ))
+            chunks.append(
+                TextChunk(
+                    content=chunk_content,
+                    index=index,
+                    start_char=start,
+                    end_char=end,
+                    metadata={"strategy": "fixed_size"},
+                )
+            )
 
             # Move to next position
             if end >= text_length:
@@ -249,25 +254,29 @@ class ChunkSplitter:
         for chunk in semantic_chunks:
             if len(chunk.content) <= self.config.chunk_size:
                 # Chunk is within size limit
-                final_chunks.append(TextChunk(
-                    content=chunk.content,
-                    index=current_index,
-                    start_char=chunk.start_char,
-                    end_char=chunk.end_char,
-                    metadata={**chunk.metadata, 'strategy': 'semantic'}
-                ))
+                final_chunks.append(
+                    TextChunk(
+                        content=chunk.content,
+                        index=current_index,
+                        start_char=chunk.start_char,
+                        end_char=chunk.end_char,
+                        metadata={**chunk.metadata, "strategy": "semantic"},
+                    )
+                )
                 current_index += 1
             else:
                 # Chunk exceeds size limit, split further using fixed-size
                 sub_chunks = self._split_fixed_size(chunk.content)
                 for sub_chunk in sub_chunks:
-                    final_chunks.append(TextChunk(
-                        content=sub_chunk.content,
-                        index=current_index,
-                        start_char=chunk.start_char + sub_chunk.start_char,
-                        end_char=chunk.start_char + sub_chunk.end_char,
-                        metadata={**chunk.metadata, 'strategy': 'semantic_fixed'}
-                    ))
+                    final_chunks.append(
+                        TextChunk(
+                            content=sub_chunk.content,
+                            index=current_index,
+                            start_char=chunk.start_char + sub_chunk.start_char,
+                            end_char=chunk.start_char + sub_chunk.end_char,
+                            metadata={**chunk.metadata, "strategy": "semantic_fixed"},
+                        )
+                    )
                     current_index += 1
 
         return final_chunks
@@ -295,25 +304,29 @@ class ChunkSplitter:
         for chunk in semantic_chunks:
             if len(chunk.content) <= self.config.chunk_size:
                 # Chunk is within size limit, keep as-is but update index
-                final_chunks.append(TextChunk(
-                    content=chunk.content,
-                    index=current_index,
-                    start_char=chunk.start_char,
-                    end_char=chunk.end_char,
-                    metadata={**chunk.metadata, 'strategy': 'hybrid_semantic'}
-                ))
+                final_chunks.append(
+                    TextChunk(
+                        content=chunk.content,
+                        index=current_index,
+                        start_char=chunk.start_char,
+                        end_char=chunk.end_char,
+                        metadata={**chunk.metadata, "strategy": "hybrid_semantic"},
+                    )
+                )
                 current_index += 1
             else:
                 # Chunk exceeds size limit, split further
                 sub_chunks = self._split_fixed_size(chunk.content)
                 for sub_chunk in sub_chunks:
-                    final_chunks.append(TextChunk(
-                        content=sub_chunk.content,
-                        index=current_index,
-                        start_char=chunk.start_char + sub_chunk.start_char,
-                        end_char=chunk.start_char + sub_chunk.end_char,
-                        metadata={**chunk.metadata, 'strategy': 'hybrid_fixed'}
-                    ))
+                    final_chunks.append(
+                        TextChunk(
+                            content=sub_chunk.content,
+                            index=current_index,
+                            start_char=chunk.start_char + sub_chunk.start_char,
+                            end_char=chunk.start_char + sub_chunk.end_char,
+                            metadata={**chunk.metadata, "strategy": "hybrid_fixed"},
+                        )
+                    )
                     current_index += 1
 
         # Merge small chunks if needed
@@ -341,21 +354,27 @@ class ChunkSplitter:
                 section_content = section.content
                 if section.title:
                     # Reconstruct heading with content
-                    heading_prefix = '#' * section.level + ' ' if section.level > 0 else ''
-                    section_content = f"{heading_prefix}{section.title}\n\n{section.content}"
+                    heading_prefix = (
+                        "#" * section.level + " " if section.level > 0 else ""
+                    )
+                    section_content = (
+                        f"{heading_prefix}{section.title}\n\n{section.content}"
+                    )
 
                 if section_content.strip():
-                    chunks.append(TextChunk(
-                        content=section_content.strip(),
-                        index=i,
-                        start_char=current_pos,
-                        end_char=current_pos + len(section_content),
-                        metadata={
-                            'section_title': section.title,
-                            'section_level': section.level,
-                            'strategy': 'markdown_section'
-                        }
-                    ))
+                    chunks.append(
+                        TextChunk(
+                            content=section_content.strip(),
+                            index=i,
+                            start_char=current_pos,
+                            end_char=current_pos + len(section_content),
+                            metadata={
+                                "section_title": section.title,
+                                "section_level": section.level,
+                                "strategy": "markdown_section",
+                            },
+                        )
+                    )
                 current_pos += len(section_content) + 1  # +1 for separator
         else:
             # Fallback to paragraph-based splitting
@@ -387,17 +406,21 @@ class ChunkSplitter:
         if document.sections:
             for i, section in enumerate(document.sections):
                 if section.content.strip():
-                    chunks.append(TextChunk(
-                        content=section.content,
-                        index=i,
-                        start_char=current_pos,
-                        end_char=current_pos + len(section.content),
-                        metadata={
-                            'definition': section.title,
-                            'language': document.metadata.get('language', 'unknown'),
-                            'strategy': 'code_section'
-                        }
-                    ))
+                    chunks.append(
+                        TextChunk(
+                            content=section.content,
+                            index=i,
+                            start_char=current_pos,
+                            end_char=current_pos + len(section.content),
+                            metadata={
+                                "definition": section.title,
+                                "language": document.metadata.get(
+                                    "language", "unknown"
+                                ),
+                                "strategy": "code_section",
+                            },
+                        )
+                    )
                 current_pos += len(section.content) + 1
         else:
             # Fallback to paragraph-based splitting
@@ -429,7 +452,7 @@ class ChunkSplitter:
 
         # Split by double newlines (paragraph boundaries)
         # Also handle various newline styles
-        paragraphs = re.split(r'\n\s*\n', text)
+        paragraphs = re.split(r"\n\s*\n", text)
 
         chunks = []
         current_pos = 0
@@ -443,13 +466,15 @@ class ChunkSplitter:
                 except ValueError:
                     actual_start = current_pos
 
-                chunks.append(TextChunk(
-                    content=para,
-                    index=i,
-                    start_char=actual_start,
-                    end_char=actual_start + len(para),
-                    metadata={'strategy': 'paragraph'}
-                ))
+                chunks.append(
+                    TextChunk(
+                        content=para,
+                        index=i,
+                        start_char=actual_start,
+                        end_char=actual_start + len(para),
+                        metadata={"strategy": "paragraph"},
+                    )
+                )
                 current_pos = actual_start + len(para)
 
         # Re-index chunks
@@ -483,15 +508,20 @@ class ChunkSplitter:
 
         for chunk in chunks:
             # If adding this chunk would exceed max size, save current and start new
-            if current_content and len(current_content) + len(chunk.content) + 2 > max_size:
+            if (
+                current_content
+                and len(current_content) + len(chunk.content) + 2 > max_size
+            ):
                 if current_content.strip():
-                    merged.append(TextChunk(
-                        content=current_content.strip(),
-                        index=len(merged),
-                        start_char=current_start,
-                        end_char=current_start + len(current_content),
-                        metadata=current_metadata
-                    ))
+                    merged.append(
+                        TextChunk(
+                            content=current_content.strip(),
+                            index=len(merged),
+                            start_char=current_start,
+                            end_char=current_start + len(current_content),
+                            metadata=current_metadata,
+                        )
+                    )
                 current_content = chunk.content
                 current_start = chunk.start_char
                 current_metadata = chunk.metadata.copy()
@@ -506,13 +536,15 @@ class ChunkSplitter:
 
         # Add remaining content
         if current_content.strip():
-            merged.append(TextChunk(
-                content=current_content.strip(),
-                index=len(merged),
-                start_char=current_start,
-                end_char=current_start + len(current_content),
-                metadata=current_metadata
-            ))
+            merged.append(
+                TextChunk(
+                    content=current_content.strip(),
+                    index=len(merged),
+                    start_char=current_start,
+                    end_char=current_start + len(current_content),
+                    metadata=current_metadata,
+                )
+            )
 
         return merged
 
@@ -532,15 +564,15 @@ class ChunkSplitter:
         boundaries = []
 
         # Paragraph boundaries (double newlines)
-        for match in re.finditer(r'\n\s*\n', text):
+        for match in re.finditer(r"\n\s*\n", text):
             boundaries.append(match.end())
 
         # Markdown heading boundaries
-        for match in re.finditer(r'\n#{1,6}\s', text):
+        for match in re.finditer(r"\n#{1,6}\s", text):
             boundaries.append(match.start() + 1)  # After the newline
 
         # Code block boundaries (```)
-        for match in re.finditer(r'\n```', text):
+        for match in re.finditer(r"\n```", text):
             boundaries.append(match.start() + 1)
 
         # Sort and deduplicate
@@ -548,7 +580,9 @@ class ChunkSplitter:
 
         return boundaries
 
-    def _split_at_boundary(self, text: str, target_pos: int, boundaries: list[int]) -> int:
+    def _split_at_boundary(
+        self, text: str, target_pos: int, boundaries: list[int]
+    ) -> int:
         """
         Find the best split position near the target position.
 
@@ -569,8 +603,11 @@ class ChunkSplitter:
         # Find boundaries within a reasonable range of target
         tolerance = self.config.chunk_size // 4  # 25% tolerance
 
-        candidates = [b for b in boundaries
-                     if target_pos - tolerance <= b <= target_pos + tolerance]
+        candidates = [
+            b
+            for b in boundaries
+            if target_pos - tolerance <= b <= target_pos + tolerance
+        ]
 
         if not candidates:
             return target_pos

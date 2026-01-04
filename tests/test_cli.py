@@ -2,7 +2,6 @@
 Tests for OllaForge CLI interface.
 """
 
-
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -23,7 +22,9 @@ runner = CliRunner()
     topic=st.text(min_size=1).filter(lambda x: x.strip()),
     count=st.integers(min_value=-100, max_value=20000),
     model=st.text(min_size=1),
-    output=st.text(min_size=1).filter(lambda x: x.strip() and '/' not in x and '\\' not in x)
+    output=st.text(min_size=1).filter(
+        lambda x: x.strip() and "/" not in x and "\\" not in x
+    ),
 )
 def test_parameter_validation_error_handling(topic, count, model, output):
     """
@@ -36,11 +37,15 @@ def test_parameter_validation_error_handling(topic, count, model, output):
     # Test with invalid count values (outside valid range)
     if count < 1 or count > 10000:
         with pytest.raises((ValidationError, ValueError)):
-            validate_parameters(topic.strip(), count, model, output.strip(), raise_on_error=False)
+            validate_parameters(
+                topic.strip(), count, model, output.strip(), raise_on_error=False
+            )
     else:
         # For valid parameters, validation should succeed
         try:
-            config = validate_parameters(topic.strip(), count, model, output.strip(), raise_on_error=False)
+            config = validate_parameters(
+                topic.strip(), count, model, output.strip(), raise_on_error=False
+            )
             assert config.topic == topic.strip()
             assert config.count == count
             assert config.model == model
@@ -104,13 +109,19 @@ def test_cli_help_display():
 
 def test_cli_with_valid_parameters():
     """Test CLI with valid parameters."""
-    result = runner.invoke(app, [
-        "generate",
-        "test topic",
-        "--count", "5",
-        "--model", "llama3",
-        "--output", "test.jsonl"
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "test topic",
+            "--count",
+            "5",
+            "--model",
+            "llama3",
+            "--output",
+            "test.jsonl",
+        ],
+    )
     # Should not exit with error (implementation is incomplete but parameters are valid)
     assert "Topic: test topic" in result.stdout
     assert "Count: 5" in result.stdout
@@ -120,32 +131,29 @@ def test_cli_with_valid_parameters():
 
 def test_cli_with_invalid_count():
     """Test CLI with invalid count parameter."""
-    result = runner.invoke(app, [
-        "generate",
-        "test topic",
-        "--count", "0"
-    ])
+    result = runner.invoke(app, ["generate", "test topic", "--count", "0"])
     assert result.exit_code != 0
     # Error message may be in stdout or output depending on Typer version
-    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    output = result.stdout + (result.output if hasattr(result, "output") else "")
     assert "Count must be at least 1" in output
 
 
 def test_cli_with_missing_topic():
     """Test CLI with missing required topic argument."""
-    result = runner.invoke(app, [
-        "generate",
-        "--count", "5"
-    ])
+    result = runner.invoke(app, ["generate", "--count", "5"])
     assert result.exit_code != 0
     # Typer should show usage information for missing argument
 
 
 @given(
     topic=st.text(min_size=1, max_size=50).filter(lambda x: x.strip() and x.isascii()),
-    model=st.text(min_size=1, max_size=20).filter(lambda x: x.strip() and x.isascii() and x.isalnum()),
+    model=st.text(min_size=1, max_size=20).filter(
+        lambda x: x.strip() and x.isascii() and x.isalnum()
+    ),
     count=st.integers(min_value=1, max_value=10),
-    output=st.text(min_size=1, max_size=20).filter(lambda x: x.strip() and x.isascii() and x.isalnum())
+    output=st.text(min_size=1, max_size=20).filter(
+        lambda x: x.strip() and x.isascii() and x.isalnum()
+    ),
 )
 def test_model_parameter_selection(topic, model, count, output):
     """
@@ -156,30 +164,43 @@ def test_model_parameter_selection(topic, model, count, output):
     model for generation requests.
     """
     # Test that the model parameter is properly accepted and stored
-    config = validate_parameters(topic.strip(), count, model.strip(), output.strip(), raise_on_error=False)
+    config = validate_parameters(
+        topic.strip(), count, model.strip(), output.strip(), raise_on_error=False
+    )
     assert config.model == model.strip()
 
     # Test CLI integration - the model should be displayed in output
-    result = runner.invoke(app, [
-        "generate",
-        topic.strip(),
-        "--count", str(count),
-        "--model", model.strip(),
-        "--output", output.strip()
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            topic.strip(),
+            "--count",
+            str(count),
+            "--model",
+            model.strip(),
+            "--output",
+            output.strip(),
+        ],
+    )
 
     # Strip ANSI color codes for comparison
     import re
-    clean_output = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
+
+    clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
 
     # Should display the specified model (with emoji prefix)
     assert f"🤖 Model: {model.strip()}" in clean_output
 
 
 @given(
-    topic=st.text(min_size=1, max_size=50).filter(lambda x: x.strip() and x.isascii() and not x.strip().startswith('-')),
-    output=st.text(min_size=1, max_size=20).filter(lambda x: x.strip() and x.isascii() and x.isalnum()),
-    count=st.integers(min_value=1, max_value=10)
+    topic=st.text(min_size=1, max_size=50).filter(
+        lambda x: x.strip() and x.isascii() and not x.strip().startswith("-")
+    ),
+    output=st.text(min_size=1, max_size=20).filter(
+        lambda x: x.strip() and x.isascii() and x.isalnum()
+    ),
+    count=st.integers(min_value=1, max_value=10),
 )
 def test_output_filename_specification(topic, output, count):
     """
@@ -190,20 +211,21 @@ def test_output_filename_specification(topic, output, count):
     written to that exact file location.
     """
     # Test that the output parameter is properly accepted and stored
-    config = validate_parameters(topic.strip(), count, "llama3", output.strip(), raise_on_error=False)
+    config = validate_parameters(
+        topic.strip(), count, "llama3", output.strip(), raise_on_error=False
+    )
     assert config.output == output.strip()
 
     # Test CLI integration - the output filename should be displayed
-    result = runner.invoke(app, [
-        "generate",
-        topic.strip(),
-        "--count", str(count),
-        "--output", output.strip()
-    ])
+    result = runner.invoke(
+        app,
+        ["generate", topic.strip(), "--count", str(count), "--output", output.strip()],
+    )
 
     # Strip ANSI color codes for comparison
     import re
-    clean_output = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
+
+    clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
 
     # Should display the specified output filename (with emoji prefix)
     assert f"📄 Output: {output.strip()}" in clean_output
@@ -211,19 +233,19 @@ def test_output_filename_specification(topic, output, count):
 
 # Edge case tests for Requirements 6.3 and 6.5
 
+
 def test_cli_with_insufficient_disk_space():
     """Test CLI behavior when disk space is insufficient - Requirements 6.3"""
     from unittest.mock import patch
 
-    with patch('ollaforge.file_manager.check_disk_space') as mock_check:
+    with patch("ollaforge.file_manager.check_disk_space") as mock_check:
         from ollaforge.file_manager import DiskSpaceError
-        mock_check.side_effect = DiskSpaceError("Insufficient disk space. Available: 10.0MB, Required: 100.0MB")
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--count", "5"
-        ])
+        mock_check.side_effect = DiskSpaceError(
+            "Insufficient disk space. Available: 10.0MB, Required: 100.0MB"
+        )
+
+        result = runner.invoke(app, ["generate", "test topic", "--count", "5"])
 
         # Should exit with error code
         assert result.exit_code == 1
@@ -236,23 +258,28 @@ def test_cli_with_disk_space_check_during_write():
 
     from ollaforge.models import DataEntry
 
-    with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
-         patch('ollaforge.processor.process_model_response') as mock_process, \
-         patch('ollaforge.file_manager.write_jsonl_file') as mock_write:
-
+    with (
+        patch("ollaforge.client.generate_data_concurrent") as mock_generate,
+        patch("ollaforge.processor.process_model_response") as mock_process,
+        patch("ollaforge.file_manager.write_jsonl_file") as mock_write,
+    ):
         # Mock successful generation
-        mock_generate.return_value = [{'raw_content': '{"instruction": "test", "input": "test", "output": "test"}', 'is_batch': False}]
-        mock_process.return_value = [DataEntry(instruction="test", input="test", output="test")]
+        mock_generate.return_value = [
+            {
+                "raw_content": '{"instruction": "test", "input": "test", "output": "test"}',
+                "is_batch": False,
+            }
+        ]
+        mock_process.return_value = [
+            DataEntry(instruction="test", input="test", output="test")
+        ]
 
         # Mock disk space error during write
         from ollaforge.file_manager import DiskSpaceError
+
         mock_write.side_effect = DiskSpaceError("Insufficient disk space during write")
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--count", "1"
-        ])
+        result = runner.invoke(app, ["generate", "test topic", "--count", "1"])
 
         # Should exit with error code and show disk space error
         assert result.exit_code == 1
@@ -265,23 +292,30 @@ def test_cli_with_file_permission_error():
 
     from ollaforge.models import DataEntry
 
-    with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
-         patch('ollaforge.processor.process_model_response') as mock_process, \
-         patch('ollaforge.file_manager.write_jsonl_file') as mock_write:
-
+    with (
+        patch("ollaforge.client.generate_data_concurrent") as mock_generate,
+        patch("ollaforge.processor.process_model_response") as mock_process,
+        patch("ollaforge.file_manager.write_jsonl_file") as mock_write,
+    ):
         # Mock successful generation
-        mock_generate.return_value = [{'raw_content': '{"instruction": "test", "input": "test", "output": "test"}', 'is_batch': False}]
-        mock_process.return_value = [DataEntry(instruction="test", input="test", output="test")]
+        mock_generate.return_value = [
+            {
+                "raw_content": '{"instruction": "test", "input": "test", "output": "test"}',
+                "is_batch": False,
+            }
+        ]
+        mock_process.return_value = [
+            DataEntry(instruction="test", input="test", output="test")
+        ]
 
         # Mock file permission error
         from ollaforge.file_manager import FileOperationError
-        mock_write.side_effect = FileOperationError("Permission denied: /readonly/test.jsonl")
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--count", "1"
-        ])
+        mock_write.side_effect = FileOperationError(
+            "Permission denied: /readonly/test.jsonl"
+        )
+
+        result = runner.invoke(app, ["generate", "test topic", "--count", "1"])
 
         # Should exit with error code and show file error
         assert result.exit_code == 1
@@ -292,17 +326,15 @@ def test_cli_with_network_interruption_during_generation():
     """Test CLI behavior with network interruption during generation - Requirements 6.5"""
     from unittest.mock import patch
 
-    with patch('ollaforge.client.generate_data_concurrent') as mock_generate:
+    with patch("ollaforge.client.generate_data_concurrent") as mock_generate:
         from ollaforge.client import OllamaConnectionError
 
         # Mock network interruption
-        mock_generate.side_effect = OllamaConnectionError("Connection lost during generation")
+        mock_generate.side_effect = OllamaConnectionError(
+            "Connection lost during generation"
+        )
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--count", "3"
-        ])
+        result = runner.invoke(app, ["generate", "test topic", "--count", "3"])
 
         # Should handle error gracefully and exit with error code
         assert result.exit_code == 1
@@ -314,25 +346,26 @@ def test_cli_with_partial_generation_failure():
     """Test CLI behavior when some generations fail but others succeed - Requirements 6.5"""
     from unittest.mock import MagicMock, patch
 
-    with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
-         patch('ollaforge.processor.process_model_response') as mock_process, \
-         patch('ollaforge.file_manager.write_jsonl_file') as mock_write:
-
+    with (
+        patch("ollaforge.client.generate_data_concurrent") as mock_generate,
+        patch("ollaforge.processor.process_model_response") as mock_process,
+        patch("ollaforge.file_manager.write_jsonl_file") as mock_write,
+    ):
         # Mock mixed success/failure responses
         mock_generate.return_value = [
-            {'raw_content': '{"instruction": "test1", "input": "test1", "output": "test1"}'},
-            {'raw_content': '{"instruction": "test3", "input": "test3", "output": "test3"}'}
+            {
+                "raw_content": '{"instruction": "test1", "input": "test1", "output": "test1"}'
+            },
+            {
+                "raw_content": '{"instruction": "test3", "input": "test3", "output": "test3"}'
+            },
         ]
 
         # Mock successful processing
         mock_process.return_value = MagicMock()
         mock_write.return_value = None
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--count", "3"
-        ])
+        result = runner.invoke(app, ["generate", "test topic", "--count", "3"])
 
         # Should complete with partial results
         # The exact behavior depends on implementation, but should not crash
@@ -343,26 +376,29 @@ def test_cli_with_malformed_model_responses():
     """Test CLI behavior with malformed model responses - Requirements 6.4"""
     from unittest.mock import MagicMock, patch
 
-    with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
-         patch('ollaforge.processor.process_model_response') as mock_process, \
-         patch('ollaforge.file_manager.write_jsonl_file') as mock_write:
-
+    with (
+        patch("ollaforge.client.generate_data_concurrent") as mock_generate,
+        patch("ollaforge.processor.process_model_response") as mock_process,
+        patch("ollaforge.file_manager.write_jsonl_file") as mock_write,
+    ):
         # Mock malformed responses
         mock_generate.return_value = [
-            {'raw_content': 'invalid json content'},
-            {'raw_content': '{"incomplete": "json"'},
-            {'raw_content': '{"valid": "json", "instruction": "test", "input": "test", "output": "test"}'}
+            {"raw_content": "invalid json content"},
+            {"raw_content": '{"incomplete": "json"'},
+            {
+                "raw_content": '{"valid": "json", "instruction": "test", "input": "test", "output": "test"}'
+            },
         ]
 
         # Mock processing that handles malformed responses
-        mock_process.side_effect = [None, None, MagicMock()]  # First two fail, third succeeds
+        mock_process.side_effect = [
+            None,
+            None,
+            MagicMock(),
+        ]  # First two fail, third succeeds
         mock_write.return_value = None
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--count", "3"
-        ])
+        result = runner.invoke(app, ["generate", "test topic", "--count", "3"])
 
         # Should handle malformed responses gracefully
         # Should not crash and should process valid responses
@@ -373,25 +409,22 @@ def test_cli_with_empty_model_responses():
     """Test CLI behavior with empty model responses - Requirements 6.4"""
     from unittest.mock import patch
 
-    with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
-         patch('ollaforge.processor.process_model_response') as mock_process, \
-         patch('ollaforge.file_manager.write_jsonl_file'):
-
+    with (
+        patch("ollaforge.client.generate_data_concurrent") as mock_generate,
+        patch("ollaforge.processor.process_model_response") as mock_process,
+        patch("ollaforge.file_manager.write_jsonl_file"),
+    ):
         # Mock empty responses
         mock_generate.return_value = [
-            {'raw_content': ''},
-            {'raw_content': '   '},
-            {'raw_content': None}
+            {"raw_content": ""},
+            {"raw_content": "   "},
+            {"raw_content": None},
         ]
 
         # Mock processing that handles empty responses
         mock_process.return_value = None
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--count", "3"
-        ])
+        result = runner.invoke(app, ["generate", "test topic", "--count", "3"])
 
         # Should handle empty responses without crashing
         # May show warning about no valid entries generated
@@ -402,15 +435,11 @@ def test_cli_with_unexpected_exception_during_generation():
     """Test CLI behavior with unexpected exceptions - Requirements 6.5"""
     from unittest.mock import patch
 
-    with patch('ollaforge.client.generate_data_concurrent') as mock_generate:
+    with patch("ollaforge.client.generate_data_concurrent") as mock_generate:
         # Mock unexpected exception
         mock_generate.side_effect = RuntimeError("Unexpected system error")
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--count", "1"
-        ])
+        result = runner.invoke(app, ["generate", "test topic", "--count", "1"])
 
         # Should handle unexpected errors gracefully
         assert result.exit_code == 1
@@ -421,15 +450,19 @@ def test_cli_with_memory_pressure():
     """Test CLI behavior under memory pressure - Requirements 6.3"""
     from unittest.mock import patch
 
-    with patch('ollaforge.client.generate_data_concurrent') as mock_generate:
+    with patch("ollaforge.client.generate_data_concurrent") as mock_generate:
         # Mock memory error
         mock_generate.side_effect = MemoryError("Out of memory")
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--count", "1000"  # Large count that might cause memory issues
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "generate",
+                "test topic",
+                "--count",
+                "1000",  # Large count that might cause memory issues
+            ],
+        )
 
         # Should handle memory errors gracefully
         assert result.exit_code == 1
@@ -444,14 +477,18 @@ def test_cli_with_corrupted_output_directory():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a file where we expect a directory
         fake_dir = os.path.join(temp_dir, "fake_dir")
-        with open(fake_dir, 'w') as f:
+        with open(fake_dir, "w") as f:
             f.write("this is a file, not a directory")
 
-        result = runner.invoke(app, [
-            "generate",
-            "test topic",
-            "--output", os.path.join(fake_dir, "test.jsonl")  # Try to write inside a file
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "generate",
+                "test topic",
+                "--output",
+                os.path.join(fake_dir, "test.jsonl"),  # Try to write inside a file
+            ],
+        )
 
         # Should detect the invalid path
         assert result.exit_code != 0
@@ -462,11 +499,7 @@ def test_cli_with_extremely_long_paths():
     # Create an extremely long path
     long_path = "a" * 1000 + ".jsonl"
 
-    result = runner.invoke(app, [
-        "generate",
-        "test topic",
-        "--output", long_path
-    ])
+    result = runner.invoke(app, ["generate", "test topic", "--output", long_path])
 
     # Should handle long paths (may succeed or fail gracefully depending on OS)
     assert result.exit_code is not None
@@ -487,12 +520,10 @@ def test_cli_with_special_characters_in_output_path():
         ]
 
         for special_path in special_paths:
-            result = runner.invoke(app, [
-                "generate",
-                "test topic",
-                "--count", "1",
-                "--output", special_path
-            ])
+            result = runner.invoke(
+                app,
+                ["generate", "test topic", "--count", "1", "--output", special_path],
+            )
 
             # Should handle special characters in paths
             # The exact behavior depends on the OS and implementation
@@ -502,11 +533,7 @@ def test_cli_with_special_characters_in_output_path():
 def test_cli_interruption_handling():
     """Test CLI interruption handling - Requirements 6.5"""
     # This is difficult to test directly, but we can test that the setup doesn't crash
-    result = runner.invoke(app, [
-        "generate",
-        "test topic",
-        "--count", "1"
-    ])
+    result = runner.invoke(app, ["generate", "test topic", "--count", "1"])
 
     # The command should start properly (even if it fails due to no Ollama)
     # The important thing is that interruption handling is set up
@@ -515,11 +542,15 @@ def test_cli_interruption_handling():
 
 def test_cli_with_invalid_output_directory():
     """Test CLI with invalid output directory path."""
-    result = runner.invoke(app, [
-        "generate",
-        "test topic",
-        "--output", "/invalid/path/that/does/not/exist/test.jsonl"
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "test topic",
+            "--output",
+            "/invalid/path/that/does/not/exist/test.jsonl",
+        ],
+    )
 
     # Should handle the error gracefully
     assert result.exit_code != 0
@@ -536,11 +567,15 @@ def test_cli_with_readonly_output_directory():
         os.chmod(readonly_dir, 0o444)  # Read-only
 
         try:
-            result = runner.invoke(app, [
-                "generate",
-                "test topic",
-                "--output", os.path.join(readonly_dir, "test.jsonl")
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "generate",
+                    "test topic",
+                    "--output",
+                    os.path.join(readonly_dir, "test.jsonl"),
+                ],
+            )
 
             # Should detect permission issues
             assert result.exit_code != 0
@@ -566,50 +601,34 @@ def test_cli_parameter_validation_edge_cases():
 
 def test_cli_with_zero_count_edge_case():
     """Test CLI with count of zero (edge case)."""
-    result = runner.invoke(app, [
-        "generate",
-        "test topic",
-        "--count", "0"
-    ])
+    result = runner.invoke(app, ["generate", "test topic", "--count", "0"])
 
     assert result.exit_code != 0
-    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    output = result.stdout + (result.output if hasattr(result, "output") else "")
     assert "Count must be at least 1" in output
 
 
 def test_cli_with_negative_count():
     """Test CLI with negative count."""
-    result = runner.invoke(app, [
-        "generate",
-        "test topic",
-        "--count", "-5"
-    ])
+    result = runner.invoke(app, ["generate", "test topic", "--count", "-5"])
 
     assert result.exit_code != 0
-    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    output = result.stdout + (result.output if hasattr(result, "output") else "")
     assert "Count must be at least 1" in output
 
 
 def test_cli_with_extremely_large_count():
     """Test CLI with extremely large count."""
-    result = runner.invoke(app, [
-        "generate",
-        "test topic",
-        "--count", "50000"
-    ])
+    result = runner.invoke(app, ["generate", "test topic", "--count", "50000"])
 
     assert result.exit_code != 0
-    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    output = result.stdout + (result.output if hasattr(result, "output") else "")
     assert "Count cannot exceed 10,000" in output
 
 
 def test_cli_with_empty_model_name():
     """Test CLI with empty model name."""
-    result = runner.invoke(app, [
-        "generate",
-        "test topic",
-        "--model", ""
-    ])
+    result = runner.invoke(app, ["generate", "test topic", "--model", ""])
 
     # Should handle empty model name
     # The exact behavior depends on validation, but shouldn't crash
@@ -618,11 +637,7 @@ def test_cli_with_empty_model_name():
 
 def test_cli_with_whitespace_only_topic():
     """Test CLI with whitespace-only topic."""
-    result = runner.invoke(app, [
-        "generate",
-        "   ",  # Only whitespace
-        "--count", "1"
-    ])
+    result = runner.invoke(app, ["generate", "   ", "--count", "1"])  # Only whitespace
 
     # Should handle whitespace-only topics appropriately
     # May succeed with trimmed topic or fail with validation error
@@ -652,12 +667,9 @@ def test_doc2dataset_help_display():
 
 def test_doc2dataset_with_nonexistent_source():
     """Test doc2dataset with non-existent source file - Requirements 5.1"""
-    result = runner.invoke(app, [
-        "doc2dataset",
-        "/nonexistent/path/to/file.md"
-    ])
+    result = runner.invoke(app, ["doc2dataset", "/nonexistent/path/to/file.md"])
     assert result.exit_code != 0
-    output = result.stdout + (result.output if hasattr(result, 'output') else '')
+    output = result.stdout + (result.output if hasattr(result, "output") else "")
     assert "Source path not found" in output or "not found" in output.lower()
 
 
@@ -666,29 +678,21 @@ def test_doc2dataset_with_invalid_chunk_size():
     import os
     import tempfile
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
 
     try:
         # Test chunk size too small
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file,
-            "--chunk-size", "100"
-        ])
+        result = runner.invoke(app, ["doc2dataset", temp_file, "--chunk-size", "100"])
         assert result.exit_code != 0
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Chunk size must be at least 500" in output
 
         # Test chunk size too large
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file,
-            "--chunk-size", "20000"
-        ])
+        result = runner.invoke(app, ["doc2dataset", temp_file, "--chunk-size", "20000"])
         assert result.exit_code != 0
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Chunk size cannot exceed 10,000" in output
     finally:
         os.unlink(temp_file)
@@ -699,29 +703,25 @@ def test_doc2dataset_with_invalid_chunk_overlap():
     import os
     import tempfile
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
 
     try:
         # Test negative overlap
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file,
-            "--chunk-overlap", "-10"
-        ])
+        result = runner.invoke(
+            app, ["doc2dataset", temp_file, "--chunk-overlap", "-10"]
+        )
         assert result.exit_code != 0
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Chunk overlap cannot be negative" in output
 
         # Test overlap too large
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file,
-            "--chunk-overlap", "2000"
-        ])
+        result = runner.invoke(
+            app, ["doc2dataset", temp_file, "--chunk-overlap", "2000"]
+        )
         assert result.exit_code != 0
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Chunk overlap cannot exceed 1,000" in output
     finally:
         os.unlink(temp_file)
@@ -732,29 +732,21 @@ def test_doc2dataset_with_invalid_entries_per_chunk():
     import os
     import tempfile
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
 
     try:
         # Test count too small
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file,
-            "--count", "0"
-        ])
+        result = runner.invoke(app, ["doc2dataset", temp_file, "--count", "0"])
         assert result.exit_code != 0
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Entries per chunk must be at least 1" in output
 
         # Test count too large
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file,
-            "--count", "20"
-        ])
+        result = runner.invoke(app, ["doc2dataset", temp_file, "--count", "20"])
         assert result.exit_code != 0
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Entries per chunk cannot exceed 10" in output
     finally:
         os.unlink(temp_file)
@@ -765,19 +757,24 @@ def test_doc2dataset_with_overlap_greater_than_chunk_size():
     import os
     import tempfile
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
 
     try:
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file,
-            "--chunk-size", "1000",
-            "--chunk-overlap", "1000"
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "doc2dataset",
+                temp_file,
+                "--chunk-size",
+                "1000",
+                "--chunk-overlap",
+                "1000",
+            ],
+        )
         assert result.exit_code != 0
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Chunk overlap must be less than chunk size" in output
     finally:
         os.unlink(temp_file)
@@ -788,18 +785,16 @@ def test_doc2dataset_with_invalid_dataset_type():
     import os
     import tempfile
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
 
     try:
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file,
-            "--type", "invalid_type"
-        ])
+        result = runner.invoke(
+            app, ["doc2dataset", temp_file, "--type", "invalid_type"]
+        )
         assert result.exit_code != 0
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Invalid dataset type" in output
     finally:
         os.unlink(temp_file)
@@ -810,18 +805,16 @@ def test_doc2dataset_with_invalid_language():
     import os
     import tempfile
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
 
     try:
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file,
-            "--lang", "invalid_lang"
-        ])
+        result = runner.invoke(
+            app, ["doc2dataset", temp_file, "--lang", "invalid_lang"]
+        )
         assert result.exit_code != 0
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Invalid language" in output
     finally:
         os.unlink(temp_file)
@@ -833,33 +826,43 @@ def test_doc2dataset_displays_config():
     import tempfile
     from unittest.mock import patch
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test Document\n\nThis is test content for the document.")
         temp_file = f.name
 
     try:
         # Mock the Ollama client to avoid actual API calls
-        with patch('ollaforge.doc_generator.ollama') as mock_ollama:
+        with patch("ollaforge.doc_generator.ollama") as mock_ollama:
             mock_ollama.chat.return_value = {
-                'message': {
-                    'content': '[{"instruction": "test", "input": "test", "output": "test"}]'
+                "message": {
+                    "content": '[{"instruction": "test", "input": "test", "output": "test"}]'
                 }
             }
 
-            result = runner.invoke(app, [
-                "doc2dataset",
-                temp_file,
-                "--type", "sft",
-                "--model", "test-model",
-                "--chunk-size", "1000",
-                "--chunk-overlap", "100",
-                "--count", "2",
-                "--lang", "en"
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "doc2dataset",
+                    temp_file,
+                    "--type",
+                    "sft",
+                    "--model",
+                    "test-model",
+                    "--chunk-size",
+                    "1000",
+                    "--chunk-overlap",
+                    "100",
+                    "--count",
+                    "2",
+                    "--lang",
+                    "en",
+                ],
+            )
 
             # Strip ANSI color codes for comparison
             import re
-            clean_output = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
+
+            clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
 
             # Check that configuration is displayed
             assert "Document to Dataset" in clean_output
@@ -878,13 +881,10 @@ def test_doc2dataset_with_empty_directory():
     import tempfile
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_dir
-        ])
+        result = runner.invoke(app, ["doc2dataset", temp_dir])
 
         # Should exit gracefully with message about no files found
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "No supported files found" in output or result.exit_code == 0
 
 
@@ -893,18 +893,15 @@ def test_doc2dataset_with_unsupported_file():
     import os
     import tempfile
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.xyz', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".xyz", delete=False) as f:
         f.write("Some content")
         temp_file = f.name
 
     try:
-        result = runner.invoke(app, [
-            "doc2dataset",
-            temp_file
-        ])
+        result = runner.invoke(app, ["doc2dataset", temp_file])
 
         # Should show unsupported format error
-        output = result.stdout + (result.output if hasattr(result, 'output') else '')
+        output = result.stdout + (result.output if hasattr(result, "output") else "")
         assert "Unsupported format" in output or "No supported files found" in output
     finally:
         os.unlink(temp_file)
@@ -918,21 +915,20 @@ def test_doc2dataset_with_permission_error():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a file and make it unreadable
         temp_file = os.path.join(temp_dir, "test.md")
-        with open(temp_file, 'w') as f:
+        with open(temp_file, "w") as f:
             f.write("# Test\nContent")
 
         # Make file unreadable
         os.chmod(temp_file, 0o000)
 
         try:
-            result = runner.invoke(app, [
-                "doc2dataset",
-                temp_file
-            ])
+            result = runner.invoke(app, ["doc2dataset", temp_file])
 
             # Should show permission error
             assert result.exit_code != 0
-            output = result.stdout + (result.output if hasattr(result, 'output') else '')
+            output = result.stdout + (
+                result.output if hasattr(result, "output") else ""
+            )
             assert "permission" in output.lower() or "Permission" in output
         finally:
             # Restore permissions for cleanup
@@ -945,18 +941,15 @@ def test_doc2dataset_ollama_connection_error():
     import tempfile
     from unittest.mock import patch
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test Document\n\nThis is test content.")
         temp_file = f.name
 
     try:
-        with patch('ollaforge.doc_generator.ollama') as mock_ollama:
+        with patch("ollaforge.doc_generator.ollama") as mock_ollama:
             mock_ollama.chat.side_effect = Exception("Connection refused")
 
-            result = runner.invoke(app, [
-                "doc2dataset",
-                temp_file
-            ])
+            result = runner.invoke(app, ["doc2dataset", temp_file])
 
             # The command should handle the error gracefully
             # It may show an error or generate no entries
@@ -1061,14 +1054,18 @@ class TestDoc2DatasetInterruptHandler:
         handler = Doc2DatasetInterruptHandler("test_output.jsonl")
 
         # Add first batch
-        handler.add_entries([{"instruction": "test1", "input": "input1", "output": "output1"}])
+        handler.add_entries(
+            [{"instruction": "test1", "input": "input1", "output": "output1"}]
+        )
         assert len(handler.get_entries()) == 1
 
         # Add second batch
-        handler.add_entries([
-            {"instruction": "test2", "input": "input2", "output": "output2"},
-            {"instruction": "test3", "input": "input3", "output": "output3"},
-        ])
+        handler.add_entries(
+            [
+                {"instruction": "test2", "input": "input2", "output": "output2"},
+                {"instruction": "test3", "input": "input3", "output": "output3"},
+            ]
+        )
         assert len(handler.get_entries()) == 3
 
         # Adding empty list should not change anything
@@ -1118,7 +1115,7 @@ class TestDoc2DatasetInterruptHandler:
             # Verify the file was created and contains the entries
             assert os.path.exists(result)
 
-            with open(result, encoding='utf-8') as f:
+            with open(result, encoding="utf-8") as f:
                 lines = f.readlines()
                 assert len(lines) == 2
 
@@ -1155,7 +1152,7 @@ class TestDoc2DatasetInterruptHandler:
             assert result is not None
             assert os.path.exists(result)
 
-            with open(result, encoding='utf-8') as f:
+            with open(result, encoding="utf-8") as f:
                 lines = f.readlines()
                 assert len(lines) == 2
 
@@ -1185,7 +1182,7 @@ class TestDoc2DatasetInterruptHandler:
             # Should only save valid entries
             assert result is not None
 
-            with open(result, encoding='utf-8') as f:
+            with open(result, encoding="utf-8") as f:
                 lines = f.readlines()
                 assert len(lines) == 2  # Only 2 valid entries
 
@@ -1253,25 +1250,22 @@ def test_doc2dataset_interrupt_handling_integration():
     import tempfile
     from unittest.mock import patch
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test Document\n\nThis is test content for the document.")
         temp_file = f.name
 
     try:
         # Mock the generator to simulate partial processing
-        with patch('ollaforge.doc_generator.ollama') as mock_ollama:
+        with patch("ollaforge.doc_generator.ollama") as mock_ollama:
             mock_ollama.chat.return_value = {
-                'message': {
-                    'content': '[{"instruction": "test", "input": "test", "output": "test"}]'
+                "message": {
+                    "content": '[{"instruction": "test", "input": "test", "output": "test"}]'
                 }
             }
 
-            result = runner.invoke(app, [
-                "doc2dataset",
-                temp_file,
-                "--type", "sft",
-                "--count", "1"
-            ])
+            result = runner.invoke(
+                app, ["doc2dataset", temp_file, "--type", "sft", "--count", "1"]
+            )
 
             # The command should complete (or fail gracefully)
             # The important thing is that interrupt handling is set up
@@ -1289,21 +1283,19 @@ def test_doc2dataset_partial_save_on_error():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a test file
         test_file = os.path.join(temp_dir, "test.md")
-        with open(test_file, 'w') as f:
+        with open(test_file, "w") as f:
             f.write("# Test\n\nContent")
 
         output_file = os.path.join(temp_dir, "output.jsonl")
 
         # Mock to simulate an error after some processing
-        with patch('ollaforge.doc_generator.ollama') as mock_ollama:
+        with patch("ollaforge.doc_generator.ollama") as mock_ollama:
             mock_ollama.chat.side_effect = Exception("Simulated error")
 
-            result = runner.invoke(app, [
-                "doc2dataset",
-                test_file,
-                "--output", output_file,
-                "--type", "sft"
-            ])
+            result = runner.invoke(
+                app,
+                ["doc2dataset", test_file, "--output", output_file, "--type", "sft"],
+            )
 
             # Should handle the error gracefully
             assert result.exit_code is not None

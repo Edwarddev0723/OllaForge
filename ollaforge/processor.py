@@ -43,30 +43,37 @@ def _clean_response(response: str) -> str:
 
     # Remove markdown code blocks - be more careful about nested backticks
     # Only remove if we have proper opening and closing code blocks
-    if cleaned.startswith('```') and cleaned.endswith('```'):
+    if cleaned.startswith("```") and cleaned.endswith("```"):
         # Find the first newline after opening backticks
-        first_newline = cleaned.find('\n')
+        first_newline = cleaned.find("\n")
         if first_newline != -1:
             # Remove opening ```json\n and closing ```
-            cleaned = cleaned[first_newline+1:-3].strip()
+            cleaned = cleaned[first_newline + 1 : -3].strip()
         else:
             # No newline, just remove the backticks
             cleaned = cleaned[3:-3].strip()
-    elif '```json\n' in cleaned and cleaned.endswith('```'):
+    elif "```json\n" in cleaned and cleaned.endswith("```"):
         # Handle cases where there's text before the code block
-        start_idx = cleaned.find('```json\n') + 8
+        start_idx = cleaned.find("```json\n") + 8
         cleaned = cleaned[start_idx:-3].strip()
-    elif '```\n' in cleaned and cleaned.endswith('```'):
+    elif "```\n" in cleaned and cleaned.endswith("```"):
         # Handle cases with generic code blocks
-        start_idx = cleaned.find('```\n') + 4
+        start_idx = cleaned.find("```\n") + 4
         cleaned = cleaned[start_idx:-3].strip()
 
     cleaned = cleaned.strip()
 
     # Remove common prefixes
-    for prefix in ["Here's the JSON:", "Here is the JSON:", "JSON:", "Response:", "Output:", "Result:"]:
+    for prefix in [
+        "Here's the JSON:",
+        "Here is the JSON:",
+        "JSON:",
+        "Response:",
+        "Output:",
+        "Result:",
+    ]:
         if cleaned.startswith(prefix):
-            cleaned = cleaned[len(prefix):].strip()
+            cleaned = cleaned[len(prefix) :].strip()
 
     return cleaned
 
@@ -84,7 +91,7 @@ def clean_json(response: str) -> Optional[dict[str, Any]]:
     cleaned = _clean_response(response)
 
     # Try to find JSON object
-    json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    json_match = re.search(r"\{.*\}", cleaned, re.DOTALL)
     if json_match:
         json_str = json_match.group(0)
     else:
@@ -112,7 +119,7 @@ def clean_json_array(response: str) -> Optional[list[dict[str, Any]]]:
     cleaned = _clean_response(response)
 
     # Try to find JSON array
-    array_match = re.search(r'\[.*\]', cleaned, re.DOTALL)
+    array_match = re.search(r"\[.*\]", cleaned, re.DOTALL)
     if array_match:
         json_str = array_match.group(0)
     else:
@@ -144,7 +151,7 @@ def _fix_common_json_issues(json_str: str) -> str:
         Fixed JSON string
     """
     # Remove trailing commas before closing braces/brackets
-    fixed = re.sub(r',\s*([}\]])', r'\1', json_str)
+    fixed = re.sub(r",\s*([}\]])", r"\1", json_str)
 
     # Replace single quotes with double quotes (but be careful about apostrophes)
     # This is a simple approach - more sophisticated parsing might be needed
@@ -154,7 +161,9 @@ def _fix_common_json_issues(json_str: str) -> str:
     return fixed
 
 
-def validate_entry(data: dict[str, Any], dataset_type: DatasetType = DatasetType.SFT) -> Optional[DatasetEntry]:
+def validate_entry(
+    data: dict[str, Any], dataset_type: DatasetType = DatasetType.SFT
+) -> Optional[DatasetEntry]:
     """
     Validate and convert a dictionary to the appropriate entry model based on dataset type.
 
@@ -168,34 +177,35 @@ def validate_entry(data: dict[str, Any], dataset_type: DatasetType = DatasetType
     try:
         if dataset_type == DatasetType.SFT:
             # Alpaca/SFT format: instruction, input, output
-            if not all(key in data for key in ['instruction', 'input', 'output']):
+            if not all(key in data for key in ["instruction", "input", "output"]):
                 return None
             return DataEntry(
-                instruction=str(data['instruction']),
-                input=str(data['input']),
-                output=str(data['output'])
+                instruction=str(data["instruction"]),
+                input=str(data["input"]),
+                output=str(data["output"]),
             )
 
         elif dataset_type == DatasetType.PRETRAIN:
             # Pre-training format: text
-            if 'text' not in data:
+            if "text" not in data:
                 return None
-            return PretrainEntry(text=str(data['text']))
+            return PretrainEntry(text=str(data["text"]))
 
         elif dataset_type == DatasetType.SFT_CONVERSATION:
             # Conversation format: conversations array
-            if 'conversations' not in data or not isinstance(data['conversations'], list):
+            if "conversations" not in data or not isinstance(
+                data["conversations"], list
+            ):
                 return None
 
             messages = []
-            for msg in data['conversations']:
-                if isinstance(msg, dict) and 'role' in msg and 'content' in msg:
-                    role = msg['role']
-                    if role in ['system', 'user', 'assistant']:
-                        messages.append(ConversationMessage(
-                            role=role,
-                            content=str(msg['content'])
-                        ))
+            for msg in data["conversations"]:
+                if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                    role = msg["role"]
+                    if role in ["system", "user", "assistant"]:
+                        messages.append(
+                            ConversationMessage(role=role, content=str(msg["content"]))
+                        )
 
             if not messages:
                 return None
@@ -203,12 +213,12 @@ def validate_entry(data: dict[str, Any], dataset_type: DatasetType = DatasetType
 
         elif dataset_type == DatasetType.DPO:
             # DPO format: prompt, chosen, rejected
-            if not all(key in data for key in ['prompt', 'chosen', 'rejected']):
+            if not all(key in data for key in ["prompt", "chosen", "rejected"]):
                 return None
             return DPOEntry(
-                prompt=str(data['prompt']),
-                chosen=str(data['chosen']),
-                rejected=str(data['rejected'])
+                prompt=str(data["prompt"]),
+                chosen=str(data["chosen"]),
+                rejected=str(data["rejected"]),
             )
 
         return None
@@ -216,8 +226,9 @@ def validate_entry(data: dict[str, Any], dataset_type: DatasetType = DatasetType
         return None
 
 
-def process_model_response(response: str, is_batch: bool = False,
-                           dataset_type: DatasetType = DatasetType.SFT) -> Union[DatasetEntry, list[DatasetEntry], None]:
+def process_model_response(
+    response: str, is_batch: bool = False, dataset_type: DatasetType = DatasetType.SFT
+) -> Union[DatasetEntry, list[DatasetEntry], None]:
     """
     Process a raw model response into validated entry objects.
 
@@ -258,8 +269,9 @@ def process_model_response(response: str, is_batch: bool = False,
         return entry
 
 
-def process_responses(responses: list[str],
-                      dataset_type: DatasetType = DatasetType.SFT) -> list[DatasetEntry]:
+def process_responses(
+    responses: list[str], dataset_type: DatasetType = DatasetType.SFT
+) -> list[DatasetEntry]:
     """
     Process multiple model responses, skipping invalid entries.
 
@@ -273,7 +285,9 @@ def process_responses(responses: list[str],
     valid_entries = []
 
     for response in responses:
-        entries = process_model_response(response, is_batch=True, dataset_type=dataset_type)
+        entries = process_model_response(
+            response, is_batch=True, dataset_type=dataset_type
+        )
         if isinstance(entries, list):
             valid_entries.extend(entries)
         elif entries is not None:

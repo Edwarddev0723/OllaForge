@@ -24,10 +24,7 @@ def test_count_parameter_controls_output_quantity(count):
     that exact count value.
     """
     config = GenerationConfig(
-        topic="test topic",
-        count=count,
-        model="llama3",
-        output="test.jsonl"
+        topic="test topic", count=count, model="llama3", output="test.jsonl"
     )
 
     assert config.count == count
@@ -43,10 +40,7 @@ def test_topic_parameter_acceptance(topic):
     accept and pass it to the generation process.
     """
     config = GenerationConfig(
-        topic=topic,
-        count=10,
-        model="llama3",
-        output="test.jsonl"
+        topic=topic, count=10, model="llama3", output="test.jsonl"
     )
 
     assert config.topic == topic.strip()
@@ -58,10 +52,11 @@ def test_topic_parameter_acceptance(topic):
 
 # Strategy for generating valid field names (non-empty strings without whitespace-only)
 valid_field_names = st.text(
-    alphabet=st.characters(whitelist_categories=('L', 'N'), whitelist_characters='_'),
+    alphabet=st.characters(whitelist_categories=("L", "N"), whitelist_characters="_"),
     min_size=1,
-    max_size=50
+    max_size=50,
 ).filter(lambda x: x.strip() and x.isidentifier())
+
 
 # Strategy for generating dataset entries with known fields
 @st.composite
@@ -69,12 +64,11 @@ def dataset_with_fields(draw):
     """Generate a dataset with a known set of fields."""
     # Generate 1-5 field names
     num_fields = draw(st.integers(min_value=1, max_value=5))
-    field_names = draw(st.lists(
-        valid_field_names,
-        min_size=num_fields,
-        max_size=num_fields,
-        unique=True
-    ))
+    field_names = draw(
+        st.lists(
+            valid_field_names, min_size=num_fields, max_size=num_fields, unique=True
+        )
+    )
 
     # Generate 1-10 entries with these fields
     num_entries = draw(st.integers(min_value=1, max_value=10))
@@ -106,7 +100,9 @@ def test_field_validation_existing_field_accepted(data):
 
     # Validation should succeed (return True) for existing field
     result = validate_target_field(entries, target_field, create_new_field=False)
-    assert result is True, f"Field '{target_field}' should be accepted as it exists in {field_names}"
+    assert (
+        result is True
+    ), f"Field '{target_field}' should be accepted as it exists in {field_names}"
 
 
 @given(data=st.data())
@@ -135,19 +131,23 @@ def test_field_validation_non_existing_field_rejected(data):
     # Error should contain at least one available field from the dataset
     error = exc_info.value
     assert len(error.available_fields) > 0, "Error should list available fields"
-    assert any(f in field_names for f in error.available_fields), \
-        f"Error available_fields {error.available_fields} should contain at least one field from {field_names}"
+    assert any(
+        f in field_names for f in error.available_fields
+    ), f"Error available_fields {error.available_fields} should contain at least one field from {field_names}"
 
 
 # ============================================================================
 # Property Tests for AugmentationResult Statistics Accuracy
 # ============================================================================
 
+
 @given(
     success_count=st.integers(min_value=0, max_value=10000),
     failure_count=st.integers(min_value=0, max_value=10000),
-    duration=st.floats(min_value=0.0, max_value=86400.0, allow_nan=False, allow_infinity=False),
-    output_file=st.text(min_size=1, max_size=100).filter(lambda x: x.strip())
+    duration=st.floats(
+        min_value=0.0, max_value=86400.0, allow_nan=False, allow_infinity=False
+    ),
+    output_file=st.text(min_size=1, max_size=100).filter(lambda x: x.strip()),
 )
 @settings(max_examples=20)
 def test_statistics_accuracy(success_count, failure_count, duration, output_file):
@@ -169,27 +169,33 @@ def test_statistics_accuracy(success_count, failure_count, duration, output_file
         failure_count=failure_count,
         output_file=output_file,
         duration=duration,
-        errors=[]
+        errors=[],
     )
 
     # Verify statistics are accurately reported
-    assert result.success_count == success_count, \
-        f"success_count should be {success_count}, got {result.success_count}"
-    assert result.failure_count == failure_count, \
-        f"failure_count should be {failure_count}, got {result.failure_count}"
-    assert result.total_entries == total_entries, \
-        f"total_entries should be {total_entries}, got {result.total_entries}"
+    assert (
+        result.success_count == success_count
+    ), f"success_count should be {success_count}, got {result.success_count}"
+    assert (
+        result.failure_count == failure_count
+    ), f"failure_count should be {failure_count}, got {result.failure_count}"
+    assert (
+        result.total_entries == total_entries
+    ), f"total_entries should be {total_entries}, got {result.total_entries}"
 
     # Verify the invariant: success + failure = total
-    assert result.success_count + result.failure_count == result.total_entries, \
-        f"success_count ({result.success_count}) + failure_count ({result.failure_count}) " \
+    assert result.success_count + result.failure_count == result.total_entries, (
+        f"success_count ({result.success_count}) + failure_count ({result.failure_count}) "
         f"should equal total_entries ({result.total_entries})"
+    )
 
     # Verify success_rate calculation is accurate
     if total_entries > 0:
         expected_rate = (success_count / total_entries) * 100
-        assert abs(result.success_rate - expected_rate) < 0.0001, \
-            f"success_rate should be {expected_rate}, got {result.success_rate}"
+        assert (
+            abs(result.success_rate - expected_rate) < 0.0001
+        ), f"success_rate should be {expected_rate}, got {result.success_rate}"
     else:
-        assert result.success_rate == 0.0, \
-            f"success_rate should be 0.0 for empty dataset, got {result.success_rate}"
+        assert (
+            result.success_rate == 0.0
+        ), f"success_rate should be 0.0 for empty dataset, got {result.success_rate}"

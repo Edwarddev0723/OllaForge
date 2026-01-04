@@ -15,5 +15,5 @@ __all__ = [
     "augmentation_router",
     "models_router",
     "tasks_router",
-    "ws_manager"
+    "ws_manager",
 ]

@@ -63,6 +63,8 @@ def validate_parameters(
             output=output,
             dataset_type=dataset_type,
             language=language,
+            qc_enabled=True,
+            qc_confidence=0.9,
         )
         return config
     except ValidationError as e:
@@ -166,9 +168,9 @@ def generate(
         "--count",
         "-c",
         help="Number of data entries to generate (1-10,000)",
-        callback=lambda ctx, param, value: validate_count_range(value)
-        if value is not None
-        else value,
+        callback=lambda ctx, param, value: (
+            validate_count_range(value) if value is not None else value
+        ),
     ),
     model: str = typer.Option(
         "llama3.2",
@@ -181,36 +183,36 @@ def generate(
         "--output",
         "-o",
         help="Output filename (will be created if it doesn't exist)",
-        callback=lambda ctx, param, value: validate_output_path(value)
-        if value is not None
-        else value,
+        callback=lambda ctx, param, value: (
+            validate_output_path(value) if value is not None else value
+        ),
     ),
     concurrency: int = typer.Option(
         5,
         "--concurrency",
         "-j",
         help="Number of parallel requests (1-20)",
-        callback=lambda ctx, param, value: validate_concurrency(value)
-        if value is not None
-        else value,
+        callback=lambda ctx, param, value: (
+            validate_concurrency(value) if value is not None else value
+        ),
     ),
     dataset_type: str = typer.Option(
         "sft",
         "--type",
         "-t",
         help=DATASET_TYPE_HELP,
-        callback=lambda ctx, param, value: validate_dataset_type(value)
-        if value is not None
-        else value,
+        callback=lambda ctx, param, value: (
+            validate_dataset_type(value) if value is not None else value
+        ),
     ),
     language: str = typer.Option(
         "en",
         "--lang",
         "-l",
         help=LANGUAGE_HELP,
-        callback=lambda ctx, param, value: validate_language(value)
-        if value is not None
-        else value,
+        callback=lambda ctx, param, value: (
+            validate_language(value) if value is not None else value
+        ),
     ),
     qc_enabled: bool = typer.Option(
         True,
@@ -365,9 +367,7 @@ def _run_generation(config: GenerationConfig, concurrency: int) -> None:
             estimated_pass_rate=0.7,
         )
         request_count = qc_controller.calculate_request_count(config.count)
-        console.print(
-            "[dim]🔍 QC model loading for Taiwan Chinese validation...[/dim]"
-        )
+        console.print("[dim]🔍 QC model loading for Taiwan Chinese validation...[/dim]")
         console.print(
             f"[dim]📊 Funnel mode: requesting {request_count} entries to get {config.count} valid ones[/dim]"
         )
@@ -375,10 +375,13 @@ def _run_generation(config: GenerationConfig, concurrency: int) -> None:
     # Start progress tracking
     if qc_controller is not None:
         progress_tracker.start_progress(
-            request_count, f"Generating {request_count} entries (target: {config.count})"
+            request_count,
+            f"Generating {request_count} entries (target: {config.count})",
         )
     else:
-        progress_tracker.start_progress(config.count, f"Generating {config.count} entries")
+        progress_tracker.start_progress(
+            config.count, f"Generating {config.count} entries"
+        )
 
     try:
         BATCH_SIZE = DEFAULT_BATCH_SIZE
@@ -408,7 +411,9 @@ def _run_generation(config: GenerationConfig, concurrency: int) -> None:
             progress_callback=on_batch_progress,
         )
 
-        console.print(f"[dim]🔍 Processing {len(raw_responses)} batch responses...[/dim]")
+        console.print(
+            f"[dim]🔍 Processing {len(raw_responses)} batch responses...[/dim]"
+        )
 
         all_entries = []
         for raw_response in raw_responses:
@@ -457,7 +462,9 @@ def _run_generation(config: GenerationConfig, concurrency: int) -> None:
         console.print("[yellow]💡 Make sure Ollama is running: ollama serve[/yellow]")
         raise typer.Exit(1) from e
     except OllamaGenerationError as e:
-        progress_tracker.display_error(f"Generation error: {str(e)}", show_immediately=False)
+        progress_tracker.display_error(
+            f"Generation error: {str(e)}", show_immediately=False
+        )
 
     elapsed_time = progress_tracker.stop_progress()
 
@@ -470,8 +477,12 @@ def _run_generation(config: GenerationConfig, concurrency: int) -> None:
             raise typer.Exit(1) from e
     else:
         if not is_interrupted():
-            progress_tracker.display_error("No valid entries were generated", show_immediately=True)
-            console.print("[yellow]💡 Try a different topic or check your Ollama model[/yellow]")
+            progress_tracker.display_error(
+                "No valid entries were generated", show_immediately=True
+            )
+            console.print(
+                "[yellow]💡 Try a different topic or check your Ollama model[/yellow]"
+            )
 
     result = GenerationResult(
         success_count=len(generated_entries),
@@ -492,6 +503,7 @@ def validate_input_file(value: str) -> str:
 
     # Check if it's a HuggingFace dataset identifier
     from .hf_loader import is_huggingface_dataset
+
     if is_huggingface_dataset(value):
         return value  # Return as-is for HuggingFace datasets
 
@@ -548,21 +560,27 @@ def augment(
     input_file: str = typer.Argument(
         ...,
         help="Source dataset file or HuggingFace dataset name (e.g., 'renhehuang/govQA-database-zhtw')",
-        callback=lambda ctx, param, value: validate_input_file(value) if value else value,
+        callback=lambda ctx, param, value: (
+            validate_input_file(value) if value else value
+        ),
     ),
     field: str = typer.Option(
         ...,
         "--field",
         "-f",
         help=AUGMENT_FIELD_HELP,
-        callback=lambda ctx, param, value: validate_field_name(value) if value else value,
+        callback=lambda ctx, param, value: (
+            validate_field_name(value) if value else value
+        ),
     ),
     instruction: str = typer.Option(
         ...,
         "--instruction",
         "-I",
         help=AUGMENT_INSTRUCTION_HELP,
-        callback=lambda ctx, param, value: validate_instruction(value) if value else value,
+        callback=lambda ctx, param, value: (
+            validate_instruction(value) if value else value
+        ),
     ),
     output: Optional[str] = typer.Option(
         None,
@@ -581,7 +599,9 @@ def augment(
         "--concurrency",
         "-j",
         help="Number of parallel requests (1-20)",
-        callback=lambda ctx, param, value: validate_concurrency(value) if value is not None else value,
+        callback=lambda ctx, param, value: (
+            validate_concurrency(value) if value is not None else value
+        ),
     ),
     new_field: bool = typer.Option(
         False,
@@ -604,7 +624,9 @@ def augment(
         3,
         "--preview-count",
         help="Number of entries to preview (1-10)",
-        callback=lambda ctx, param, value: validate_preview_count(value) if value is not None else value,
+        callback=lambda ctx, param, value: (
+            validate_preview_count(value) if value is not None else value
+        ),
     ),
     interactive: bool = typer.Option(
         False,
@@ -623,7 +645,9 @@ def augment(
         "--lang",
         "-l",
         help=LANGUAGE_HELP,
-        callback=lambda ctx, param, value: validate_language(value) if value is not None else value,
+        callback=lambda ctx, param, value: (
+            validate_language(value) if value is not None else value
+        ),
     ),
     input_format: Optional[str] = typer.Option(
         None,
@@ -680,27 +704,42 @@ def augment(
         # Handle interactive mode
         if interactive:
             from .interactive import augment_interactive
+
             result = augment_interactive()
             if result is None:
                 raise typer.Exit(0)
             # Unpack interactive result and continue with augmentation
-            input_file, field, instruction, output, model, concurrency, new_field, context, preview, language = result
+            (
+                input_file,
+                field,
+                instruction,
+                output,
+                model,
+                concurrency,
+                new_field,
+                context,
+                preview,
+                language,
+            ) = result
 
         # Check if input is a HuggingFace dataset
         from .hf_loader import is_huggingface_dataset
+
         is_hf_dataset = is_huggingface_dataset(input_file)
 
         # Generate default output filename if not specified
         if is_hf_dataset:
             # For HuggingFace datasets, use dataset name as base
-            dataset_name = input_file.replace('/', '_')
+            dataset_name = input_file.replace("/", "_")
             output_file = output or f"{dataset_name}_augmented.jsonl"
         else:
             output_file = _generate_output_filename(input_file, output)
 
         # Check for existing output file
         if not force and _check_output_exists(output_file):
-            if not typer.confirm(f"Output file '{output_file}' already exists. Overwrite?"):
+            if not typer.confirm(
+                f"Output file '{output_file}' already exists. Overwrite?"
+            ):
                 console.print("[yellow]Operation cancelled.[/yellow]")
                 raise typer.Exit(0)
 
@@ -814,7 +853,9 @@ def _run_augmentation(
                 FileFormat(input_format.lower())
             except ValueError:
                 console.print(f"[red]❌ Invalid input format: {input_format}[/red]")
-                console.print("[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+                console.print(
+                    "[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]"
+                )
                 raise typer.Exit(1)
         else:
             pass
@@ -832,16 +873,20 @@ def _run_augmentation(
             output_fmt = FileFormat(output_format.lower())
         except ValueError:
             console.print(f"[red]❌ Invalid output format: {output_format}[/red]")
-            console.print("[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+            console.print(
+                "[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]"
+            )
             raise typer.Exit(1)
     else:
         output_fmt = None
 
     # Load dataset and display info
-    console.print(Panel.fit(
-        Text("🔧 OllaForge Dataset Augmentor", style="bold magenta"),
-        border_style="bright_blue",
-    ))
+    console.print(
+        Panel.fit(
+            Text("🔧 OllaForge Dataset Augmentor", style="bold magenta"),
+            border_style="bright_blue",
+        )
+    )
 
     try:
         if is_hf_dataset:
@@ -874,7 +919,9 @@ def _run_augmentation(
     console.print(f"📊 Entries: {len(entries)}")
     console.print(f"📋 Fields: {', '.join(field_names)}")
     console.print(f"🎯 Target field: {field}")
-    console.print(f"📝 Instruction: {instruction[:50]}{'...' if len(instruction) > 50 else ''}")
+    console.print(
+        f"📝 Instruction: {instruction[:50]}{'...' if len(instruction) > 50 else ''}"
+    )
     console.print(f"🤖 Model: {model}")
     console.print(f"⚡ Concurrency: {concurrency}")
     if context_fields:
@@ -889,12 +936,16 @@ def _run_augmentation(
     except FieldValidationError as e:
         console.print(f"[red]❌ {e.message}[/red]")
         if e.available_fields:
-            console.print(f"[yellow]Available fields: {', '.join(e.available_fields)}[/yellow]")
+            console.print(
+                f"[yellow]Available fields: {', '.join(e.available_fields)}[/yellow]"
+            )
         raise typer.Exit(1) from e
 
     # Handle preview mode (Requirement 7.1, 7.2)
     if preview_mode:
-        console.print(f"[cyan]🔍 Preview mode: processing {min(len(entries), preview_count)} sample entries...[/cyan]")
+        console.print(
+            f"[cyan]🔍 Preview mode: processing {min(len(entries), preview_count)} sample entries...[/cyan]"
+        )
         console.print()
 
         preview_results = augmentor.preview(entries)
@@ -910,7 +961,9 @@ def _run_augmentation(
 
         # Ask for confirmation to proceed (Requirement 7.3, 7.4)
         if not typer.confirm("Proceed with full dataset augmentation?"):
-            console.print("[yellow]Operation cancelled. You can modify the instruction and retry.[/yellow]")
+            console.print(
+                "[yellow]Operation cancelled. You can modify the instruction and retry.[/yellow]"
+            )
             raise typer.Exit(0)
 
         console.print()
@@ -929,7 +982,9 @@ def _run_augmentation(
     def handle_interrupt(signum, frame):
         nonlocal interrupted
         interrupted = True
-        console.print("\n[yellow]⚠️  Interruption detected, saving partial results...[/yellow]")
+        console.print(
+            "\n[yellow]⚠️  Interruption detected, saving partial results...[/yellow]"
+        )
 
     original_handler = signal.signal(signal.SIGINT, handle_interrupt)
 
@@ -984,9 +1039,9 @@ def _save_partial_results(entries: list[dict], output_file: str) -> None:
     partial_file = output_path.parent / f"{output_path.stem}_partial_{timestamp}.jsonl"
 
     try:
-        with open(partial_file, 'w', encoding='utf-8') as f:
+        with open(partial_file, "w", encoding="utf-8") as f:
             for entry in valid_entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
         console.print(f"[green]✅ Partial results saved to: {partial_file}[/green]")
         console.print(f"[cyan]📊 Saved {len(valid_entries)} entries[/cyan]")
@@ -994,8 +1049,9 @@ def _save_partial_results(entries: list[dict], output_file: str) -> None:
         console.print(f"[red]❌ Failed to save partial results: {str(e)}[/red]")
 
 
-def _write_augmented_output(entries: list[dict], output_file: str,
-                           output_format: Optional[FileFormat] = None) -> None:
+def _write_augmented_output(
+    entries: list[dict], output_file: str, output_format: Optional[FileFormat] = None
+) -> None:
     """Write augmented entries to output file in specified format."""
     # Filter out None entries
     valid_entries = [e for e in entries if e is not None]
@@ -1019,10 +1075,12 @@ def _write_augmented_output(entries: list[dict], output_file: str,
 def _display_augmentation_summary(result: AugmentationResult) -> None:
     """Display augmentation summary statistics."""
     console.print()
-    console.print(Panel.fit(
-        Text("📊 Augmentation Summary", style="bold green"),
-        border_style="green",
-    ))
+    console.print(
+        Panel.fit(
+            Text("📊 Augmentation Summary", style="bold green"),
+            border_style="green",
+        )
+    )
     console.print(f"📁 Output: {result.output_file}")
     console.print(f"📊 Total entries: {result.total_entries}")
     console.print(f"✅ Successful: {result.success_count}")
@@ -1031,7 +1089,9 @@ def _display_augmentation_summary(result: AugmentationResult) -> None:
     console.print(f"⏱️  Duration: {result.duration:.1f}s")
 
     if result.errors:
-        console.print(f"\n[yellow]⚠️  {len(result.errors)} error(s) occurred during processing[/yellow]")
+        console.print(
+            f"\n[yellow]⚠️  {len(result.errors)} error(s) occurred during processing[/yellow]"
+        )
 
 
 @app.callback(invoke_without_command=True)
@@ -1068,11 +1128,13 @@ def main(
     """
     if version:
         from . import __version__
+
         console.print(f"OllaForge version {__version__}")
         raise typer.Exit(0)
 
     if interactive:
         from .interactive import main_interactive_router
+
         try:
             main_interactive_router()
         except KeyboardInterrupt:
@@ -1085,8 +1147,10 @@ def main(
 
     if ctx.invoked_subcommand is None:
         # Show help if no subcommand is provided
-        console.print(app.get_help(ctx))
-        console.print("\n[yellow]💡 Use 'ollaforge -i' for interactive mode or 'ollaforge --help' for more options[/yellow]")
+        ctx.get_help()  # type: ignore[attr-defined]
+        console.print(
+            "\n[yellow]💡 Use 'ollaforge -i' for interactive mode or 'ollaforge --help' for more options[/yellow]"
+        )
 
 
 def validate_chunk_size(value: int) -> int:
@@ -1143,52 +1207,72 @@ def doc2dataset(
     source: str = typer.Argument(
         ...,
         help="Source document or directory path",
-        callback=lambda ctx, param, value: validate_source_path(value) if value else value,
+        callback=lambda ctx, param, value: (
+            validate_source_path(value) if value else value
+        ),
     ),
     output: str = typer.Option(
         "dataset.jsonl",
-        "--output", "-o",
+        "--output",
+        "-o",
         help="Output dataset file path",
-        callback=lambda ctx, param, value: validate_output_path(value) if value else value,
+        callback=lambda ctx, param, value: (
+            validate_output_path(value) if value else value
+        ),
     ),
     dataset_type: str = typer.Option(
         "sft",
-        "--type", "-t",
+        "--type",
+        "-t",
         help=DOC2DATASET_TYPE_HELP,
-        callback=lambda ctx, param, value: validate_dataset_type(value) if value else value,
+        callback=lambda ctx, param, value: (
+            validate_dataset_type(value) if value else value
+        ),
     ),
     model: str = typer.Option(
         "llama3.2",
-        "--model", "-m",
+        "--model",
+        "-m",
         help="Ollama model to use for generation",
     ),
     chunk_size: int = typer.Option(
         2000,
         "--chunk-size",
         help="Chunk size in characters (500-10000)",
-        callback=lambda ctx, param, value: validate_chunk_size(value) if value is not None else value,
+        callback=lambda ctx, param, value: (
+            validate_chunk_size(value) if value is not None else value
+        ),
     ),
     chunk_overlap: int = typer.Option(
         200,
         "--chunk-overlap",
         help="Overlap between chunks in characters (0-1000)",
-        callback=lambda ctx, param, value: validate_chunk_overlap(value) if value is not None else value,
+        callback=lambda ctx, param, value: (
+            validate_chunk_overlap(value) if value is not None else value
+        ),
     ),
     count: int = typer.Option(
         3,
-        "--count", "-c",
+        "--count",
+        "-c",
         help="Number of entries to generate per chunk (1-10)",
-        callback=lambda ctx, param, value: validate_entries_per_chunk(value) if value is not None else value,
+        callback=lambda ctx, param, value: (
+            validate_entries_per_chunk(value) if value is not None else value
+        ),
     ),
     language: str = typer.Option(
         "en",
-        "--lang", "-l",
+        "--lang",
+        "-l",
         help=LANGUAGE_HELP,
-        callback=lambda ctx, param, value: validate_language(value) if value is not None else value,
+        callback=lambda ctx, param, value: (
+            validate_language(value) if value is not None else value
+        ),
     ),
     pattern: Optional[str] = typer.Option(
         None,
-        "--pattern", "-p",
+        "--pattern",
+        "-p",
         help="File pattern for directory processing (e.g., '*.md')",
     ),
     recursive: bool = typer.Option(
@@ -1287,11 +1371,13 @@ class Doc2DatasetInterruptHandler:
     def setup(self) -> None:
         """Set up the signal handler for SIGINT."""
         import signal
+
         self._original_handler = signal.signal(signal.SIGINT, self._handle_interrupt)
 
     def cleanup(self) -> None:
         """Restore the original signal handler."""
         import signal
+
         if self._original_handler is not None:
             signal.signal(signal.SIGINT, self._original_handler)
             self._original_handler = None
@@ -1299,7 +1385,9 @@ class Doc2DatasetInterruptHandler:
     def _handle_interrupt(self, signum, frame) -> None:
         """Handle SIGINT signal."""
         self._interrupted = True
-        console.print("\n[yellow]⚠️  Interruption detected, saving partial results...[/yellow]")
+        console.print(
+            "\n[yellow]⚠️  Interruption detected, saving partial results...[/yellow]"
+        )
 
     @property
     def interrupted(self) -> bool:
@@ -1348,29 +1436,31 @@ class Doc2DatasetInterruptHandler:
 
         output_path = Path(self._output_file)
         timestamp = int(time.time())
-        partial_file = output_path.parent / f"{output_path.stem}_partial_{timestamp}.jsonl"
+        partial_file = (
+            output_path.parent / f"{output_path.stem}_partial_{timestamp}.jsonl"
+        )
 
         # Ensure parent directory exists
         partial_file.parent.mkdir(parents=True, exist_ok=True)
 
         try:
             saved_count = 0
-            with open(partial_file, 'w', encoding='utf-8') as f:
+            with open(partial_file, "w", encoding="utf-8") as f:
                 for entry in self._entries:
                     if entry is None:
                         continue
 
                     # Convert entry to dict if needed
-                    if hasattr(entry, 'model_dump'):
+                    if hasattr(entry, "model_dump"):
                         entry_dict = entry.model_dump()
-                    elif hasattr(entry, 'dict'):
+                    elif hasattr(entry, "dict"):
                         entry_dict = entry.dict()
                     elif isinstance(entry, dict):
                         entry_dict = entry
                     else:
                         continue
 
-                    f.write(json.dumps(entry_dict, ensure_ascii=False) + '\n')
+                    f.write(json.dumps(entry_dict, ensure_ascii=False) + "\n")
                     saved_count += 1
 
             console.print(f"[green]✅ Partial results saved to: {partial_file}[/green]")
@@ -1439,9 +1529,7 @@ def _run_doc2dataset(
 
     # Initialize batch processor
     batch_config = BatchConfig(
-        recursive=recursive,
-        file_pattern=pattern,
-        continue_on_error=True
+        recursive=recursive, file_pattern=pattern, continue_on_error=True
     )
     batch_processor = BatchProcessor(batch_config)
 
@@ -1454,7 +1542,9 @@ def _run_doc2dataset(
 
     if not files_to_process:
         console.print("[yellow]⚠️  No supported files found to process[/yellow]")
-        console.print(f"[dim]Supported formats: {', '.join(DocumentParserFactory.get_supported_formats())}[/dim]")
+        console.print(
+            f"[dim]Supported formats: {', '.join(DocumentParserFactory.get_supported_formats())}[/dim]"
+        )
         raise typer.Exit(0)
 
     console.print(f"[dim]📁 Found {len(files_to_process)} file(s) to process[/dim]")
@@ -1487,7 +1577,9 @@ def _run_doc2dataset(
     try:
         # Check disk space
         try:
-            estimated_size = estimate_file_size(len(files_to_process) * entries_per_chunk * 10)
+            estimated_size = estimate_file_size(
+                len(files_to_process) * entries_per_chunk * 10
+            )
             check_disk_space(output, estimated_size)
         except DiskSpaceError as e:
             console.print(f"[red]❌ {str(e)}[/red]")
@@ -1505,7 +1597,9 @@ def _run_doc2dataset(
             file_entries_count = 0
             file_chunks_count = 0
 
-            console.print(f"[cyan]📄 Processing ({file_idx + 1}/{total_files}): {file_path.name}[/cyan]")
+            console.print(
+                f"[cyan]📄 Processing ({file_idx + 1}/{total_files}): {file_path.name}[/cyan]"
+            )
 
             try:
                 # Parse document
@@ -1518,21 +1612,26 @@ def _run_doc2dataset(
                 total_chunks += file_chunks_count
 
                 if not chunks:
-                    console.print(f"[dim]  ⚠️  No content to process in {file_path.name}[/dim]")
-                    batch_processor.add_file_result(DocProcessingResult(
-                        source_file=str(file_path),
-                        chunks_processed=0,
-                        entries_generated=0,
-                        errors=["No content to process"]
-                    ))
+                    console.print(
+                        f"[dim]  ⚠️  No content to process in {file_path.name}[/dim]"
+                    )
+                    batch_processor.add_file_result(
+                        DocProcessingResult(
+                            source_file=str(file_path),
+                            chunks_processed=0,
+                            entries_generated=0,
+                            errors=["No content to process"],
+                        )
+                    )
                     continue
 
-                console.print(f"[dim]  📦 Split into {file_chunks_count} chunk(s)[/dim]")
+                console.print(
+                    f"[dim]  📦 Split into {file_chunks_count} chunk(s)[/dim]"
+                )
 
                 # Generate entries from chunks with progress
                 progress_tracker.start_progress(
-                    file_chunks_count,
-                    f"Generating from {file_path.name}"
+                    file_chunks_count, f"Generating from {file_path.name}"
                 )
 
                 def on_chunk_progress(completed: int, total: int):
@@ -1548,12 +1647,18 @@ def _run_doc2dataset(
                 except OllamaConnectionError as e:
                     progress_tracker.stop_progress()
                     console.print(f"[red]❌ Ollama connection failed: {str(e)}[/red]")
-                    console.print("[yellow]💡 Make sure Ollama is running: ollama serve[/yellow]")
-                    console.print(f"[yellow]💡 Ensure model '{model}' is available: ollama pull {model}[/yellow]")
+                    console.print(
+                        "[yellow]💡 Make sure Ollama is running: ollama serve[/yellow]"
+                    )
+                    console.print(
+                        f"[yellow]💡 Ensure model '{model}' is available: ollama pull {model}[/yellow]"
+                    )
                     raise typer.Exit(1) from e
 
                 progress_tracker.stop_progress()
-                console.print(f"[green]  ✅ Generated {file_entries_count} entries[/green]")
+                console.print(
+                    f"[green]  ✅ Generated {file_entries_count} entries[/green]"
+                )
 
             except UnsupportedFormatError as e:
                 file_errors.append(str(e))
@@ -1568,12 +1673,14 @@ def _run_doc2dataset(
                 file_errors.append(f"Error processing {file_path}: {str(e)}")
                 console.print(f"[red]  ❌ Error: {str(e)}[/red]")
 
-            batch_processor.add_file_result(DocProcessingResult(
-                source_file=str(file_path),
-                chunks_processed=file_chunks_count,
-                entries_generated=file_entries_count,
-                errors=file_errors
-            ))
+            batch_processor.add_file_result(
+                DocProcessingResult(
+                    source_file=str(file_path),
+                    chunks_processed=file_chunks_count,
+                    entries_generated=file_entries_count,
+                    errors=file_errors,
+                )
+            )
 
         # Get all collected entries
         all_entries = batch_processor.get_entries()
@@ -1585,9 +1692,9 @@ def _run_doc2dataset(
                 # Convert entries to dicts for writing
                 entries_dicts = []
                 for entry in all_entries:
-                    if hasattr(entry, 'model_dump'):
+                    if hasattr(entry, "model_dump"):
                         entries_dicts.append(entry.model_dump())
-                    elif hasattr(entry, 'dict'):
+                    elif hasattr(entry, "dict"):
                         entries_dicts.append(entry.dict())
                     elif isinstance(entry, dict):
                         entries_dicts.append(entry)
@@ -1600,7 +1707,9 @@ def _run_doc2dataset(
         else:
             if not interrupt_handler.interrupted:
                 console.print("\n[yellow]⚠️  No entries were generated[/yellow]")
-                console.print("[yellow]💡 Check if the documents contain processable content[/yellow]")
+                console.print(
+                    "[yellow]💡 Check if the documents contain processable content[/yellow]"
+                )
 
         # Calculate results
         elapsed_time = time.time() - start_time
@@ -1628,9 +1737,7 @@ def _run_doc2dataset(
 
 
 def _collect_files_from_directory(
-    directory: Path,
-    pattern: Optional[str],
-    recursive: bool
+    directory: Path, pattern: Optional[str], recursive: bool
 ) -> list[Path]:
     """
     Collect supported files from a directory.
@@ -1717,15 +1824,19 @@ def _display_doc2dataset_summary(
     console.print()
 
     if interrupted:
-        console.print(Panel.fit(
-            Text("⚠️  Processing Interrupted", style="bold yellow"),
-            border_style="yellow",
-        ))
+        console.print(
+            Panel.fit(
+                Text("⚠️  Processing Interrupted", style="bold yellow"),
+                border_style="yellow",
+            )
+        )
     else:
-        console.print(Panel.fit(
-            Text("📊 Processing Summary", style="bold green"),
-            border_style="green",
-        ))
+        console.print(
+            Panel.fit(
+                Text("📊 Processing Summary", style="bold green"),
+                border_style="green",
+            )
+        )
 
     console.print(f"📁 Files processed: {successful_files}/{total_files}")
     if failed_files > 0:
@@ -1753,17 +1864,17 @@ def _save_partial_doc2dataset_results(entries: list, output_file: str) -> None:
     partial_file = output_path.parent / f"{output_path.stem}_partial_{timestamp}.jsonl"
 
     try:
-        with open(partial_file, 'w', encoding='utf-8') as f:
+        with open(partial_file, "w", encoding="utf-8") as f:
             for entry in entries:
-                if hasattr(entry, 'model_dump'):
+                if hasattr(entry, "model_dump"):
                     entry_dict = entry.model_dump()
-                elif hasattr(entry, 'dict'):
+                elif hasattr(entry, "dict"):
                     entry_dict = entry.dict()
                 elif isinstance(entry, dict):
                     entry_dict = entry
                 else:
                     continue
-                f.write(json.dumps(entry_dict, ensure_ascii=False) + '\n')
+                f.write(json.dumps(entry_dict, ensure_ascii=False) + "\n")
 
         console.print(f"[green]✅ Partial results saved to: {partial_file}[/green]")
         console.print(f"[cyan]📊 Saved {len(entries)} entries[/cyan]")
@@ -1773,6 +1884,7 @@ def _save_partial_doc2dataset_results(entries: list, output_file: str) -> None:
 
 if __name__ == "__main__":
     app()
+
 
 @app.command()
 def convert(
@@ -1834,7 +1946,9 @@ def convert(
                 input_fmt = FileFormat(input_format.lower())
             except ValueError:
                 console.print(f"[red]❌ Invalid input format: {input_format}[/red]")
-                console.print("[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+                console.print(
+                    "[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]"
+                )
                 raise typer.Exit(1)
 
         output_fmt = None
@@ -1843,20 +1957,26 @@ def convert(
                 output_fmt = FileFormat(output_format.lower())
             except ValueError:
                 console.print(f"[red]❌ Invalid output format: {output_format}[/red]")
-                console.print("[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]")
+                console.print(
+                    "[yellow]Supported formats: jsonl, json, csv, tsv, parquet[/yellow]"
+                )
                 raise typer.Exit(1)
 
         # Check if output file exists
         if Path(output_file).exists() and not force:
-            if not typer.confirm(f"Output file '{output_file}' already exists. Overwrite?"):
+            if not typer.confirm(
+                f"Output file '{output_file}' already exists. Overwrite?"
+            ):
                 console.print("[yellow]Operation cancelled.[/yellow]")
                 raise typer.Exit(0)
 
         # Display conversion info
-        console.print(Panel.fit(
-            Text("🔄 OllaForge Format Converter", style="bold cyan"),
-            border_style="bright_blue",
-        ))
+        console.print(
+            Panel.fit(
+                Text("🔄 OllaForge Format Converter", style="bold cyan"),
+                border_style="bright_blue",
+            )
+        )
 
         console.print(f"📂 Input: {input_file}")
         console.print(f"📁 Output: {output_file}")

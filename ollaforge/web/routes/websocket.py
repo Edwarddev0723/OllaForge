@@ -20,6 +20,7 @@ from typing import Any, Optional
 @dataclass
 class TaskSubscription:
     """Represents a client's subscription to a task."""
+
     task_id: str
     subscribed_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -160,7 +161,7 @@ class WebSocketManager:
         progress: int,
         total: int,
         status: str = "running",
-        message: Optional[str] = None
+        message: Optional[str] = None,
     ):
         """
         Emit progress update to all subscribers of a task.
@@ -192,7 +193,7 @@ class WebSocketManager:
             "total": total,
             "percentage": round(percentage, 1),
             "status": status,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         if message:
@@ -213,7 +214,7 @@ class WebSocketManager:
         success_count: int,
         failure_count: int,
         duration: float,
-        message: Optional[str] = None
+        message: Optional[str] = None,
     ):
         """
         Emit task completion event to all subscribers.
@@ -243,7 +244,7 @@ class WebSocketManager:
             "success_count": success_count,
             "failure_count": failure_count,
             "duration": round(duration, 2),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         if message:
@@ -261,7 +262,7 @@ class WebSocketManager:
         task_id: str,
         error: str,
         error_type: str = "error",
-        details: Optional[dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None,
     ):
         """
         Emit error event to all subscribers.
@@ -286,7 +287,7 @@ class WebSocketManager:
             "task_id": task_id,
             "error_type": error_type,
             "error": error,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         if details:
@@ -300,10 +301,7 @@ class WebSocketManager:
                 pass
 
     async def emit_failed(
-        self,
-        task_id: str,
-        error: str,
-        details: Optional[dict[str, Any]] = None
+        self, task_id: str, error: str, details: Optional[dict[str, Any]] = None
     ):
         """
         Emit task failure event to all subscribers.
@@ -324,7 +322,7 @@ class WebSocketManager:
             "task_id": task_id,
             "status": "failed",
             "error": error,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         if details:

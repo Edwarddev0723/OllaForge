@@ -18,11 +18,13 @@ from ollaforge.processor import (
 )
 
 # Strategy for generating valid JSON data entries
-valid_data_entry = st.fixed_dictionaries({
-    'instruction': st.text(min_size=1),
-    'input': st.text(min_size=1),
-    'output': st.text(min_size=1)
-})
+valid_data_entry = st.fixed_dictionaries(
+    {
+        "instruction": st.text(min_size=1),
+        "input": st.text(min_size=1),
+        "output": st.text(min_size=1),
+    }
+)
 
 
 @given(data=valid_data_entry)
@@ -59,7 +61,9 @@ def test_json_extraction_from_responses(data):
     for test_case in test_cases:
         result = clean_json(test_case)
         assert result is not None, f"Failed to extract JSON from: {test_case}"
-        assert result == data, f"Extracted JSON doesn't match original data for: {test_case}"
+        assert (
+            result == data
+        ), f"Extracted JSON doesn't match original data for: {test_case}"
 
 
 @given(responses=st.lists(st.text(), min_size=1, max_size=10))
@@ -88,13 +92,15 @@ def test_malformed_response_recovery(responses):
     invalid_responses=st.lists(
         st.one_of(
             st.text().filter(lambda x: not x.strip()),  # Empty/whitespace
-            st.text().filter(lambda x: '{' not in x and '}' not in x),  # No JSON brackets
+            st.text().filter(
+                lambda x: "{" not in x and "}" not in x
+            ),  # No JSON brackets
             st.just("invalid json {"),  # Malformed JSON
             st.just('{"missing": "fields"}'),  # Missing required fields
         ),
         min_size=1,
-        max_size=5
-    )
+        max_size=5,
+    ),
 )
 def test_invalid_json_recovery(valid_data, invalid_responses):
     """
@@ -120,9 +126,9 @@ def test_invalid_json_recovery(valid_data, invalid_responses):
     # All returned entries should be valid DataEntry instances
     for entry in result:
         assert isinstance(entry, DataEntry)
-        assert entry.instruction == valid_data['instruction']
-        assert entry.input == valid_data['input']
-        assert entry.output == valid_data['output']
+        assert entry.instruction == valid_data["instruction"]
+        assert entry.input == valid_data["input"]
+        assert entry.output == valid_data["output"]
 
 
 def test_clean_json_edge_cases():
@@ -169,6 +175,7 @@ def test_fix_common_json_issues():
 
 # Additional edge case tests for Requirements 6.3, 6.4, and 6.5
 
+
 def test_process_model_response_with_unicode_content():
     """Test processing model responses with Unicode content - Requirements 6.4"""
     unicode_responses = [
@@ -188,11 +195,9 @@ def test_process_model_response_with_extremely_large_content():
     """Test processing extremely large model responses - Requirements 6.3"""
     # Create response with very large content
     large_content = "x" * 100000  # 100KB content
-    large_response = json.dumps({
-        "instruction": large_content,
-        "input": "small input",
-        "output": "small output"
-    })
+    large_response = json.dumps(
+        {"instruction": large_content, "input": "small input", "output": "small output"}
+    )
 
     # Should handle large content without issues
     result = process_model_response(large_response)
@@ -269,11 +274,13 @@ def test_process_responses_with_memory_pressure():
     # Create a large number of responses
     large_response_list = []
     for i in range(10000):
-        response = json.dumps({
-            "instruction": f"instruction_{i}",
-            "input": f"input_{i}",
-            "output": f"output_{i}"
-        })
+        response = json.dumps(
+            {
+                "instruction": f"instruction_{i}",
+                "input": f"input_{i}",
+                "output": f"output_{i}",
+            }
+        )
         large_response_list.append(response)
 
     # Should handle large lists without memory issues
@@ -309,7 +316,11 @@ def test_validate_entry_with_edge_case_values():
         # Whitespace only
         {"instruction": "   ", "input": "\t\t", "output": "\n\n"},
         # Special characters
-        {"instruction": "test\x00null", "input": "test\x01control", "output": "test\x02chars"},
+        {
+            "instruction": "test\x00null",
+            "input": "test\x01control",
+            "output": "test\x02chars",
+        },
         # Unicode
         {"instruction": "测试", "input": "🚀", "output": "ñ"},
     ]
@@ -327,7 +338,7 @@ def test_clean_json_with_performance_stress():
     large_data = {
         "instruction": "x" * 50000,
         "input": "y" * 50000,
-        "output": "z" * 50000
+        "output": "z" * 50000,
     }
     large_json = json.dumps(large_data)
 
@@ -354,10 +365,10 @@ def test_process_responses_with_mixed_valid_invalid():
         '{"instruction": "test1", "input": "input1", "output": "output1"}',
         '{"instruction": "test2", "input": "input2", "output": "output2"}',
         # Invalid responses
-        'not json at all',
+        "not json at all",
         '{"incomplete": "json"',
         '{"missing": "required_fields"}',
-        '',
+        "",
         None,
         # More valid responses
         '{"instruction": "test3", "input": "input3", "output": "output3"}',
@@ -376,15 +387,15 @@ def test_fix_common_json_issues_comprehensive():
     """Test comprehensive JSON fixing scenarios - Requirements 6.4"""
     json_issues = [
         # Multiple trailing commas
-        ('{"key1": "value1",, "key2": "value2",}', 'trailing commas'),
+        ('{"key1": "value1",, "key2": "value2",}', "trailing commas"),
         # Mixed quotes
-        ('{"key1": \'value1\', "key2": "value2"}', 'mixed quotes'),
+        ('{"key1": \'value1\', "key2": "value2"}', "mixed quotes"),
         # Unescaped quotes
-        ('{"key": "value with "quotes" inside"}', 'unescaped quotes'),
+        ('{"key": "value with "quotes" inside"}', "unescaped quotes"),
         # Missing quotes on keys
-        ('{key: "value"}', 'missing key quotes'),
+        ('{key: "value"}', "missing key quotes"),
         # Extra whitespace
-        ('{ "key" : "value" , }', 'extra whitespace'),
+        ('{ "key" : "value" , }', "extra whitespace"),
     ]
 
     for broken_json, _description in json_issues:
@@ -403,11 +414,13 @@ def test_process_model_response_with_timeout_simulation():
     import time
 
     # Create response that might take time to process
-    complex_response = json.dumps({
-        "instruction": "complex " * 10000,
-        "input": "processing " * 10000,
-        "output": "task " * 10000
-    })
+    complex_response = json.dumps(
+        {
+            "instruction": "complex " * 10000,
+            "input": "processing " * 10000,
+            "output": "task " * 10000,
+        }
+    )
 
     # Should complete processing within reasonable time
     start_time = time.time()

@@ -23,7 +23,7 @@ from ...client import (
 )
 from ...models import DatasetEntry, DatasetType, OutputLanguage
 from ...processor import process_model_response
-from ...qc import QualityController
+from ...qc import QualityController, is_taiwan_chinese
 
 
 class GenerationService:
@@ -47,7 +47,7 @@ class GenerationService:
         language: OutputLanguage = OutputLanguage.EN,
         qc_enabled: bool = True,
         qc_confidence: float = 0.9,
-        progress_callback: Optional[Callable[[int, int], None]] = None
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> dict[str, Any]:
         """
         Generate dataset with progress updates.
@@ -84,7 +84,7 @@ class GenerationService:
                 # Schedule callback in event loop
                 asyncio.run_coroutine_threadsafe(
                     self._async_progress_callback(progress_callback, completed, total),
-                    loop
+                    loop,
                 )
 
         try:
@@ -97,18 +97,18 @@ class GenerationService:
                     total_count=count,
                     dataset_type=dataset_type,
                     language=language,
-                    progress_callback=sync_progress_callback
-                )
+                    progress_callback=sync_progress_callback,
+                ),
             )
 
             # Process responses to extract valid entries
             entries = []
             for response in responses:
-                if 'raw_content' in response:
+                if "raw_content" in response:
                     processed = process_model_response(
-                        response['raw_content'],
-                        is_batch=response.get('is_batch', False),
-                        dataset_type=dataset_type
+                        response["raw_content"],
+                        is_batch=response.get("is_batch", False),
+                        dataset_type=dataset_type,
                     )
                     if isinstance(processed, list):
                         entries.extend(processed)
@@ -120,8 +120,7 @@ class GenerationService:
             if qc_enabled and language == OutputLanguage.ZH_TW:
                 qc = QualityController(confidence_threshold=qc_confidence)
                 entries, qc_stats = await loop.run_in_executor(
-                    None,
-                    lambda: self._apply_qc(qc, entries)
+                    None, lambda: self._apply_qc(qc, entries)
                 )
 
             duration = time.time() - start_time
@@ -130,7 +129,7 @@ class GenerationService:
                 "entries": entries,
                 "total": len(entries),
                 "duration": duration,
-                "qc_stats": qc_stats
+                "qc_stats": qc_stats,
             }
 
         except (OllamaConnectionError, OllamaGenerationError):
@@ -141,10 +140,7 @@ class GenerationService:
             raise OllamaGenerationError(f"Generation failed: {str(e)}") from e
 
     async def _async_progress_callback(
-        self,
-        callback: Callable[[int, int], None],
-        completed: int,
-        total: int
+        self, callback: Callable[[int, int], None], completed: int, total: int
     ):
         """Async wrapper for progress callback."""
         if asyncio.iscoroutinefunction(callback):
@@ -153,9 +149,7 @@ class GenerationService:
             callback(completed, total)
 
     def _apply_qc(
-        self,
-        qc: QualityController,
-        entries: list[DatasetEntry]
+        self, qc: QualityController, entries: list[DatasetEntry]
     ) -> tuple[list[DatasetEntry], dict[str, Any]]:
         """
         Apply QC filtering to entries.
@@ -170,11 +164,11 @@ class GenerationService:
         # Extract text content from entries for QC
         texts = []
         for entry in entries:
-            if hasattr(entry, 'text'):
+            if hasattr(entry, "text"):
                 texts.append(entry.text)
-            elif hasattr(entry, 'output'):
+            elif hasattr(entry, "output"):
                 texts.append(entry.output)
-            elif hasattr(entry, 'conversations'):
+            elif hasattr(entry, "conversations"):
                 # For conversation entries, check all messages
                 for msg in entry.conversations:
                     texts.append(msg.content)
@@ -184,7 +178,8 @@ class GenerationService:
         failed_count = 0
 
         for i, text in enumerate(texts):
-            if qc.is_taiwan_chinese(text):
+            passed, _ = is_taiwan_chinese(text)
+            if passed:
                 passed_indices.append(i)
             else:
                 failed_count += 1
@@ -196,7 +191,7 @@ class GenerationService:
             "total_checked": len(entries),
             "passed": len(filtered_entries),
             "failed": failed_count,
-            "pass_rate": len(filtered_entries) / len(entries) if entries else 0
+            "pass_rate": len(filtered_entries) / len(entries) if entries else 0,
         }
 
         return filtered_entries, qc_stats
@@ -215,7 +210,7 @@ class GenerationService:
             "total": 0,
             "result": None,
             "error": None,
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.utcnow().isoformat(),
         }
         return task_id
 
@@ -226,7 +221,7 @@ class GenerationService:
         progress: Optional[int] = None,
         total: Optional[int] = None,
         result: Optional[dict[str, Any]] = None,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ):
         """
         Update task status.

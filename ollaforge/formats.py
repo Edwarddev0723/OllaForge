@@ -27,6 +27,7 @@ import pandas as pd
 
 class FileFormat(Enum):
     """Supported file formats."""
+
     JSONL = "jsonl"
     JSON = "json"
     CSV = "csv"
@@ -36,6 +37,7 @@ class FileFormat(Enum):
 
 class FormatError(Exception):
     """Raised when file format operations fail."""
+
     pass
 
 
@@ -56,18 +58,18 @@ def detect_format(file_path: str) -> FileFormat:
     extension = path.suffix.lower()
 
     format_map = {
-        '.jsonl': FileFormat.JSONL,
-        '.json': FileFormat.JSON,
-        '.csv': FileFormat.CSV,
-        '.tsv': FileFormat.TSV,
-        '.parquet': FileFormat.PARQUET,
+        ".jsonl": FileFormat.JSONL,
+        ".json": FileFormat.JSON,
+        ".csv": FileFormat.CSV,
+        ".tsv": FileFormat.TSV,
+        ".parquet": FileFormat.PARQUET,
     }
 
     if extension in format_map:
         return format_map[extension]
 
     # Try to detect from content if extension is ambiguous
-    if extension in ['.txt', '.data']:
+    if extension in [".txt", ".data"]:
         return _detect_from_content(file_path)
 
     raise FormatError(f"Unsupported file format: {extension}")
@@ -76,7 +78,7 @@ def detect_format(file_path: str) -> FileFormat:
 def _detect_from_content(file_path: str) -> FileFormat:
     """Detect format from file content."""
     try:
-        with open(file_path, encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             first_line = f.readline().strip()
 
         # Try JSON first
@@ -87,8 +89,8 @@ def _detect_from_content(file_path: str) -> FileFormat:
             pass
 
         # Check for CSV-like structure
-        if ',' in first_line or '\t' in first_line:
-            return FileFormat.CSV if ',' in first_line else FileFormat.TSV
+        if "," in first_line or "\t" in first_line:
+            return FileFormat.CSV if "," in first_line else FileFormat.TSV
 
         # Default to JSONL
         return FileFormat.JSONL
@@ -97,7 +99,9 @@ def _detect_from_content(file_path: str) -> FileFormat:
         return FileFormat.JSONL
 
 
-def read_file(file_path: str, format_hint: Optional[FileFormat] = None) -> tuple[list[dict[str, Any]], list[str]]:
+def read_file(
+    file_path: str, format_hint: Optional[FileFormat] = None
+) -> tuple[list[dict[str, Any]], list[str]]:
     """
     Read file in any supported format and return entries with field names.
 
@@ -121,17 +125,20 @@ def read_file(file_path: str, format_hint: Optional[FileFormat] = None) -> tuple
     elif file_format == FileFormat.JSON:
         return _read_json(file_path)
     elif file_format == FileFormat.CSV:
-        return _read_csv(file_path, delimiter=',')
+        return _read_csv(file_path, delimiter=",")
     elif file_format == FileFormat.TSV:
-        return _read_csv(file_path, delimiter='\t')
+        return _read_csv(file_path, delimiter="\t")
     elif file_format == FileFormat.PARQUET:
         return _read_parquet(file_path)
     else:
         raise FormatError(f"Unsupported format: {file_format}")
 
 
-def write_file(entries: list[dict[str, Any]], file_path: str,
-               format_hint: Optional[FileFormat] = None) -> None:
+def write_file(
+    entries: list[dict[str, Any]],
+    file_path: str,
+    format_hint: Optional[FileFormat] = None,
+) -> None:
     """
     Write entries to file in specified format.
 
@@ -153,9 +160,9 @@ def write_file(entries: list[dict[str, Any]], file_path: str,
     elif file_format == FileFormat.JSON:
         _write_json(entries, file_path)
     elif file_format == FileFormat.CSV:
-        _write_csv(entries, file_path, delimiter=',')
+        _write_csv(entries, file_path, delimiter=",")
     elif file_format == FileFormat.TSV:
-        _write_csv(entries, file_path, delimiter='\t')
+        _write_csv(entries, file_path, delimiter="\t")
     elif file_format == FileFormat.PARQUET:
         _write_parquet(entries, file_path)
     else:
@@ -168,7 +175,7 @@ def _read_jsonl(file_path: str) -> tuple[list[dict[str, Any]], list[str]]:
     field_names = set()
 
     try:
-        with open(file_path, encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:
@@ -180,9 +187,13 @@ def _read_jsonl(file_path: str) -> tuple[list[dict[str, Any]], list[str]]:
                         entries.append(entry)
                         field_names.update(entry.keys())
                     else:
-                        raise FormatError(f"Line {line_num}: Expected JSON object, got {type(entry).__name__}")
+                        raise FormatError(
+                            f"Line {line_num}: Expected JSON object, got {type(entry).__name__}"
+                        )
                 except json.JSONDecodeError as e:
-                    raise FormatError(f"Line {line_num}: Invalid JSON - {str(e)}") from e
+                    raise FormatError(
+                        f"Line {line_num}: Invalid JSON - {str(e)}"
+                    ) from e
 
     except FileNotFoundError:
         raise FormatError(f"File not found: {file_path}")
@@ -195,7 +206,7 @@ def _read_jsonl(file_path: str) -> tuple[list[dict[str, Any]], list[str]]:
 def _read_json(file_path: str) -> tuple[list[dict[str, Any]], list[str]]:
     """Read JSON array format."""
     try:
-        with open(file_path, encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
         if isinstance(data, list):
@@ -207,7 +218,9 @@ def _read_json(file_path: str) -> tuple[list[dict[str, Any]], list[str]]:
                     entries.append(item)
                     field_names.update(item.keys())
                 else:
-                    raise FormatError(f"Item {i}: Expected JSON object, got {type(item).__name__}")
+                    raise FormatError(
+                        f"Item {i}: Expected JSON object, got {type(item).__name__}"
+                    )
 
             return entries, sorted(field_names)
         else:
@@ -221,15 +234,22 @@ def _read_json(file_path: str) -> tuple[list[dict[str, Any]], list[str]]:
         raise FormatError(f"File encoding error: {file_path}")
 
 
-def _read_csv(file_path: str, delimiter: str = ',') -> tuple[list[dict[str, Any]], list[str]]:
+def _read_csv(
+    file_path: str, delimiter: str = ","
+) -> tuple[list[dict[str, Any]], list[str]]:
     """Read CSV/TSV format."""
     try:
         entries = []
 
-        with open(file_path, encoding='utf-8', newline='') as f:
+        with open(file_path, encoding="utf-8", newline="") as f:
             # Use explicit dialect configuration for better reliability
-            reader = csv.DictReader(f, delimiter=delimiter, quotechar='"',
-                                  quoting=csv.QUOTE_MINIMAL, skipinitialspace=True)
+            reader = csv.DictReader(
+                f,
+                delimiter=delimiter,
+                quotechar='"',
+                quoting=csv.QUOTE_MINIMAL,
+                skipinitialspace=True,
+            )
             field_names = reader.fieldnames or []
 
             for _row_num, row in enumerate(reader, 2):  # Start from 2 (header is row 1)
@@ -259,12 +279,14 @@ def _read_parquet(file_path: str) -> tuple[list[dict[str, Any]], list[str]]:
     """Read Parquet format."""
     try:
         df = pd.read_parquet(file_path)
-        entries = df.to_dict('records')
+        entries = df.to_dict("records")
         field_names = list(df.columns)
         return entries, field_names
 
     except ImportError:
-        raise FormatError("Parquet support requires pandas and pyarrow: pip install pandas pyarrow")
+        raise FormatError(
+            "Parquet support requires pandas and pyarrow: pip install pandas pyarrow"
+        )
     except FileNotFoundError:
         raise FormatError(f"File not found: {file_path}")
     except Exception as e:
@@ -274,9 +296,9 @@ def _read_parquet(file_path: str) -> tuple[list[dict[str, Any]], list[str]]:
 def _write_jsonl(entries: list[dict[str, Any]], file_path: str) -> None:
     """Write JSONL format."""
     try:
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             for entry in entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception as e:
         raise FormatError(f"JSONL writing error: {str(e)}") from e
 
@@ -284,13 +306,15 @@ def _write_jsonl(entries: list[dict[str, Any]], file_path: str) -> None:
 def _write_json(entries: list[dict[str, Any]], file_path: str) -> None:
     """Write JSON array format."""
     try:
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump(entries, f, ensure_ascii=False, indent=2)
     except Exception as e:
         raise FormatError(f"JSON writing error: {str(e)}") from e
 
 
-def _write_csv(entries: list[dict[str, Any]], file_path: str, delimiter: str = ',') -> None:
+def _write_csv(
+    entries: list[dict[str, Any]], file_path: str, delimiter: str = ","
+) -> None:
     """Write CSV/TSV format."""
     if not entries:
         return
@@ -302,20 +326,25 @@ def _write_csv(entries: list[dict[str, Any]], file_path: str, delimiter: str = '
             field_names.update(entry.keys())
         field_names = sorted(field_names)
 
-        with open(file_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=field_names, delimiter=delimiter,
-                                  quoting=csv.QUOTE_MINIMAL, quotechar='"')
+        with open(file_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=field_names,
+                delimiter=delimiter,
+                quoting=csv.QUOTE_MINIMAL,
+                quotechar='"',
+            )
             writer.writeheader()
 
             for entry in entries:
                 # Handle complex values (convert to JSON strings)
                 row = {}
                 for field in field_names:
-                    value = entry.get(field, '')
+                    value = entry.get(field, "")
                     if isinstance(value, (dict, list)):
                         row[field] = json.dumps(value, ensure_ascii=False)
                     else:
-                        row[field] = str(value) if value is not None else ''
+                        row[field] = str(value) if value is not None else ""
                 writer.writerow(row)
 
     except Exception as e:
@@ -329,7 +358,9 @@ def _write_parquet(entries: list[dict[str, Any]], file_path: str) -> None:
         df.to_parquet(file_path, index=False)
 
     except ImportError:
-        raise FormatError("Parquet support requires pandas and pyarrow: pip install pandas pyarrow")
+        raise FormatError(
+            "Parquet support requires pandas and pyarrow: pip install pandas pyarrow"
+        )
     except Exception as e:
         raise FormatError(f"Parquet writing error: {str(e)}") from e
 
@@ -351,7 +382,9 @@ def get_format_description(format_type: FileFormat) -> str:
     return descriptions.get(format_type, "Unknown format")
 
 
-def validate_format_compatibility(entries: list[dict[str, Any]], format_type: FileFormat) -> bool:
+def validate_format_compatibility(
+    entries: list[dict[str, Any]], format_type: FileFormat
+) -> bool:
     """
     Validate if entries are compatible with the target format.
 

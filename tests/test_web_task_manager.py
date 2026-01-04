@@ -56,9 +56,8 @@ task_type_strategy = st.sampled_from([TaskType.GENERATION, TaskType.AUGMENTATION
 # Property Test 21: Concurrent requests are independent
 # ============================================================================
 
-@given(
-    task_count=st.integers(min_value=2, max_value=5)
-)
+
+@given(task_count=st.integers(min_value=2, max_value=5))
 @settings(max_examples=10, deadline=30000)
 def test_concurrent_requests_are_independent(task_count):
     """
@@ -68,6 +67,7 @@ def test_concurrent_requests_are_independent(task_count):
     For any multiple generation requests submitted simultaneously, the system
     should process each request independently without interference.
     """
+
     async def run_test():
         # Create a fresh task manager for this test
         manager = TaskManager(max_concurrent_tasks=task_count)
@@ -87,8 +87,7 @@ def test_concurrent_requests_are_independent(task_count):
 
             # Submit task with unique value
             await manager.submit_task(
-                task_id,
-                lambda tid=task_id, val=i: mock_task(tid, val)
+                task_id, lambda tid=task_id, val=i: mock_task(tid, val)
             )
 
         # Wait for all tasks to complete
@@ -98,15 +97,18 @@ def test_concurrent_requests_are_independent(task_count):
         for i, task_id in enumerate(task_ids):
             task = manager.get_task(task_id)
             assert task is not None, f"Task {task_id} should exist"
-            assert task["status"] == "completed", \
-                f"Task {task_id} should be completed, got {task['status']}"
+            assert (
+                task["status"] == "completed"
+            ), f"Task {task_id} should be completed, got {task['status']}"
 
             # Verify result contains correct value
             result = task.get("result", {})
-            assert result.get("task_id") == task_id, \
-                f"Task {task_id} result should have correct task_id"
-            assert result.get("value") == i, \
-                f"Task {task_id} should have value {i}, got {result.get('value')}"
+            assert (
+                result.get("task_id") == task_id
+            ), f"Task {task_id} result should have correct task_id"
+            assert (
+                result.get("value") == i
+            ), f"Task {task_id} should have value {i}, got {result.get('value')}"
 
     asyncio.run(run_test())
 
@@ -115,9 +117,8 @@ def test_concurrent_requests_are_independent(task_count):
 # Property Test 22: Operations don't block endpoints
 # ============================================================================
 
-@given(
-    slow_task_delay=st.floats(min_value=0.1, max_value=0.3)
-)
+
+@given(slow_task_delay=st.floats(min_value=0.1, max_value=0.3))
 @settings(max_examples=10, deadline=30000)
 def test_operations_dont_block_endpoints(slow_task_delay):
     """
@@ -127,9 +128,12 @@ def test_operations_dont_block_endpoints(slow_task_delay):
     For any generation or augmentation in progress, other API endpoints
     should remain responsive and not be blocked.
     """
+
     async def run_test():
         transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             # Start a slow task in the background
             slow_task_started = asyncio.Event()
 
@@ -142,9 +146,7 @@ def test_operations_dont_block_endpoints(slow_task_delay):
             task_id = task_manager.create_task(TaskType.GENERATION)
 
             # Submit slow task
-            asyncio.create_task(
-                task_manager.submit_task(task_id, slow_operation)
-            )
+            asyncio.create_task(task_manager.submit_task(task_id, slow_operation))
 
             # Wait for slow task to start
             await asyncio.wait_for(slow_task_started.wait(), timeout=1.0)
@@ -157,8 +159,9 @@ def test_operations_dont_block_endpoints(slow_task_delay):
             health_time = time.time() - start_time
 
             assert response.status_code == 200, "Health endpoint should respond"
-            assert health_time < 0.5, \
-                f"Health endpoint should respond quickly, took {health_time}s"
+            assert (
+                health_time < 0.5
+            ), f"Health endpoint should respond quickly, took {health_time}s"
 
             # Stats endpoint should respond immediately
             start_time = time.time()
@@ -166,8 +169,9 @@ def test_operations_dont_block_endpoints(slow_task_delay):
             stats_time = time.time() - start_time
 
             assert response.status_code == 200, "Stats endpoint should respond"
-            assert stats_time < 0.5, \
-                f"Stats endpoint should respond quickly, took {stats_time}s"
+            assert (
+                stats_time < 0.5
+            ), f"Stats endpoint should respond quickly, took {stats_time}s"
 
             # Wait for slow task to complete
             await asyncio.sleep(slow_task_delay + 0.1)
@@ -179,9 +183,10 @@ def test_operations_dont_block_endpoints(slow_task_delay):
 # Property Test 23: Resource limits trigger queueing
 # ============================================================================
 
+
 @given(
     max_concurrent=st.integers(min_value=1, max_value=3),
-    total_tasks=st.integers(min_value=2, max_value=6)
+    total_tasks=st.integers(min_value=2, max_value=6),
 )
 @settings(max_examples=10, deadline=30000)
 def test_resource_limits_trigger_queueing(max_concurrent, total_tasks):
@@ -215,10 +220,7 @@ def test_resource_limits_trigger_queueing(max_concurrent, total_tasks):
         for i in range(total_tasks):
             task_id = manager.create_task(TaskType.GENERATION)
             task_ids.append(task_id)
-            await manager.submit_task(
-                task_id,
-                lambda num=i: tracked_task(num)
-            )
+            await manager.submit_task(task_id, lambda num=i: tracked_task(num))
 
         # Give tasks time to start
         await asyncio.sleep(0.02)
@@ -227,8 +229,9 @@ def test_resource_limits_trigger_queueing(max_concurrent, total_tasks):
         stats = manager.get_stats()
 
         # At most max_concurrent should be running
-        assert stats["running_count"] <= max_concurrent, \
-            f"Running count {stats['running_count']} should not exceed {max_concurrent}"
+        assert (
+            stats["running_count"] <= max_concurrent
+        ), f"Running count {stats['running_count']} should not exceed {max_concurrent}"
 
         # Wait for all tasks to complete
         await asyncio.sleep(0.5)
@@ -236,12 +239,14 @@ def test_resource_limits_trigger_queueing(max_concurrent, total_tasks):
         # All tasks should complete eventually
         for task_id in task_ids:
             task = manager.get_task(task_id)
-            assert task["status"] == "completed", \
-                f"Task {task_id} should complete, got {task['status']}"
+            assert (
+                task["status"] == "completed"
+            ), f"Task {task_id} should complete, got {task['status']}"
 
         # All tasks should have executed
-        assert len(execution_order) == total_tasks, \
-            f"All {total_tasks} tasks should have executed"
+        assert (
+            len(execution_order) == total_tasks
+        ), f"All {total_tasks} tasks should have executed"
 
     asyncio.run(run_test())
 
@@ -250,9 +255,8 @@ def test_resource_limits_trigger_queueing(max_concurrent, total_tasks):
 # Property Test 24: Timeouts return error responses
 # ============================================================================
 
-@given(
-    timeout_seconds=st.floats(min_value=0.05, max_value=0.2)
-)
+
+@given(timeout_seconds=st.floats(min_value=0.05, max_value=0.2))
 @settings(max_examples=10, deadline=30000)
 def test_timeouts_return_error_responses(timeout_seconds):
     """
@@ -262,6 +266,7 @@ def test_timeouts_return_error_responses(timeout_seconds):
     For any request that times out, the system should return an appropriate
     error response.
     """
+
     async def run_test():
         # Create task manager with short timeout
         manager = TaskManager(default_timeout=timeout_seconds)
@@ -281,11 +286,13 @@ def test_timeouts_return_error_responses(timeout_seconds):
         # Task should be in timeout status
         task = manager.get_task(task_id)
         assert task is not None, "Task should exist"
-        assert task["status"] == "timeout", \
-            f"Task should be timeout, got {task['status']}"
+        assert (
+            task["status"] == "timeout"
+        ), f"Task should be timeout, got {task['status']}"
         assert task["error"] is not None, "Task should have error message"
-        assert "timed out" in task["error"].lower() or "timeout" in task["error"].lower(), \
-            f"Error should mention timeout: {task['error']}"
+        assert (
+            "timed out" in task["error"].lower() or "timeout" in task["error"].lower()
+        ), f"Error should mention timeout: {task['error']}"
 
     asyncio.run(run_test())
 
@@ -293,6 +300,7 @@ def test_timeouts_return_error_responses(timeout_seconds):
 # ============================================================================
 # Unit Tests for Task Manager
 # ============================================================================
+
 
 class TestTaskManagerBasics:
     """Unit tests for basic task manager operations."""
@@ -325,12 +333,7 @@ class TestTaskManagerBasics:
         manager = TaskManager()
         task_id = manager.create_task(TaskType.GENERATION)
 
-        manager.update_task(
-            task_id,
-            status=TaskStatus.RUNNING,
-            progress=5,
-            total=10
-        )
+        manager.update_task(task_id, status=TaskStatus.RUNNING, progress=5, total=10)
 
         task = manager.get_task(task_id)
         assert task["status"] == "running"
@@ -484,11 +487,14 @@ class TestTaskManagerConcurrency:
 # Unit Tests for Task API Routes
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_list_tasks_endpoint():
     """Test the list tasks endpoint."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/tasks")
 
         assert response.status_code == 200
@@ -501,7 +507,9 @@ async def test_list_tasks_endpoint():
 async def test_get_stats_endpoint():
     """Test the stats endpoint."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/tasks/stats")
 
         assert response.status_code == 200
@@ -515,7 +523,9 @@ async def test_get_stats_endpoint():
 async def test_get_task_not_found():
     """Test getting a non-existent task."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/tasks/nonexistent_task_id")
 
         assert response.status_code == 404
@@ -525,7 +535,9 @@ async def test_get_task_not_found():
 async def test_cancel_task_not_found():
     """Test cancelling a non-existent task."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.post("/api/tasks/nonexistent_task_id/cancel")
 
         assert response.status_code == 404
@@ -535,7 +547,9 @@ async def test_cancel_task_not_found():
 async def test_delete_task_not_found():
     """Test deleting a non-existent task."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.delete("/api/tasks/nonexistent_task_id")
 
         assert response.status_code == 404
@@ -545,7 +559,9 @@ async def test_delete_task_not_found():
 async def test_cleanup_endpoint():
     """Test the cleanup endpoint."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.post("/api/tasks/cleanup?max_age_hours=24")
 
         assert response.status_code == 200
@@ -557,7 +573,9 @@ async def test_cleanup_endpoint():
 async def test_list_tasks_with_type_filter():
     """Test listing tasks with type filter."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/tasks?task_type=generation")
 
         assert response.status_code == 200
@@ -569,7 +587,9 @@ async def test_list_tasks_with_type_filter():
 async def test_list_tasks_with_status_filter():
     """Test listing tasks with status filter."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/tasks?status=completed")
 
         assert response.status_code == 200
@@ -581,7 +601,9 @@ async def test_list_tasks_with_status_filter():
 async def test_list_tasks_invalid_type_filter():
     """Test listing tasks with invalid type filter."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/tasks?task_type=invalid")
 
         # Should return 422 for validation error

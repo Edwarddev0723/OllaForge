@@ -25,7 +25,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 
 class DocumentType(Enum):
@@ -35,6 +35,7 @@ class DocumentType(Enum):
     Each type corresponds to a specific parser implementation that handles
     the format-specific extraction logic.
     """
+
     MARKDOWN = "markdown"
     PDF = "pdf"
     HTML = "html"
@@ -58,6 +59,7 @@ class DocumentSection:
         start_line: Starting line number in the source document
         end_line: Ending line number in the source document
     """
+
     title: Optional[str]
     content: str
     level: int
@@ -80,9 +82,10 @@ class ParsedDocument:
         sections: List of document sections for structured access
         source_path: Path to the original source file
     """
+
     content: str
     doc_type: DocumentType
-    metadata: dict[str, any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     sections: list[DocumentSection] = field(default_factory=list)
     source_path: str = ""
 
@@ -108,7 +111,9 @@ class UnsupportedFormatError(Exception):
         super().__init__(message)
 
     def __str__(self) -> str:
-        formats_str = ", ".join(self.supported_formats) if self.supported_formats else "none"
+        formats_str = (
+            ", ".join(self.supported_formats) if self.supported_formats else "none"
+        )
         return f"{self.message}. Supported formats: {formats_str}"
 
 
@@ -184,8 +189,8 @@ class DocumentParserFactory:
         for ext in extensions:
             # Normalize extension to lowercase with leading dot
             normalized_ext = ext.lower()
-            if not normalized_ext.startswith('.'):
-                normalized_ext = '.' + normalized_ext
+            if not normalized_ext.startswith("."):
+                normalized_ext = "." + normalized_ext
             cls._parsers[normalized_ext] = parser
 
     @classmethod
@@ -210,7 +215,7 @@ class DocumentParserFactory:
         if ext not in cls._parsers:
             raise UnsupportedFormatError(
                 f"Unsupported format: {ext}",
-                supported_formats=cls.get_supported_formats()
+                supported_formats=cls.get_supported_formats(),
             )
 
         return cls._parsers[ext]
@@ -281,12 +286,12 @@ class MarkdownParser(BaseParser):
             raise FileNotFoundError(f"File not found: {file_path}")
 
         try:
-            content = path.read_text(encoding='utf-8')
+            content = path.read_text(encoding="utf-8")
         except PermissionError:
             raise PermissionError(f"Permission denied: {file_path}")
         except UnicodeDecodeError:
             # Try with different encodings
-            for encoding in ['latin-1', 'cp1252', 'iso-8859-1']:
+            for encoding in ["latin-1", "cp1252", "iso-8859-1"]:
                 try:
                     content = path.read_text(encoding=encoding)
                     break
@@ -303,18 +308,18 @@ class MarkdownParser(BaseParser):
             doc_type=DocumentType.MARKDOWN,
             metadata=metadata,
             sections=sections,
-            source_path=str(path.absolute())
+            source_path=str(path.absolute()),
         )
 
     def supports(self, file_path: str) -> bool:
         """Check if this parser supports the given file."""
         ext = Path(file_path).suffix.lower()
-        return ext in ['.md', '.markdown']
+        return ext in [".md", ".markdown"]
 
     def _extract_sections(self, content: str) -> list[DocumentSection]:
         """Extract sections based on Markdown headings."""
         sections = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         current_section_start = 0
         current_section_title = None
@@ -324,26 +329,30 @@ class MarkdownParser(BaseParser):
         for i, line in enumerate(lines):
             # Check for ATX-style headings (# Heading)
             stripped = line.lstrip()
-            if stripped.startswith('#'):
+            if stripped.startswith("#"):
                 # Count the heading level
                 level = 0
                 for char in stripped:
-                    if char == '#':
+                    if char == "#":
                         level += 1
                     else:
                         break
 
                 # Valid heading: 1-6 # followed by space or end of line
-                if level <= 6 and (len(stripped) == level or stripped[level] == ' '):
+                if level <= 6 and (len(stripped) == level or stripped[level] == " "):
                     # Save previous section if exists
                     if current_section_content_lines or current_section_title:
-                        sections.append(DocumentSection(
-                            title=current_section_title,
-                            content='\n'.join(current_section_content_lines).strip(),
-                            level=current_section_level,
-                            start_line=current_section_start,
-                            end_line=i - 1
-                        ))
+                        sections.append(
+                            DocumentSection(
+                                title=current_section_title,
+                                content="\n".join(
+                                    current_section_content_lines
+                                ).strip(),
+                                level=current_section_level,
+                                start_line=current_section_start,
+                                end_line=i - 1,
+                            )
+                        )
 
                     # Start new section
                     current_section_start = i
@@ -356,52 +365,56 @@ class MarkdownParser(BaseParser):
 
         # Add the last section
         if current_section_content_lines or current_section_title:
-            sections.append(DocumentSection(
-                title=current_section_title,
-                content='\n'.join(current_section_content_lines).strip(),
-                level=current_section_level,
-                start_line=current_section_start,
-                end_line=len(lines) - 1
-            ))
+            sections.append(
+                DocumentSection(
+                    title=current_section_title,
+                    content="\n".join(current_section_content_lines).strip(),
+                    level=current_section_level,
+                    start_line=current_section_start,
+                    end_line=len(lines) - 1,
+                )
+            )
 
         # If no sections found, create one section with all content
         if not sections:
-            sections.append(DocumentSection(
-                title=None,
-                content=content.strip(),
-                level=0,
-                start_line=0,
-                end_line=len(lines) - 1
-            ))
+            sections.append(
+                DocumentSection(
+                    title=None,
+                    content=content.strip(),
+                    level=0,
+                    start_line=0,
+                    end_line=len(lines) - 1,
+                )
+            )
 
         return sections
 
-    def _extract_metadata(self, content: str) -> dict[str, any]:
+    def _extract_metadata(self, content: str) -> dict[str, Any]:
         """Extract metadata from Markdown content (e.g., YAML front matter)."""
         metadata = {}
 
         # Check for YAML front matter
-        if content.startswith('---'):
-            lines = content.split('\n')
+        if content.startswith("---"):
+            lines = content.split("\n")
             end_index = -1
             for i, line in enumerate(lines[1:], 1):
-                if line.strip() == '---':
+                if line.strip() == "---":
                     end_index = i
                     break
 
             if end_index > 0:
                 # Simple YAML parsing for common fields
                 for line in lines[1:end_index]:
-                    if ':' in line:
-                        key, value = line.split(':', 1)
+                    if ":" in line:
+                        key, value = line.split(":", 1)
                         metadata[key.strip()] = value.strip()
 
         # Extract first heading as title if not in metadata
-        if 'title' not in metadata:
-            for line in content.split('\n'):
+        if "title" not in metadata:
+            for line in content.split("\n"):
                 stripped = line.strip()
-                if stripped.startswith('# '):
-                    metadata['title'] = stripped[2:].strip()
+                if stripped.startswith("# "):
+                    metadata["title"] = stripped[2:].strip()
                     break
 
         return metadata
@@ -434,11 +447,11 @@ class HTMLParser(BaseParser):
             raise FileNotFoundError(f"File not found: {file_path}")
 
         try:
-            html_content = path.read_text(encoding='utf-8')
+            html_content = path.read_text(encoding="utf-8")
         except PermissionError:
             raise PermissionError(f"Permission denied: {file_path}")
         except UnicodeDecodeError:
-            for encoding in ['latin-1', 'cp1252', 'iso-8859-1']:
+            for encoding in ["latin-1", "cp1252", "iso-8859-1"]:
                 try:
                     html_content = path.read_text(encoding=encoding)
                     break
@@ -450,6 +463,7 @@ class HTMLParser(BaseParser):
         # Try to use BeautifulSoup if available, otherwise use regex
         try:
             from bs4 import BeautifulSoup  # noqa: F401
+
             text_content = self._extract_with_beautifulsoup(html_content)
         except ImportError:
             text_content = self._extract_with_regex(html_content)
@@ -462,30 +476,31 @@ class HTMLParser(BaseParser):
             doc_type=DocumentType.HTML,
             metadata=metadata,
             sections=sections,
-            source_path=str(path.absolute())
+            source_path=str(path.absolute()),
         )
 
     def supports(self, file_path: str) -> bool:
         """Check if this parser supports the given file."""
         ext = Path(file_path).suffix.lower()
-        return ext in ['.html', '.htm']
+        return ext in [".html", ".htm"]
 
     def _extract_with_beautifulsoup(self, html_content: str) -> str:
         """Extract text using BeautifulSoup."""
         from bs4 import BeautifulSoup
 
-        soup = BeautifulSoup(html_content, 'html.parser')
+        soup = BeautifulSoup(html_content, "html.parser")
 
         # Remove script and style elements
-        for element in soup(['script', 'style', 'head', 'meta', 'link']):
+        for element in soup(["script", "style", "head", "meta", "link"]):
             element.decompose()
 
         # Get text with proper spacing
-        text = soup.get_text(separator='\n', strip=True)
+        text = soup.get_text(separator="\n", strip=True)
 
         # Clean up multiple newlines
         import re
-        text = re.sub(r'\n{3,}', '\n\n', text)
+
+        text = re.sub(r"\n{3,}", "\n\n", text)
 
         return text.strip()
 
@@ -494,61 +509,81 @@ class HTMLParser(BaseParser):
         import re
 
         # Remove script and style content
-        text = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
-        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(
+            r"<script[^>]*>.*?</script>",
+            "",
+            html_content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        text = re.sub(
+            r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE
+        )
 
         # Remove HTML comments
-        text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
 
         # Replace block elements with newlines
-        text = re.sub(r'<(br|p|div|h[1-6]|li|tr)[^>]*>', '\n', text, flags=re.IGNORECASE)
+        text = re.sub(
+            r"<(br|p|div|h[1-6]|li|tr)[^>]*>", "\n", text, flags=re.IGNORECASE
+        )
 
         # Remove all remaining HTML tags
-        text = re.sub(r'<[^>]+>', '', text)
+        text = re.sub(r"<[^>]+>", "", text)
 
         # Decode HTML entities
         import html
+
         text = html.unescape(text)
 
         # Clean up whitespace
-        text = re.sub(r'[ \t]+', ' ', text)
-        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
 
         return text.strip()
 
-    def _extract_metadata(self, html_content: str) -> dict[str, any]:
+    def _extract_metadata(self, html_content: str) -> dict[str, Any]:
         """Extract metadata from HTML (title, meta tags)."""
         import re
+
         metadata = {}
 
         # Extract title
-        title_match = re.search(r'<title[^>]*>(.*?)</title>', html_content, re.IGNORECASE | re.DOTALL)
+        title_match = re.search(
+            r"<title[^>]*>(.*?)</title>", html_content, re.IGNORECASE | re.DOTALL
+        )
         if title_match:
             import html
-            metadata['title'] = html.unescape(title_match.group(1).strip())
+
+            metadata["title"] = html.unescape(title_match.group(1).strip())
 
         # Extract meta description
-        desc_match = re.search(r'<meta[^>]*name=["\']description["\'][^>]*content=["\']([^"\']*)["\']',
-                               html_content, re.IGNORECASE)
+        desc_match = re.search(
+            r'<meta[^>]*name=["\']description["\'][^>]*content=["\']([^"\']*)["\']',
+            html_content,
+            re.IGNORECASE,
+        )
         if desc_match:
             import html
-            metadata['description'] = html.unescape(desc_match.group(1).strip())
+
+            metadata["description"] = html.unescape(desc_match.group(1).strip())
 
         return metadata
 
     def _extract_sections(self, text_content: str) -> list[DocumentSection]:
         """Create sections from extracted text."""
-        lines = text_content.split('\n')
+        lines = text_content.split("\n")
 
         # For HTML, we create a single section with all content
         # More sophisticated section detection could be added later
-        return [DocumentSection(
-            title=None,
-            content=text_content,
-            level=0,
-            start_line=0,
-            end_line=len(lines) - 1
-        )]
+        return [
+            DocumentSection(
+                title=None,
+                content=text_content,
+                level=0,
+                start_line=0,
+                end_line=len(lines) - 1,
+            )
+        ]
 
 
 class TextParser(BaseParser):
@@ -584,18 +619,18 @@ class TextParser(BaseParser):
             doc_type=DocumentType.TEXT,
             metadata={},
             sections=sections,
-            source_path=str(path.absolute())
+            source_path=str(path.absolute()),
         )
 
     def supports(self, file_path: str) -> bool:
         """Check if this parser supports the given file."""
         ext = Path(file_path).suffix.lower()
-        return ext == '.txt'
+        return ext == ".txt"
 
     def _read_with_encoding_detection(self, path: Path) -> str:
         """Read file with encoding detection."""
         # Try common encodings in order of likelihood
-        encodings = ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1', 'ascii']
+        encodings = ["utf-8", "utf-8-sig", "latin-1", "cp1252", "iso-8859-1", "ascii"]
 
         for encoding in encodings:
             try:
@@ -608,31 +643,33 @@ class TextParser(BaseParser):
 
         # If all encodings fail, read as binary and decode with errors='replace'
         try:
-            content = path.read_bytes().decode('utf-8', errors='replace')
+            content = path.read_bytes().decode("utf-8", errors="replace")
             return content
         except PermissionError:
             raise PermissionError(f"Permission denied: {path}")
 
     def _extract_sections(self, content: str) -> list[DocumentSection]:
         """Create sections from text content based on blank line separation."""
-        lines = content.split('\n')
+        lines = content.split("\n")
         sections = []
 
         current_content_lines = []
         current_start = 0
 
         for i, line in enumerate(lines):
-            if line.strip() == '' and current_content_lines:
+            if line.strip() == "" and current_content_lines:
                 # Check if we have substantial content (not just whitespace)
-                content_text = '\n'.join(current_content_lines).strip()
+                content_text = "\n".join(current_content_lines).strip()
                 if content_text:
-                    sections.append(DocumentSection(
-                        title=None,
-                        content=content_text,
-                        level=0,
-                        start_line=current_start,
-                        end_line=i - 1
-                    ))
+                    sections.append(
+                        DocumentSection(
+                            title=None,
+                            content=content_text,
+                            level=0,
+                            start_line=current_start,
+                            end_line=i - 1,
+                        )
+                    )
                 current_content_lines = []
                 current_start = i + 1
             else:
@@ -640,25 +677,29 @@ class TextParser(BaseParser):
 
         # Add remaining content
         if current_content_lines:
-            content_text = '\n'.join(current_content_lines).strip()
+            content_text = "\n".join(current_content_lines).strip()
             if content_text:
-                sections.append(DocumentSection(
-                    title=None,
-                    content=content_text,
-                    level=0,
-                    start_line=current_start,
-                    end_line=len(lines) - 1
-                ))
+                sections.append(
+                    DocumentSection(
+                        title=None,
+                        content=content_text,
+                        level=0,
+                        start_line=current_start,
+                        end_line=len(lines) - 1,
+                    )
+                )
 
         # If no sections, create one with all content
         if not sections:
-            sections.append(DocumentSection(
-                title=None,
-                content=content.strip(),
-                level=0,
-                start_line=0,
-                end_line=len(lines) - 1
-            ))
+            sections.append(
+                DocumentSection(
+                    title=None,
+                    content=content.strip(),
+                    level=0,
+                    start_line=0,
+                    end_line=len(lines) - 1,
+                )
+            )
 
         return sections
 
@@ -691,7 +732,7 @@ class JSONParser(BaseParser):
             raise FileNotFoundError(f"File not found: {file_path}")
 
         try:
-            content = path.read_text(encoding='utf-8')
+            content = path.read_text(encoding="utf-8")
         except PermissionError:
             raise PermissionError(f"Permission denied: {file_path}")
 
@@ -702,37 +743,39 @@ class JSONParser(BaseParser):
 
         # Extract all string values recursively
         text_values = self._extract_strings(data)
-        extracted_content = '\n'.join(text_values)
+        extracted_content = "\n".join(text_values)
 
-        metadata = {'original_structure': type(data).__name__}
+        metadata = {"original_structure": type(data).__name__}
         if isinstance(data, dict):
             # Extract common metadata fields
-            for key in ['title', 'name', 'description', 'id']:
+            for key in ["title", "name", "description", "id"]:
                 if key in data and isinstance(data[key], str):
                     metadata[key] = data[key]
 
-        sections = [DocumentSection(
-            title=None,
-            content=extracted_content,
-            level=0,
-            start_line=0,
-            end_line=len(text_values) - 1
-        )]
+        sections = [
+            DocumentSection(
+                title=None,
+                content=extracted_content,
+                level=0,
+                start_line=0,
+                end_line=len(text_values) - 1,
+            )
+        ]
 
         return ParsedDocument(
             content=extracted_content,
             doc_type=DocumentType.JSON,
             metadata=metadata,
             sections=sections,
-            source_path=str(path.absolute())
+            source_path=str(path.absolute()),
         )
 
     def supports(self, file_path: str) -> bool:
         """Check if this parser supports the given file."""
         ext = Path(file_path).suffix.lower()
-        return ext == '.json'
+        return ext == ".json"
 
-    def _extract_strings(self, data: any, depth: int = 0) -> list[str]:
+    def _extract_strings(self, data: Any, depth: int = 0) -> list[str]:
         """Recursively extract string values from JSON data."""
         strings = []
 
@@ -743,7 +786,7 @@ class JSONParser(BaseParser):
         elif isinstance(data, dict):
             for key, value in data.items():
                 # Include key if it's descriptive (not just an ID)
-                if isinstance(key, str) and len(key) > 2 and not key.startswith('_'):
+                if isinstance(key, str) and len(key) > 2 and not key.startswith("_"):
                     strings.extend(self._extract_strings(value, depth + 1))
                 else:
                     strings.extend(self._extract_strings(value, depth + 1))
@@ -815,40 +858,44 @@ class PDFParser(BaseParser):
                         pages_text.append(page_text)
 
                         # Create a section for each page
-                        sections.append(DocumentSection(
-                            title=f"Page {page_num + 1}",
-                            content=page_text.strip(),
-                            level=1,
-                            start_line=page_num,
-                            end_line=page_num
-                        ))
+                        sections.append(
+                            DocumentSection(
+                                title=f"Page {page_num + 1}",
+                                content=page_text.strip(),
+                                level=1,
+                                start_line=page_num,
+                                end_line=page_num,
+                            )
+                        )
                 except Exception as e:
                     # Log warning but continue with other pages
                     pages_text.append(f"[Error extracting page {page_num + 1}: {e}]")
 
             # Combine all pages
-            content = '\n\n'.join(pages_text)
+            content = "\n\n".join(pages_text)
 
             # Extract metadata
             metadata = self._extract_metadata(reader)
-            metadata['page_count'] = len(reader.pages)
+            metadata["page_count"] = len(reader.pages)
 
             # If no sections were created, create one with all content
             if not sections:
-                sections.append(DocumentSection(
-                    title=None,
-                    content=content.strip() if content else "",
-                    level=0,
-                    start_line=0,
-                    end_line=0
-                ))
+                sections.append(
+                    DocumentSection(
+                        title=None,
+                        content=content.strip() if content else "",
+                        level=0,
+                        start_line=0,
+                        end_line=0,
+                    )
+                )
 
             return ParsedDocument(
                 content=content,
                 doc_type=DocumentType.PDF,
                 metadata=metadata,
                 sections=sections,
-                source_path=str(path.absolute())
+                source_path=str(path.absolute()),
             )
 
         except (FileNotFoundError, PermissionError, ImportError, ValueError):
@@ -859,9 +906,9 @@ class PDFParser(BaseParser):
     def supports(self, file_path: str) -> bool:
         """Check if this parser supports the given file."""
         ext = Path(file_path).suffix.lower()
-        return ext == '.pdf'
+        return ext == ".pdf"
 
-    def _extract_metadata(self, reader) -> dict[str, any]:
+    def _extract_metadata(self, reader) -> dict[str, Any]:
         """Extract metadata from PDF document."""
         metadata = {}
 
@@ -869,13 +916,13 @@ class PDFParser(BaseParser):
             if reader.metadata:
                 # Common PDF metadata fields
                 if reader.metadata.title:
-                    metadata['title'] = str(reader.metadata.title)
+                    metadata["title"] = str(reader.metadata.title)
                 if reader.metadata.author:
-                    metadata['author'] = str(reader.metadata.author)
+                    metadata["author"] = str(reader.metadata.author)
                 if reader.metadata.subject:
-                    metadata['subject'] = str(reader.metadata.subject)
+                    metadata["subject"] = str(reader.metadata.subject)
                 if reader.metadata.creator:
-                    metadata['creator'] = str(reader.metadata.creator)
+                    metadata["creator"] = str(reader.metadata.creator)
         except Exception:
             # Metadata extraction is optional, don't fail if it doesn't work
             pass
@@ -895,19 +942,19 @@ class CodeParser(BaseParser):
 
     # Mapping of file extensions to language names
     LANGUAGE_MAP = {
-        '.py': 'python',
-        '.js': 'javascript',
-        '.ts': 'typescript',
-        '.java': 'java',
-        '.go': 'go',
-        '.rs': 'rust',
-        '.c': 'c',
-        '.cpp': 'cpp',
-        '.cc': 'cpp',
-        '.cxx': 'cpp',
-        '.h': 'c',
-        '.hpp': 'cpp',
-        '.rb': 'ruby',
+        ".py": "python",
+        ".js": "javascript",
+        ".ts": "typescript",
+        ".java": "java",
+        ".go": "go",
+        ".rs": "rust",
+        ".c": "c",
+        ".cpp": "cpp",
+        ".cc": "cpp",
+        ".cxx": "cpp",
+        ".h": "c",
+        ".hpp": "cpp",
+        ".rb": "ruby",
     }
 
     def parse(self, file_path: str) -> ParsedDocument:
@@ -926,11 +973,11 @@ class CodeParser(BaseParser):
             raise FileNotFoundError(f"File not found: {file_path}")
 
         try:
-            content = path.read_text(encoding='utf-8')
+            content = path.read_text(encoding="utf-8")
         except PermissionError:
             raise PermissionError(f"Permission denied: {file_path}")
         except UnicodeDecodeError:
-            for encoding in ['latin-1', 'cp1252', 'iso-8859-1']:
+            for encoding in ["latin-1", "cp1252", "iso-8859-1"]:
                 try:
                     content = path.read_text(encoding=encoding)
                     break
@@ -940,12 +987,12 @@ class CodeParser(BaseParser):
                 raise ValueError(f"Unable to decode file: {file_path}")
 
         ext = path.suffix.lower()
-        language = self.LANGUAGE_MAP.get(ext, 'unknown')
+        language = self.LANGUAGE_MAP.get(ext, "unknown")
 
         metadata = {
-            'language': language,
-            'extension': ext,
-            'filename': path.name,
+            "language": language,
+            "extension": ext,
+            "filename": path.name,
         }
 
         sections = self._extract_sections(content, language)
@@ -955,7 +1002,7 @@ class CodeParser(BaseParser):
             doc_type=DocumentType.CODE,
             metadata=metadata,
             sections=sections,
-            source_path=str(path.absolute())
+            source_path=str(path.absolute()),
         )
 
     def supports(self, file_path: str) -> bool:
@@ -965,7 +1012,7 @@ class CodeParser(BaseParser):
 
     def _extract_sections(self, content: str, language: str) -> list[DocumentSection]:
         """Extract sections based on code structure (functions, classes)."""
-        lines = content.split('\n')
+        lines = content.split("\n")
         sections = []
 
         # Simple heuristic-based section detection
@@ -982,13 +1029,15 @@ class CodeParser(BaseParser):
             if section_title:
                 # Save previous section if exists
                 if current_section_content_lines:
-                    sections.append(DocumentSection(
-                        title=current_section_title,
-                        content='\n'.join(current_section_content_lines),
-                        level=1 if current_section_title else 0,
-                        start_line=current_section_start,
-                        end_line=i - 1
-                    ))
+                    sections.append(
+                        DocumentSection(
+                            title=current_section_title,
+                            content="\n".join(current_section_content_lines),
+                            level=1 if current_section_title else 0,
+                            start_line=current_section_start,
+                            end_line=i - 1,
+                        )
+                    )
 
                 current_section_start = i
                 current_section_title = section_title
@@ -998,23 +1047,27 @@ class CodeParser(BaseParser):
 
         # Add the last section
         if current_section_content_lines:
-            sections.append(DocumentSection(
-                title=current_section_title,
-                content='\n'.join(current_section_content_lines),
-                level=1 if current_section_title else 0,
-                start_line=current_section_start,
-                end_line=len(lines) - 1
-            ))
+            sections.append(
+                DocumentSection(
+                    title=current_section_title,
+                    content="\n".join(current_section_content_lines),
+                    level=1 if current_section_title else 0,
+                    start_line=current_section_start,
+                    end_line=len(lines) - 1,
+                )
+            )
 
         # If no sections found, create one section with all content
         if not sections:
-            sections.append(DocumentSection(
-                title=None,
-                content=content,
-                level=0,
-                start_line=0,
-                end_line=len(lines) - 1
-            ))
+            sections.append(
+                DocumentSection(
+                    title=None,
+                    content=content,
+                    level=0,
+                    start_line=0,
+                    end_line=len(lines) - 1,
+                )
+            )
 
         return sections
 
@@ -1024,52 +1077,57 @@ class CodeParser(BaseParser):
 
         stripped = line.strip()
 
-        if language == 'python':
+        if language == "python":
             # Python: def function_name or class ClassName
-            match = re.match(r'^(def|class)\s+(\w+)', stripped)
+            match = re.match(r"^(def|class)\s+(\w+)", stripped)
             if match:
                 return f"{match.group(1)} {match.group(2)}"
 
-        elif language in ['javascript', 'typescript']:
+        elif language in ["javascript", "typescript"]:
             # JS/TS: function name, class Name, const name = function/arrow
-            match = re.match(r'^(function|class)\s+(\w+)', stripped)
+            match = re.match(r"^(function|class)\s+(\w+)", stripped)
             if match:
                 return f"{match.group(1)} {match.group(2)}"
-            match = re.match(r'^(const|let|var)\s+(\w+)\s*=\s*(function|\(|async)', stripped)
+            match = re.match(
+                r"^(const|let|var)\s+(\w+)\s*=\s*(function|\(|async)", stripped
+            )
             if match:
                 return f"function {match.group(2)}"
 
-        elif language == 'java':
+        elif language == "java":
             # Java: public/private/protected class/void/type methodName
-            match = re.match(r'^(public|private|protected)?\s*(static)?\s*(class|void|\w+)\s+(\w+)\s*[\({]', stripped)
+            match = re.match(
+                r"^(public|private|protected)?\s*(static)?\s*(class|void|\w+)\s+(\w+)\s*[\({]",
+                stripped,
+            )
             if match:
                 return f"{match.group(3)} {match.group(4)}"
 
-        elif language == 'go':
+        elif language == "go":
             # Go: func (receiver) name or func name
-            match = re.match(r'^func\s+(\([^)]+\)\s+)?(\w+)', stripped)
+            match = re.match(r"^func\s+(\([^)]+\)\s+)?(\w+)", stripped)
             if match:
                 return f"func {match.group(2)}"
-            match = re.match(r'^type\s+(\w+)\s+(struct|interface)', stripped)
+            match = re.match(r"^type\s+(\w+)\s+(struct|interface)", stripped)
             if match:
                 return f"type {match.group(1)}"
 
-        elif language == 'rust':
+        elif language == "rust":
             # Rust: fn name, struct Name, impl Name
-            match = re.match(r'^(pub\s+)?(fn|struct|enum|impl|trait)\s+(\w+)', stripped)
+            match = re.match(r"^(pub\s+)?(fn|struct|enum|impl|trait)\s+(\w+)", stripped)
             if match:
                 return f"{match.group(2)} {match.group(3)}"
 
-        elif language in ['c', 'cpp']:
+        elif language in ["c", "cpp"]:
             # C/C++: type function_name( or class Name
-            match = re.match(r'^(class|struct)\s+(\w+)', stripped)
+            match = re.match(r"^(class|struct)\s+(\w+)", stripped)
             if match:
                 return f"{match.group(1)} {match.group(2)}"
             # Function detection is more complex in C/C++, skip for now
 
-        elif language == 'ruby':
+        elif language == "ruby":
             # Ruby: def method_name, class ClassName, module ModuleName
-            match = re.match(r'^(def|class|module)\s+(\w+)', stripped)
+            match = re.match(r"^(def|class|module)\s+(\w+)", stripped)
             if match:
                 return f"{match.group(1)} {match.group(2)}"
 
@@ -1080,6 +1138,7 @@ class CodeParser(BaseParser):
 # Parser Registration
 # ============================================================================
 
+
 def register_default_parsers() -> None:
     """
     Register all default parsers with the factory.
@@ -1088,25 +1147,39 @@ def register_default_parsers() -> None:
     all parsers available through the DocumentParserFactory.
     """
     # Markdown parser
-    DocumentParserFactory.register(['.md', '.markdown'], MarkdownParser())
+    DocumentParserFactory.register([".md", ".markdown"], MarkdownParser())
 
     # HTML parser
-    DocumentParserFactory.register(['.html', '.htm'], HTMLParser())
+    DocumentParserFactory.register([".html", ".htm"], HTMLParser())
 
     # Text parser
-    DocumentParserFactory.register(['.txt'], TextParser())
+    DocumentParserFactory.register([".txt"], TextParser())
 
     # JSON parser
-    DocumentParserFactory.register(['.json'], JSONParser())
+    DocumentParserFactory.register([".json"], JSONParser())
 
     # PDF parser
-    DocumentParserFactory.register(['.pdf'], PDFParser())
+    DocumentParserFactory.register([".pdf"], PDFParser())
 
     # Code parser - register for all supported extensions
     code_parser = CodeParser()
     DocumentParserFactory.register(
-        ['.py', '.js', '.ts', '.java', '.go', '.rs', '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.rb'],
-        code_parser
+        [
+            ".py",
+            ".js",
+            ".ts",
+            ".java",
+            ".go",
+            ".rs",
+            ".c",
+            ".cpp",
+            ".cc",
+            ".cxx",
+            ".h",
+            ".hpp",
+            ".rb",
+        ],
+        code_parser,
     )
 
 

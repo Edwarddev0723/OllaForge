@@ -26,5 +26,5 @@ __all__ = [
     "Task",
     "TaskTimeoutError",
     "TaskQueueFullError",
-    "task_manager"
+    "task_manager",
 ]

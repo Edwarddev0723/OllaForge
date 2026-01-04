@@ -41,15 +41,19 @@ console = Console()
 
 class FileOperationError(Exception):
     """Raised when file operations fail."""
+
     pass
 
 
 class DiskSpaceError(FileOperationError):
     """Raised when insufficient disk space is detected."""
+
     pass
 
 
-def write_jsonl_file(entries: list[DataEntry], output_path: str, overwrite: bool = True) -> None:
+def write_jsonl_file(
+    entries: list[DataEntry], output_path: str, overwrite: bool = True
+) -> None:
     """
     Write data entries to a JSONL file with atomic operations.
 
@@ -75,13 +79,17 @@ def write_jsonl_file(entries: list[DataEntry], output_path: str, overwrite: bool
         file_exists = False
 
     if file_exists and not overwrite:
-        raise FileOperationError(f"Output file {output_path} already exists and overwrite is disabled")
+        raise FileOperationError(
+            f"Output file {output_path} already exists and overwrite is disabled"
+        )
 
     # Create parent directories if they don't exist
     try:
         output_file.parent.mkdir(parents=True, exist_ok=True)
     except (OSError, PermissionError) as e:
-        raise FileOperationError(f"Cannot create directory {output_file.parent}: {str(e)}") from e
+        raise FileOperationError(
+            f"Cannot create directory {output_file.parent}: {str(e)}"
+        ) from e
 
     # Check disk space before writing
     estimated_size = estimate_file_size(len(entries))
@@ -90,19 +98,19 @@ def write_jsonl_file(entries: list[DataEntry], output_path: str, overwrite: bool
     # Use atomic write operation with temporary file
     try:
         with tempfile.NamedTemporaryFile(
-            mode='w',
-            encoding='utf-8',
+            mode="w",
+            encoding="utf-8",
             dir=output_file.parent,
             prefix=f".{output_file.name}.",
-            suffix='.tmp',
-            delete=False
+            suffix=".tmp",
+            delete=False,
         ) as temp_file:
             temp_path = temp_file.name
 
             # Write each entry as a JSON line
             for entry in entries:
                 json_line = entry.model_dump_json()
-                temp_file.write(json_line + '\n')
+                temp_file.write(json_line + "\n")
 
             temp_file.flush()
             os.fsync(temp_file.fileno())
@@ -112,7 +120,7 @@ def write_jsonl_file(entries: list[DataEntry], output_path: str, overwrite: bool
 
     except Exception as e:
         # Clean up temporary file if it exists
-        if 'temp_path' in locals() and os.path.exists(temp_path):
+        if "temp_path" in locals() and os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
             except OSError:
@@ -141,10 +149,10 @@ def append_jsonl_entries(entries: list[DataEntry], output_path: str) -> None:
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Append entries to file
-        with open(output_file, 'a', encoding='utf-8') as f:
+        with open(output_file, "a", encoding="utf-8") as f:
             for entry in entries:
                 json_line = entry.model_dump_json()
-                f.write(json_line + '\n')
+                f.write(json_line + "\n")
 
     except Exception as e:
         raise FileOperationError(f"Failed to append to JSONL file: {str(e)}") from e
@@ -161,7 +169,7 @@ def validate_jsonl_file(file_path: str) -> bool:
         bool: True if file is valid JSONL, False otherwise
     """
     try:
-        with open(file_path, encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:  # Skip empty lines
@@ -170,7 +178,9 @@ def validate_jsonl_file(file_path: str) -> bool:
                 try:
                     json.loads(line)
                 except json.JSONDecodeError:
-                    console.print(f"[red]Invalid JSON on line {line_num}: {line[:50]}...[/red]")
+                    console.print(
+                        f"[red]Invalid JSON on line {line_num}: {line[:50]}...[/red]"
+                    )
                     return False
         return True
 
@@ -179,7 +189,9 @@ def validate_jsonl_file(file_path: str) -> bool:
         return False
 
 
-def read_jsonl_file(file_path: str, return_field_names: bool = False) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], list[str]]:
+def read_jsonl_file(
+    file_path: str, return_field_names: bool = False
+) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], list[str]]:
     """
     Read and parse a JSONL file.
 
@@ -198,7 +210,7 @@ def read_jsonl_file(file_path: str, return_field_names: bool = False) -> list[di
         entries = []
         field_names_set: set[str] = set()
 
-        with open(file_path, encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:  # Skip empty lines
@@ -276,7 +288,7 @@ def ensure_jsonl_extension(filename: str) -> str:
     Returns:
         str: Filename with .jsonl extension
     """
-    if not filename.endswith('.jsonl'):
+    if not filename.endswith(".jsonl"):
         return f"{filename}.jsonl"
     return filename
 
@@ -297,7 +309,11 @@ def check_disk_space(path: str, required_bytes: int = 1024 * 1024) -> bool:
     """
     try:
         # Get the directory path
-        dir_path = Path(path).parent if Path(path).is_file() or not Path(path).exists() else Path(path)
+        dir_path = (
+            Path(path).parent
+            if Path(path).is_file() or not Path(path).exists()
+            else Path(path)
+        )
 
         # Ensure directory exists
         dir_path.mkdir(parents=True, exist_ok=True)
@@ -321,7 +337,9 @@ def check_disk_space(path: str, required_bytes: int = 1024 * 1024) -> bool:
         raise
     except Exception as e:
         # If we can't check disk space, assume it's available
-        console.print(f"[yellow]⚠️  Warning: Could not check disk space: {str(e)}[/yellow]")
+        console.print(
+            f"[yellow]⚠️  Warning: Could not check disk space: {str(e)}[/yellow]"
+        )
         return True
 
 
@@ -361,7 +379,9 @@ def create_partial_backup(entries: list[DataEntry], output_path: str) -> str:
         # Create backup filename
         output_file = Path(output_path)
         timestamp = int(time.time())
-        backup_path = output_file.parent / f"{output_file.stem}_partial_{timestamp}.jsonl"
+        backup_path = (
+            output_file.parent / f"{output_file.stem}_partial_{timestamp}.jsonl"
+        )
 
         # Write entries to backup file
         write_jsonl_file(entries, str(backup_path), overwrite=True)
@@ -388,7 +408,9 @@ def _signal_handler(signum, frame):
         try:
             backup_path = create_partial_backup(_partial_results, _output_path)
             console.print(f"[green]✅ Partial results saved to: {backup_path}[/green]")
-            console.print(f"[cyan]📊 Saved {len(_partial_results)} entries before interruption[/cyan]")
+            console.print(
+                f"[cyan]📊 Saved {len(_partial_results)} entries before interruption[/cyan]"
+            )
         except Exception as e:
             console.print(f"[red]❌ Failed to save partial results: {str(e)}[/red]")
 
@@ -396,7 +418,9 @@ def _signal_handler(signum, frame):
     sys.exit(130)  # Standard exit code for Ctrl+C
 
 
-def setup_interruption_handling(partial_results: list[DataEntry], output_path: str) -> None:
+def setup_interruption_handling(
+    partial_results: list[DataEntry], output_path: str
+) -> None:
     """
     Set up signal handlers for graceful interruption handling.
 
@@ -428,7 +452,10 @@ def is_interrupted() -> bool:
 # Multi-Format File Operations
 # ============================================================================
 
-def read_dataset_file(file_path: str, format_hint: Optional[FileFormat] = None) -> tuple[list[dict[str, Any]], list[str]]:
+
+def read_dataset_file(
+    file_path: str, format_hint: Optional[FileFormat] = None
+) -> tuple[list[dict[str, Any]], list[str]]:
     """
     Read dataset file in any supported format and return entries with field names.
 
@@ -449,7 +476,9 @@ def read_dataset_file(file_path: str, format_hint: Optional[FileFormat] = None) 
         entries, field_names = read_file(file_path, format_hint)
 
         if not entries:
-            console.print(f"[yellow]⚠️  Warning: No entries found in {file_path}[/yellow]")
+            console.print(
+                f"[yellow]⚠️  Warning: No entries found in {file_path}[/yellow]"
+            )
 
         return entries, field_names
 
@@ -459,9 +488,12 @@ def read_dataset_file(file_path: str, format_hint: Optional[FileFormat] = None) 
         raise FileOperationError(f"Failed to read dataset file: {str(e)}") from e
 
 
-def write_dataset_file(entries: list[dict[str, Any]], file_path: str,
-                      format_hint: Optional[FileFormat] = None,
-                      overwrite: bool = True) -> None:
+def write_dataset_file(
+    entries: list[dict[str, Any]],
+    file_path: str,
+    format_hint: Optional[FileFormat] = None,
+    overwrite: bool = True,
+) -> None:
     """
     Write dataset entries to file in any supported format.
 
@@ -496,7 +528,9 @@ def write_dataset_file(entries: list[dict[str, Any]], file_path: str,
             except FormatError:
                 # Default to JSONL if detection fails
                 file_format = FileFormat.JSONL
-                console.print("[yellow]⚠️  Could not detect format, defaulting to JSONL[/yellow]")
+                console.print(
+                    "[yellow]⚠️  Could not detect format, defaulting to JSONL[/yellow]"
+                )
         else:
             file_format = format_hint
 
@@ -511,7 +545,7 @@ def write_dataset_file(entries: list[dict[str, Any]], file_path: str,
             temp_fd, temp_file = tempfile.mkstemp(
                 suffix=output_path.suffix,
                 dir=output_path.parent,
-                prefix=f".{output_path.name}_tmp_"
+                prefix=f".{output_path.name}_tmp_",
             )
             os.close(temp_fd)  # Close file descriptor, we'll use the path
 
@@ -522,7 +556,9 @@ def write_dataset_file(entries: list[dict[str, Any]], file_path: str,
             shutil.move(temp_file, file_path)
             temp_file = None  # Successfully moved
 
-            console.print(f"[green]✅ Successfully wrote {len(entries)} entries to {file_path}[/green]")
+            console.print(
+                f"[green]✅ Successfully wrote {len(entries)} entries to {file_path}[/green]"
+            )
 
         except Exception:
             # Clean up temporary file if it exists
@@ -548,7 +584,7 @@ def get_supported_extensions() -> list[str]:
     Returns:
         List of supported file extensions (with dots)
     """
-    return ['.jsonl', '.json', '.csv', '.tsv', '.parquet']
+    return [".jsonl", ".json", ".csv", ".tsv", ".parquet"]
 
 
 def validate_file_format(file_path: str) -> tuple[bool, str]:
@@ -564,16 +600,23 @@ def validate_file_format(file_path: str) -> tuple[bool, str]:
     try:
         file_format = detect_format(file_path)
         from .formats import get_format_description
+
         description = get_format_description(file_format)
         return True, f"Detected format: {description}"
     except FormatError:
         supported = get_supported_extensions()
-        return False, f"Unsupported format. Supported extensions: {', '.join(supported)}"
+        return (
+            False,
+            f"Unsupported format. Supported extensions: {', '.join(supported)}",
+        )
 
 
-def convert_file_format(input_path: str, output_path: str,
-                       input_format: Optional[FileFormat] = None,
-                       output_format: Optional[FileFormat] = None) -> None:
+def convert_file_format(
+    input_path: str,
+    output_path: str,
+    input_format: Optional[FileFormat] = None,
+    output_format: Optional[FileFormat] = None,
+) -> None:
     """
     Convert dataset file from one format to another.
 
@@ -601,20 +644,27 @@ def convert_file_format(input_path: str, output_path: str,
                 output_format = FileFormat.JSONL
 
         from .formats import validate_format_compatibility
+
         if not validate_format_compatibility(entries, output_format):
-            console.print(f"[yellow]⚠️  Warning: Some data may be modified for {output_format.value} format[/yellow]")
+            console.print(
+                f"[yellow]⚠️  Warning: Some data may be modified for {output_format.value} format[/yellow]"
+            )
 
         # Write to target format
         write_dataset_file(entries, output_path, output_format, overwrite=True)
 
-        console.print(f"[green]✅ Converted {len(entries)} entries from {input_path} to {output_path}[/green]")
+        console.print(
+            f"[green]✅ Converted {len(entries)} entries from {input_path} to {output_path}[/green]"
+        )
 
     except Exception as e:
         raise FileOperationError(f"Format conversion failed: {str(e)}") from e
 
 
 # Backward compatibility aliases
-def read_jsonl_file_with_field_names(file_path: str) -> tuple[list[dict[str, Any]], list[str]]:
+def read_jsonl_file_with_field_names(
+    file_path: str,
+) -> tuple[list[dict[str, Any]], list[str]]:
     """
     Backward compatibility wrapper for read_jsonl_file with field names.
 

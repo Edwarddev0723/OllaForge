@@ -54,10 +54,13 @@ router = APIRouter(prefix="/api/augment", tags=["augmentation"])
 augmentation_service = AugmentationService()
 
 
-@router.post("/upload", response_model=AugmentUploadResponse, responses={
-    400: {"model": ErrorResponse, "description": "Invalid file or format"},
-    415: {"model": ErrorResponse, "description": "Unsupported file format"}
-},
+@router.post(
+    "/upload",
+    response_model=AugmentUploadResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid file or format"},
+        415: {"model": ErrorResponse, "description": "Unsupported file format"},
+    },
     summary="Upload Dataset for Augmentation",
     description="""
 Upload a dataset file for augmentation.
@@ -75,7 +78,7 @@ Returns file information including:
 - Total entry count
 - List of available field names
 - Preview of first few entries
-"""
+""",
 )
 async def upload_dataset(
     file: UploadFile = File(..., description="Dataset file to upload")
@@ -110,8 +113,8 @@ async def upload_dataset(
             status_code=415,
             detail={
                 "error": "UnsupportedFormat",
-                "message": f"Unsupported file format: {ext}. Supported formats: {', '.join(valid_extensions)}"
-            }
+                "message": f"Unsupported file format: {ext}. Supported formats: {', '.join(valid_extensions)}",
+            },
         )
 
     try:
@@ -126,32 +129,37 @@ async def upload_dataset(
             entry_count=result["entry_count"],
             fields=result["fields"],
             preview=result["preview"],
-            source_type="file"
+            source_type="file",
         )
 
     except FileOperationError as e:
         raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "FileProcessingError",
-                "message": str(e)
-            }
+            status_code=400, detail={"error": "FileProcessingError", "message": str(e)}
         )
     except Exception as e:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "UploadError",
-                "message": f"Failed to process uploaded file: {str(e)}"
-            }
+                "message": f"Failed to process uploaded file: {str(e)}",
+            },
         )
 
 
-@router.post("/huggingface", response_model=AugmentUploadResponse, responses={
-    400: {"model": ErrorResponse, "description": "Invalid dataset name or configuration"},
-    404: {"model": ErrorResponse, "description": "Dataset not found on HuggingFace"},
-    503: {"model": ErrorResponse, "description": "HuggingFace service unavailable"}
-},
+@router.post(
+    "/huggingface",
+    response_model=AugmentUploadResponse,
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid dataset name or configuration",
+        },
+        404: {
+            "model": ErrorResponse,
+            "description": "Dataset not found on HuggingFace",
+        },
+        503: {"model": ErrorResponse, "description": "HuggingFace service unavailable"},
+    },
     summary="Load HuggingFace Dataset",
     description="""
 Load a dataset directly from HuggingFace Hub for augmentation.
@@ -168,10 +176,10 @@ Provide a HuggingFace dataset identifier in the format `username/dataset-name`.
 
 Returns the same response as file upload, with a file_id that can be used
 for subsequent augmentation operations.
-"""
+""",
 )
 async def load_huggingface_dataset_endpoint(
-    request: HuggingFaceLoadRequest
+    request: HuggingFaceLoadRequest,
 ) -> AugmentUploadResponse:
     """
     Load a dataset from HuggingFace Hub.
@@ -200,8 +208,8 @@ async def load_huggingface_dataset_endpoint(
                 status_code=400,
                 detail={
                     "error": "EmptyDataset",
-                    "message": f"Dataset '{request.dataset_name}' is empty or has no entries in split '{request.split}'"
-                }
+                    "message": f"Dataset '{request.dataset_name}' is empty or has no entries in split '{request.split}'",
+                },
             )
 
         # Store in augmentation service
@@ -217,41 +225,36 @@ async def load_huggingface_dataset_endpoint(
             entry_count=result["entry_count"],
             fields=result["fields"],
             preview=result["preview"],
-            source_type="huggingface"
+            source_type="huggingface",
         )
 
     except HuggingFaceLoaderError as e:
         # Check if it's a "not found" error
         if "not found" in str(e).lower():
             raise HTTPException(
-                status_code=404,
-                detail={
-                    "error": "DatasetNotFound",
-                    "message": str(e)
-                }
+                status_code=404, detail={"error": "DatasetNotFound", "message": str(e)}
             )
         raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "HuggingFaceError",
-                "message": str(e)
-            }
+            status_code=400, detail={"error": "HuggingFaceError", "message": str(e)}
         )
     except Exception as e:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "LoadError",
-                "message": f"Failed to load HuggingFace dataset: {str(e)}"
-            }
+                "message": f"Failed to load HuggingFace dataset: {str(e)}",
+            },
         )
 
 
-@router.post("/preview", response_model=AugmentPreviewResponse, responses={
-    400: {"model": ErrorResponse, "description": "Invalid request parameters"},
-    404: {"model": ErrorResponse, "description": "File not found"},
-    503: {"model": ErrorResponse, "description": "Ollama service unavailable"}
-},
+@router.post(
+    "/preview",
+    response_model=AugmentPreviewResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid request parameters"},
+        404: {"model": ErrorResponse, "description": "File not found"},
+        503: {"model": ErrorResponse, "description": "Ollama service unavailable"},
+    },
     summary="Preview Augmentation",
     description="""
 Preview augmentation on sample entries before full processing.
@@ -262,10 +265,10 @@ augmentation will produce the desired results before processing the
 entire dataset.
 
 Returns original and augmented versions side-by-side for comparison.
-"""
+""",
 )
 async def preview_augmentation(
-    request: AugmentPreviewRequest
+    request: AugmentPreviewRequest,
 ) -> AugmentPreviewResponse:
     """
     Preview augmentation on sample entries.
@@ -295,24 +298,18 @@ async def preview_augmentation(
             status_code=404,
             detail={
                 "error": "FileNotFound",
-                "message": f"File {request.file_id} not found"
-            }
+                "message": f"File {request.file_id} not found",
+            },
         )
 
     # Validate target field
     is_valid, error_msg = augmentation_service.validate_field(
-        request.file_id,
-        request.target_field,
-        request.create_new_field
+        request.file_id, request.target_field, request.create_new_field
     )
 
     if not is_valid:
         raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "InvalidField",
-                "message": error_msg
-            }
+            status_code=400, detail={"error": "InvalidField", "message": error_msg}
         )
 
     try:
@@ -324,7 +321,7 @@ async def preview_augmentation(
             model=request.model,
             create_new_field=request.create_new_field,
             context_fields=request.context_fields,
-            preview_count=request.preview_count
+            preview_count=request.preview_count,
         )
 
         return AugmentPreviewResponse(previews=previews)
@@ -334,32 +331,28 @@ async def preview_augmentation(
             status_code=503,
             detail={
                 "error": "OllamaConnectionError",
-                "message": f"Unable to connect to Ollama service: {str(e)}"
-            }
+                "message": f"Unable to connect to Ollama service: {str(e)}",
+            },
         )
     except FileOperationError as e:
         raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "PreviewError",
-                "message": str(e)
-            }
+            status_code=400, detail={"error": "PreviewError", "message": str(e)}
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail={
-                "error": "PreviewError",
-                "message": f"Preview failed: {str(e)}"
-            }
+            detail={"error": "PreviewError", "message": f"Preview failed: {str(e)}"},
         )
 
 
-@router.post("", response_model=GenerationResponse, responses={
-    400: {"model": ErrorResponse, "description": "Invalid request parameters"},
-    404: {"model": ErrorResponse, "description": "File not found"},
-    503: {"model": ErrorResponse, "description": "Ollama service unavailable"}
-},
+@router.post(
+    "",
+    response_model=GenerationResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid request parameters"},
+        404: {"model": ErrorResponse, "description": "File not found"},
+        503: {"model": ErrorResponse, "description": "Ollama service unavailable"},
+    },
     summary="Start Dataset Augmentation",
     description="""
 Start a full augmentation task on an uploaded dataset.
@@ -379,11 +372,10 @@ that can be used to track progress and download results.
 
 If some entries fail during augmentation, the original data is preserved
 and failure statistics are reported in the result.
-"""
+""",
 )
 async def start_augmentation(
-    request: AugmentationRequest,
-    background_tasks: BackgroundTasks
+    request: AugmentationRequest, background_tasks: BackgroundTasks
 ) -> GenerationResponse:
     """
     Start a full augmentation task.
@@ -414,40 +406,30 @@ async def start_augmentation(
             status_code=404,
             detail={
                 "error": "FileNotFound",
-                "message": f"File {request.file_id} not found"
-            }
+                "message": f"File {request.file_id} not found",
+            },
         )
 
     # Validate target field
     is_valid, error_msg = augmentation_service.validate_field(
-        request.file_id,
-        request.target_field,
-        request.create_new_field
+        request.file_id, request.target_field, request.create_new_field
     )
 
     if not is_valid:
         raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "InvalidField",
-                "message": error_msg
-            }
+            status_code=400, detail={"error": "InvalidField", "message": error_msg}
         )
 
     # Create task
     task_id = augmentation_service.create_task()
 
     # Start augmentation in background
-    background_tasks.add_task(
-        _run_augmentation_task,
-        task_id,
-        request
-    )
+    background_tasks.add_task(_run_augmentation_task, task_id, request)
 
     return GenerationResponse(
         task_id=task_id,
         status="pending",
-        message="Augmentation task created successfully"
+        message="Augmentation task created successfully",
     )
 
 
@@ -465,11 +447,7 @@ async def _run_augmentation_task(task_id: str, request: AugmentationRequest):
         total = file_info["entry_count"] if file_info else 0
 
         # Update task status to running
-        augmentation_service.update_task(
-            task_id,
-            status="running",
-            total=total
-        )
+        augmentation_service.update_task(task_id, status="running", total=total)
 
         # Emit initial progress via WebSocket
         await ws_manager.emit_progress(
@@ -477,24 +455,22 @@ async def _run_augmentation_task(task_id: str, request: AugmentationRequest):
             progress=0,
             total=total,
             status="running",
-            message="Starting augmentation..."
+            message="Starting augmentation...",
         )
 
         # Progress callback that updates both task state and WebSocket
         def progress_callback(completed: int, total: int):
-            augmentation_service.update_task(
-                task_id,
-                progress=completed,
-                total=total
-            )
+            augmentation_service.update_task(task_id, progress=completed, total=total)
             # Schedule async emit
-            asyncio.create_task(ws_manager.emit_progress(
-                task_id=task_id,
-                progress=completed,
-                total=total,
-                status="running",
-                message=f"Augmented {completed}/{total} entries"
-            ))
+            asyncio.create_task(
+                ws_manager.emit_progress(
+                    task_id=task_id,
+                    progress=completed,
+                    total=total,
+                    status="running",
+                    message=f"Augmented {completed}/{total} entries",
+                )
+            )
 
         # Run augmentation
         result = await augmentation_service.augment_dataset(
@@ -506,7 +482,7 @@ async def _run_augmentation_task(task_id: str, request: AugmentationRequest):
             create_new_field=request.create_new_field,
             context_fields=request.context_fields,
             concurrency=request.concurrency,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
         )
 
         # Update task with result
@@ -515,7 +491,7 @@ async def _run_augmentation_task(task_id: str, request: AugmentationRequest):
             status="completed",
             progress=result["total"],
             total=result["total"],
-            result=result
+            result=result,
         )
 
         # Emit completion via WebSocket
@@ -525,71 +501,46 @@ async def _run_augmentation_task(task_id: str, request: AugmentationRequest):
             success_count=result.get("success_count", result["total"]),
             failure_count=result.get("failure_count", 0),
             duration=result.get("duration", 0),
-            message="Augmentation completed successfully"
+            message="Augmentation completed successfully",
         )
 
         # Emit item errors if any
         if result.get("errors"):
             for error in result["errors"][:5]:  # Limit to first 5 errors
                 await ws_manager.emit_error(
-                    task_id=task_id,
-                    error=error,
-                    error_type="item_error"
+                    task_id=task_id, error=error, error_type="item_error"
                 )
 
     except OllamaConnectionError as e:
         error_msg = f"Ollama service unavailable: {str(e)}"
-        augmentation_service.update_task(
-            task_id,
-            status="failed",
-            error=error_msg
-        )
+        augmentation_service.update_task(task_id, status="failed", error=error_msg)
         await ws_manager.emit_failed(
-            task_id=task_id,
-            error=error_msg,
-            details={"error_type": "connection"}
+            task_id=task_id, error=error_msg, details={"error_type": "connection"}
         )
     except OllamaGenerationError as e:
         error_msg = f"Augmentation failed: {str(e)}"
-        augmentation_service.update_task(
-            task_id,
-            status="failed",
-            error=error_msg
-        )
+        augmentation_service.update_task(task_id, status="failed", error=error_msg)
         await ws_manager.emit_failed(
-            task_id=task_id,
-            error=error_msg,
-            details={"error_type": "generation"}
+            task_id=task_id, error=error_msg, details={"error_type": "generation"}
         )
     except FileOperationError as e:
         error_msg = f"File error: {str(e)}"
-        augmentation_service.update_task(
-            task_id,
-            status="failed",
-            error=error_msg
-        )
+        augmentation_service.update_task(task_id, status="failed", error=error_msg)
         await ws_manager.emit_failed(
-            task_id=task_id,
-            error=error_msg,
-            details={"error_type": "file"}
+            task_id=task_id, error=error_msg, details={"error_type": "file"}
         )
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
-        augmentation_service.update_task(
-            task_id,
-            status="failed",
-            error=error_msg
-        )
+        augmentation_service.update_task(task_id, status="failed", error=error_msg)
         await ws_manager.emit_failed(
-            task_id=task_id,
-            error=error_msg,
-            details={"error_type": "unexpected"}
+            task_id=task_id, error=error_msg, details={"error_type": "unexpected"}
         )
 
 
-@router.get("/{task_id}", response_model=TaskStatus, responses={
-    404: {"model": ErrorResponse, "description": "Task not found"}
-},
+@router.get(
+    "/{task_id}",
+    response_model=TaskStatus,
+    responses={404: {"model": ErrorResponse, "description": "Task not found"}},
     summary="Get Augmentation Task Status",
     description="""
 Get the current status of an augmentation task.
@@ -601,7 +552,7 @@ Returns progress information including:
 - Duration (when completed)
 - Success/failure counts
 - Error message (if failed)
-"""
+""",
 )
 async def get_augmentation_status(task_id: str) -> TaskStatus:
     """
@@ -625,7 +576,7 @@ async def get_augmentation_status(task_id: str) -> TaskStatus:
     if task is None:
         raise HTTPException(
             status_code=404,
-            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
+            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"},
         )
 
     # Calculate duration if task is completed
@@ -640,15 +591,17 @@ async def get_augmentation_status(task_id: str) -> TaskStatus:
         total=task["total"],
         result=task.get("result"),
         error=task.get("error"),
-        duration=duration
+        duration=duration,
     )
 
 
-@router.get("/{task_id}/download", responses={
-    200: {"description": "Dataset file download"},
-    404: {"model": ErrorResponse, "description": "Task not found or not completed"},
-    400: {"model": ErrorResponse, "description": "Invalid format parameter"}
-},
+@router.get(
+    "/{task_id}/download",
+    responses={
+        200: {"description": "Dataset file download"},
+        404: {"model": ErrorResponse, "description": "Task not found or not completed"},
+        400: {"model": ErrorResponse, "description": "Invalid format parameter"},
+    },
     summary="Download Augmented Dataset",
     description="""
 Download the augmented dataset in the specified format.
@@ -660,11 +613,15 @@ Download the augmented dataset in the specified format.
 - **csv**: Comma-separated values
 - **tsv**: Tab-separated values
 - **parquet**: Apache Parquet binary format
-"""
+""",
 )
 async def download_augmented_dataset(
     task_id: str,
-    format: str = Query("jsonl", regex="^(jsonl|json|csv|tsv|parquet)$", description="Output format for the dataset")
+    format: str = Query(
+        "jsonl",
+        regex="^(jsonl|json|csv|tsv|parquet)$",
+        description="Output format for the dataset",
+    ),
 ) -> StreamingResponse:
     """
     Download the augmented dataset.
@@ -689,7 +646,7 @@ async def download_augmented_dataset(
     if task is None:
         raise HTTPException(
             status_code=404,
-            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
+            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"},
         )
 
     if task["status"] != "completed":
@@ -697,17 +654,14 @@ async def download_augmented_dataset(
             status_code=404,
             detail={
                 "error": "TaskNotCompleted",
-                "message": f"Task {task_id} is not completed yet"
-            }
+                "message": f"Task {task_id} is not completed yet",
+            },
         )
 
     if not task.get("result") or not task["result"].get("entries"):
         raise HTTPException(
             status_code=404,
-            detail={
-                "error": "NoData",
-                "message": "No data available for download"
-            }
+            detail={"error": "NoData", "message": "No data available for download"},
         )
 
     # Get entries
@@ -723,7 +677,7 @@ async def download_augmented_dataset(
             "json": FileFormat.JSON,
             "csv": FileFormat.CSV,
             "tsv": FileFormat.TSV,
-            "parquet": FileFormat.PARQUET
+            "parquet": FileFormat.PARQUET,
         }
 
         if format not in format_map:
@@ -731,23 +685,23 @@ async def download_augmented_dataset(
                 status_code=400,
                 detail={
                     "error": "InvalidFormat",
-                    "message": f"Unsupported format: {format}"
-                }
+                    "message": f"Unsupported format: {format}",
+                },
             )
 
         file_format = format_map[format]
 
         # Write to temp file then read back
         with tempfile.NamedTemporaryFile(
-            mode='wb' if format == 'parquet' else 'w+',
-            suffix=f'.{format}',
-            delete=False
+            mode="wb" if format == "parquet" else "w+",
+            suffix=f".{format}",
+            delete=False,
         ) as tmp:
             tmp_path = tmp.name
 
         try:
             write_file(entries, tmp_path, file_format)
-            with open(tmp_path, 'rb') as f:
+            with open(tmp_path, "rb") as f:
                 output.write(f.read())
         finally:
             os.unlink(tmp_path)
@@ -760,7 +714,7 @@ async def download_augmented_dataset(
             "json": "application/json",
             "csv": "text/csv",
             "tsv": "text/tab-separated-values",
-            "parquet": "application/octet-stream"
+            "parquet": "application/octet-stream",
         }
 
         return StreamingResponse(
@@ -768,7 +722,7 @@ async def download_augmented_dataset(
             media_type=media_types[format],
             headers={
                 "Content-Disposition": f"attachment; filename=augmented_{task_id}.{format}"
-            }
+            },
         )
 
     except Exception as e:
@@ -776,6 +730,6 @@ async def download_augmented_dataset(
             status_code=500,
             detail={
                 "error": "ConversionError",
-                "message": f"Failed to convert dataset: {str(e)}"
-            }
+                "message": f"Failed to convert dataset: {str(e)}",
+            },
         )

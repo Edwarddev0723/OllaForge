@@ -26,9 +26,9 @@ from ..services.task_manager import TaskType, task_manager
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 
-@router.get("", responses={
-    200: {"description": "List of tasks"}
-},
+@router.get(
+    "",
+    responses={200: {"description": "List of tasks"}},
     summary="List All Tasks",
     description="""
 List all tasks with optional filtering.
@@ -41,12 +41,20 @@ filtered by type and/or status.
 - **task_type**: Filter by task type (generation, augmentation)
 - **status**: Filter by status (pending, queued, running, completed, failed, timeout, cancelled)
 - **limit**: Maximum number of tasks to return (default 100)
-"""
+""",
 )
 async def list_tasks(
-    task_type: Optional[str] = Query(None, regex="^(generation|augmentation)$", description="Filter by task type"),
-    status: Optional[str] = Query(None, regex="^(pending|queued|running|completed|failed|timeout|cancelled)$", description="Filter by status"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tasks to return")
+    task_type: Optional[str] = Query(
+        None, regex="^(generation|augmentation)$", description="Filter by task type"
+    ),
+    status: Optional[str] = Query(
+        None,
+        regex="^(pending|queued|running|completed|failed|timeout|cancelled)$",
+        description="Filter by status",
+    ),
+    limit: int = Query(
+        100, ge=1, le=1000, description="Maximum number of tasks to return"
+    ),
 ) -> dict:
     """
     List all tasks with optional filtering.
@@ -62,7 +70,9 @@ async def list_tasks(
     # Convert string filters to enums
     type_filter = None
     if task_type:
-        type_filter = TaskType.GENERATION if task_type == "generation" else TaskType.AUGMENTATION
+        type_filter = (
+            TaskType.GENERATION if task_type == "generation" else TaskType.AUGMENTATION
+        )
 
     status_filter = None
     if status:
@@ -73,22 +83,20 @@ async def list_tasks(
             "completed": TMTaskStatus.COMPLETED,
             "failed": TMTaskStatus.FAILED,
             "timeout": TMTaskStatus.TIMEOUT,
-            "cancelled": TMTaskStatus.CANCELLED
+            "cancelled": TMTaskStatus.CANCELLED,
         }
         status_filter = status_map.get(status)
 
     tasks = task_manager.list_tasks(
-        task_type=type_filter,
-        status=status_filter,
-        limit=limit
+        task_type=type_filter, status=status_filter, limit=limit
     )
 
     return {"tasks": tasks, "count": len(tasks)}
 
 
-@router.get("/stats", responses={
-    200: {"description": "Task manager statistics"}
-},
+@router.get(
+    "/stats",
+    responses={200: {"description": "Task manager statistics"}},
     summary="Get Task Statistics",
     description="""
 Get task manager statistics.
@@ -98,7 +106,7 @@ Returns statistics about the task queue and processing:
 - Queue length
 - Active tasks count
 - Resource utilization
-"""
+""",
 )
 async def get_stats() -> dict:
     """
@@ -113,12 +121,14 @@ async def get_stats() -> dict:
     return task_manager.get_stats()
 
 
-@router.get("/{task_id}", responses={
-    200: {"description": "Task status"},
-    404: {"model": ErrorResponse, "description": "Task not found"}
-},
+@router.get(
+    "/{task_id}",
+    responses={
+        200: {"description": "Task status"},
+        404: {"model": ErrorResponse, "description": "Task not found"},
+    },
     summary="Get Task by ID",
-    description="Get detailed status information for a specific task."
+    description="Get detailed status information for a specific task.",
 )
 async def get_task(task_id: str) -> dict:
     """
@@ -138,24 +148,26 @@ async def get_task(task_id: str) -> dict:
     if task is None:
         raise HTTPException(
             status_code=404,
-            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
+            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"},
         )
 
     return task
 
 
-@router.post("/{task_id}/cancel", responses={
-    200: {"description": "Task cancelled"},
-    404: {"model": ErrorResponse, "description": "Task not found"},
-    400: {"model": ErrorResponse, "description": "Task cannot be cancelled"}
-},
+@router.post(
+    "/{task_id}/cancel",
+    responses={
+        200: {"description": "Task cancelled"},
+        404: {"model": ErrorResponse, "description": "Task not found"},
+        400: {"model": ErrorResponse, "description": "Task cannot be cancelled"},
+    },
     summary="Cancel Task",
     description="""
 Cancel a running or queued task.
 
 Only tasks in 'pending', 'queued', or 'running' status can be cancelled.
 Completed or failed tasks cannot be cancelled.
-"""
+""",
 )
 async def cancel_task(task_id: str) -> dict:
     """
@@ -176,7 +188,7 @@ async def cancel_task(task_id: str) -> dict:
     if task is None:
         raise HTTPException(
             status_code=404,
-            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
+            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"},
         )
 
     success = await task_manager.cancel_task(task_id)
@@ -186,25 +198,31 @@ async def cancel_task(task_id: str) -> dict:
             status_code=400,
             detail={
                 "error": "CannotCancel",
-                "message": f"Task {task_id} cannot be cancelled (status: {task['status']})"
-            }
+                "message": f"Task {task_id} cannot be cancelled (status: {task['status']})",
+            },
         )
 
-    return {"task_id": task_id, "status": "cancelled", "message": "Task cancelled successfully"}
+    return {
+        "task_id": task_id,
+        "status": "cancelled",
+        "message": "Task cancelled successfully",
+    }
 
 
-@router.delete("/{task_id}", responses={
-    200: {"description": "Task deleted"},
-    404: {"model": ErrorResponse, "description": "Task not found"},
-    400: {"model": ErrorResponse, "description": "Task cannot be deleted"}
-},
+@router.delete(
+    "/{task_id}",
+    responses={
+        200: {"description": "Task deleted"},
+        404: {"model": ErrorResponse, "description": "Task not found"},
+        400: {"model": ErrorResponse, "description": "Task cannot be deleted"},
+    },
     summary="Delete Task",
     description="""
 Delete a completed or failed task.
 
 Only tasks that are no longer running can be deleted.
 This removes the task from the task list and frees associated resources.
-"""
+""",
 )
 async def delete_task(task_id: str) -> dict:
     """
@@ -225,7 +243,7 @@ async def delete_task(task_id: str) -> dict:
     if task is None:
         raise HTTPException(
             status_code=404,
-            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
+            detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"},
         )
 
     success = task_manager.delete_task(task_id)
@@ -235,26 +253,28 @@ async def delete_task(task_id: str) -> dict:
             status_code=400,
             detail={
                 "error": "CannotDelete",
-                "message": f"Task {task_id} cannot be deleted (status: {task['status']})"
-            }
+                "message": f"Task {task_id} cannot be deleted (status: {task['status']})",
+            },
         )
 
     return {"task_id": task_id, "message": "Task deleted successfully"}
 
 
-@router.post("/cleanup", responses={
-    200: {"description": "Cleanup result"}
-},
+@router.post(
+    "/cleanup",
+    responses={200: {"description": "Cleanup result"}},
     summary="Cleanup Old Tasks",
     description="""
 Clean up old completed and failed tasks.
 
 Removes tasks older than the specified age to free up memory.
 Default is 24 hours.
-"""
+""",
 )
 async def cleanup_old_tasks(
-    max_age_hours: float = Query(24.0, ge=0.1, le=720, description="Maximum age in hours for tasks to keep")
+    max_age_hours: float = Query(
+        24.0, ge=0.1, le=720, description="Maximum age in hours for tasks to keep"
+    )
 ) -> dict:
     """
     Clean up old completed/failed tasks.
@@ -268,7 +288,4 @@ async def cleanup_old_tasks(
     max_age_seconds = max_age_hours * 3600
     count = await task_manager.cleanup_old_tasks(max_age_seconds)
 
-    return {
-        "cleaned_up": count,
-        "message": f"Cleaned up {count} old tasks"
-    }
+    return {"cleaned_up": count, "message": f"Cleaned up {count} old tasks"}

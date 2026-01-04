@@ -83,7 +83,7 @@ class TestJSONLFormat:
     @given(dataset=sample_dataset())
     def test_jsonl_round_trip(self, dataset):
         """Test JSONL round-trip consistency."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -109,9 +109,9 @@ class TestJSONLFormat:
 
     def test_jsonl_invalid_format(self):
         """Test handling of invalid JSONL."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
             f.write('{"valid": "json"}\n')
-            f.write('invalid json line\n')
+            f.write("invalid json line\n")
             f.write('{"another": "valid"}\n')
             temp_path = f.name
 
@@ -128,7 +128,7 @@ class TestJSONFormat:
     @given(dataset=sample_dataset())
     def test_json_round_trip(self, dataset):
         """Test JSON array round-trip consistency."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -148,7 +148,7 @@ class TestJSONFormat:
 
     def test_json_invalid_format(self):
         """Test handling of invalid JSON."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write('{"not": "an array"}')
             temp_path = f.name
 
@@ -169,7 +169,7 @@ class TestCSVFormat:
             {"name": "Bob", "age": "25", "city": "London"},
         ]
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -201,7 +201,7 @@ class TestCSVFormat:
             }
         ]
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -234,7 +234,7 @@ class TestTSVFormat:
             {"col1": "value3", "col2": "value4"},
         ]
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.tsv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
             temp_path = f.name
 
         try:

@@ -45,13 +45,13 @@ def _format_size(size_bytes: Optional[int]) -> Optional[str]:
         return None
 
     # Convert to GB
-    size_gb = size_bytes / (1024 ** 3)
+    size_gb = size_bytes / (1024**3)
 
     if size_gb >= 1:
         return f"{size_gb:.1f}GB"
 
     # Convert to MB if less than 1GB
-    size_mb = size_bytes / (1024 ** 2)
+    size_mb = size_bytes / (1024**2)
     return f"{size_mb:.0f}MB"
 
 
@@ -71,11 +71,11 @@ def _get_model_details(model_name: str) -> Optional[dict]:
     try:
         client = _get_ollama_client()
         response = client.list()
-        if not isinstance(response, dict) or 'models' not in response:
+        if not isinstance(response, dict) or "models" not in response:
             raise OllamaConnectionError("Invalid response from Ollama API")
 
-        for model in response['models']:
-            if isinstance(model, dict) and model.get('name') == model_name:
+        for model in response["models"]:
+            if isinstance(model, dict) and model.get("name") == model_name:
                 return model
 
         return None
@@ -84,13 +84,18 @@ def _get_model_details(model_name: str) -> Optional[dict]:
     except Exception as e:
         error_msg = str(e).lower()
         if "connection" in error_msg or "refused" in error_msg:
-            raise OllamaConnectionError(f"Unable to connect to Ollama service: {str(e)}") from e
+            raise OllamaConnectionError(
+                f"Unable to connect to Ollama service: {str(e)}"
+            ) from e
         raise
 
 
-@router.get("", response_model=ModelListResponse, responses={
-    503: {"model": ErrorResponse, "description": "Ollama service unavailable"}
-},
+@router.get(
+    "",
+    response_model=ModelListResponse,
+    responses={
+        503: {"model": ErrorResponse, "description": "Ollama service unavailable"}
+    },
     summary="List Available Models",
     description="""
 List all available Ollama models.
@@ -107,7 +112,7 @@ ollama serve
 
 If Ollama is not running, this endpoint returns a 503 error with
 instructions for starting the service.
-"""
+""",
 )
 async def list_models() -> ModelListResponse:
     """
@@ -132,16 +137,16 @@ async def list_models() -> ModelListResponse:
         client = _get_ollama_client()
         response = client.list()
 
-        if not isinstance(response, dict) or 'models' not in response:
+        if not isinstance(response, dict) or "models" not in response:
             raise OllamaConnectionError("Invalid response from Ollama API")
 
         models = []
-        for model in response['models']:
-            if isinstance(model, dict) and 'name' in model:
+        for model in response["models"]:
+            if isinstance(model, dict) and "name" in model:
                 model_info = ModelInfo(
-                    name=model['name'],
-                    size=_format_size(model.get('size')),
-                    modified_at=model.get('modified_at')
+                    name=model["name"],
+                    size=_format_size(model.get("size")),
+                    modified_at=model.get("modified_at"),
                 )
                 models.append(model_info)
 
@@ -152,8 +157,8 @@ async def list_models() -> ModelListResponse:
             status_code=503,
             detail={
                 "error": "OllamaConnectionError",
-                "message": f"Unable to connect to Ollama service: {str(e)}. Please ensure Ollama is running with 'ollama serve'."
-            }
+                "message": f"Unable to connect to Ollama service: {str(e)}. Please ensure Ollama is running with 'ollama serve'.",
+            },
         )
     except Exception as e:
         error_msg = str(e).lower()
@@ -162,29 +167,32 @@ async def list_models() -> ModelListResponse:
                 status_code=503,
                 detail={
                     "error": "OllamaConnectionError",
-                    "message": "Unable to connect to Ollama service. Please ensure Ollama is running with 'ollama serve'."
-                }
+                    "message": "Unable to connect to Ollama service. Please ensure Ollama is running with 'ollama serve'.",
+                },
             )
         raise HTTPException(
             status_code=503,
             detail={
                 "error": "OllamaError",
-                "message": f"Failed to list models: {str(e)}"
-            }
+                "message": f"Failed to list models: {str(e)}",
+            },
         )
 
 
-@router.get("/{model_name}", response_model=ModelInfo, responses={
-    404: {"model": ErrorResponse, "description": "Model not found"},
-    503: {"model": ErrorResponse, "description": "Ollama service unavailable"}
-},
+@router.get(
+    "/{model_name}",
+    response_model=ModelInfo,
+    responses={
+        404: {"model": ErrorResponse, "description": "Model not found"},
+        503: {"model": ErrorResponse, "description": "Ollama service unavailable"},
+    },
     summary="Get Model Information",
     description="""
 Get detailed information about a specific Ollama model.
 
 Returns the model's name, size, and last modified timestamp.
 If the model is not found, returns a 404 error with a list of available models.
-"""
+""",
 )
 async def get_model_info(model_name: str) -> ModelInfo:
     """
@@ -217,22 +225,20 @@ async def get_model_info(model_name: str) -> ModelInfo:
                 available_str = ", ".join(available[:5])
                 if len(available) > 5:
                     available_str += f" (and {len(available) - 5} more)"
-                message = f"Model '{model_name}' not found. Available models: {available_str}"
+                message = (
+                    f"Model '{model_name}' not found. Available models: {available_str}"
+                )
             except Exception:
                 message = f"Model '{model_name}' not found"
 
             raise HTTPException(
-                status_code=404,
-                detail={
-                    "error": "ModelNotFound",
-                    "message": message
-                }
+                status_code=404, detail={"error": "ModelNotFound", "message": message}
             )
 
         return ModelInfo(
-            name=model_details['name'],
-            size=_format_size(model_details.get('size')),
-            modified_at=model_details.get('modified_at')
+            name=model_details["name"],
+            size=_format_size(model_details.get("size")),
+            modified_at=model_details.get("modified_at"),
         )
 
     except HTTPException:
@@ -242,8 +248,8 @@ async def get_model_info(model_name: str) -> ModelInfo:
             status_code=503,
             detail={
                 "error": "OllamaConnectionError",
-                "message": f"Unable to connect to Ollama service: {str(e)}. Please ensure Ollama is running with 'ollama serve'."
-            }
+                "message": f"Unable to connect to Ollama service: {str(e)}. Please ensure Ollama is running with 'ollama serve'.",
+            },
         )
     except Exception as e:
         error_msg = str(e).lower()
@@ -252,23 +258,25 @@ async def get_model_info(model_name: str) -> ModelInfo:
                 status_code=503,
                 detail={
                     "error": "OllamaConnectionError",
-                    "message": "Unable to connect to Ollama service. Please ensure Ollama is running with 'ollama serve'."
-                }
+                    "message": "Unable to connect to Ollama service. Please ensure Ollama is running with 'ollama serve'.",
+                },
             )
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "InternalError",
-                "message": f"Failed to get model info: {str(e)}"
-            }
+                "message": f"Failed to get model info: {str(e)}",
+            },
         )
 
 
-@router.get("/{model_name}/validate", responses={
-    200: {"description": "Model is valid and available"},
-    404: {"model": ErrorResponse, "description": "Model not found"},
-    503: {"model": ErrorResponse, "description": "Ollama service unavailable"}
-},
+@router.get(
+    "/{model_name}/validate",
+    responses={
+        200: {"description": "Model is valid and available"},
+        404: {"model": ErrorResponse, "description": "Model not found"},
+        503: {"model": ErrorResponse, "description": "Ollama service unavailable"},
+    },
     summary="Validate Model Availability",
     description="""
 Validate that a model exists and is available for use.
@@ -276,7 +284,7 @@ Validate that a model exists and is available for use.
 Use this endpoint to check if a model is available before starting
 a generation or augmentation task. This helps provide better error
 messages to users before they start a long-running operation.
-"""
+""",
 )
 async def validate_model(model_name: str) -> dict:
     """
@@ -304,5 +312,5 @@ async def validate_model(model_name: str) -> dict:
     return {
         "valid": True,
         "model": model_info.name,
-        "message": f"Model '{model_name}' is available"
+        "message": f"Model '{model_name}' is available",
     }

@@ -49,28 +49,21 @@ def augmentation_service():
 
 # Strategy for valid field names (simple ASCII identifiers)
 field_name_strategy = st.text(
-    alphabet='abcdefghijklmnopqrstuvwxyz_',
-    min_size=1,
-    max_size=20
+    alphabet="abcdefghijklmnopqrstuvwxyz_", min_size=1, max_size=20
 ).filter(lambda x: x[0].isalpha())
 
 # Strategy for valid field values
 field_value_strategy = st.text(
-    alphabet='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?-',
+    alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?-",
     min_size=1,
-    max_size=100
+    max_size=100,
 ).filter(lambda x: x.strip())
 
 # Strategy for model names
-model_strategy = st.sampled_from([
-    "llama3.2", "mistral", "gpt-oss:20b", "qwen2.5:7b"
-])
+model_strategy = st.sampled_from(["llama3.2", "mistral", "gpt-oss:20b", "qwen2.5:7b"])
 
 # Strategy for output languages
-language_strategy = st.sampled_from([
-    OutputLanguage.EN,
-    OutputLanguage.ZH_TW
-])
+language_strategy = st.sampled_from([OutputLanguage.EN, OutputLanguage.ZH_TW])
 
 # Strategy for download formats
 format_strategy = st.sampled_from(["jsonl", "json", "csv", "tsv"])
@@ -80,10 +73,11 @@ format_strategy = st.sampled_from(["jsonl", "json", "csv", "tsv"])
 # Helper Functions
 # ============================================================================
 
+
 def create_jsonl_content(entries: list) -> bytes:
     """Create JSONL file content from entries."""
     lines = [json.dumps(entry) for entry in entries]
-    return '\n'.join(lines).encode('utf-8')
+    return "\n".join(lines).encode("utf-8")
 
 
 def create_test_entries(field_names: list, count: int = 5) -> list:
@@ -99,14 +93,10 @@ def create_test_entries(field_names: list, count: int = 5) -> list:
 # Property Test 4: File upload extracts fields
 # ============================================================================
 
+
 @given(
-    field_names=st.lists(
-        field_name_strategy,
-        min_size=1,
-        max_size=5,
-        unique=True
-    ),
-    entry_count=st.integers(min_value=1, max_value=10)
+    field_names=st.lists(field_name_strategy, min_size=1, max_size=5, unique=True),
+    entry_count=st.integers(min_value=1, max_value=10),
 )
 @settings(max_examples=20, deadline=60000)
 def test_file_upload_extracts_fields(field_names, entry_count):
@@ -117,9 +107,12 @@ def test_file_upload_extracts_fields(field_names, entry_count):
     For any valid dataset file upload, the system should extract and return
     all field names present in the dataset.
     """
+
     async def run_test():
         transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             # Create test entries
             entries = create_test_entries(field_names, entry_count)
             content = create_jsonl_content(entries)
@@ -129,8 +122,9 @@ def test_file_upload_extracts_fields(field_names, entry_count):
             response = await client.post("/api/augment/upload", files=files)
 
             # Should return 200 OK
-            assert response.status_code == 200, \
-                f"Valid file upload should return 200, got {response.status_code}: {response.text}"
+            assert (
+                response.status_code == 200
+            ), f"Valid file upload should return 200, got {response.status_code}: {response.text}"
 
             data = response.json()
 
@@ -150,8 +144,9 @@ def test_file_upload_extracts_fields(field_names, entry_count):
             # All field names should be extracted
             returned_fields = set(data["fields"])
             expected_fields = set(field_names)
-            assert returned_fields == expected_fields, \
-                f"Expected fields {expected_fields}, got {returned_fields}"
+            assert (
+                returned_fields == expected_fields
+            ), f"Expected fields {expected_fields}, got {returned_fields}"
 
             # Preview should have entries (up to 3)
             expected_preview_count = min(entry_count, 3)
@@ -164,14 +159,10 @@ def test_file_upload_extracts_fields(field_names, entry_count):
 # Property Test 5: Field validation works correctly
 # ============================================================================
 
+
 @given(
-    field_names=st.lists(
-        field_name_strategy,
-        min_size=2,
-        max_size=5,
-        unique=True
-    ),
-    target_index=st.integers(min_value=0, max_value=4)
+    field_names=st.lists(field_name_strategy, min_size=2, max_size=5, unique=True),
+    target_index=st.integers(min_value=0, max_value=4),
 )
 @settings(max_examples=20, deadline=60000)
 def test_field_validation_works_correctly(field_names, target_index):
@@ -199,24 +190,26 @@ def test_field_validation_works_correctly(field_names, target_index):
 
         # Test with valid field - should pass validation
         is_valid, error = service.validate_field(file_id, valid_field)
-        assert is_valid is True, \
-            f"Valid field '{valid_field}' should pass validation, got error: {error}"
+        assert (
+            is_valid is True
+        ), f"Valid field '{valid_field}' should pass validation, got error: {error}"
         assert error is None
 
         # Test with invalid field - should fail validation
         is_valid, error = service.validate_field(file_id, "nonexistent_field_xyz")
-        assert is_valid is False, \
-            "Invalid field should fail validation"
+        assert is_valid is False, "Invalid field should fail validation"
         assert error is not None
-        assert "not found" in error.lower(), \
-            f"Error should mention field not found, got: {error}"
+        assert (
+            "not found" in error.lower()
+        ), f"Error should mention field not found, got: {error}"
 
         # Test with invalid field but create_new_field=True - should pass
         is_valid, error = service.validate_field(
             file_id, "new_field", create_new_field=True
         )
-        assert is_valid is True, \
-            "New field with create_new_field=True should pass validation"
+        assert (
+            is_valid is True
+        ), "New field with create_new_field=True should pass validation"
 
         # Test with non-existent file
         is_valid, error = service.validate_field("nonexistent_file", valid_field)
@@ -230,23 +223,16 @@ def test_field_validation_works_correctly(field_names, target_index):
 # Property Test 6: Completed augmentation provides download
 # ============================================================================
 
+
 @given(
-    field_names=st.lists(
-        field_name_strategy,
-        min_size=1,
-        max_size=3,
-        unique=True
-    ),
+    field_names=st.lists(field_name_strategy, min_size=1, max_size=3, unique=True),
     entry_count=st.integers(min_value=1, max_value=5),
-    format=format_strategy
+    format=format_strategy,
 )
 @settings(max_examples=20, deadline=10000)
-@patch('ollaforge.web.routes.augmentation.augmentation_service')
+@patch("ollaforge.web.routes.augmentation.augmentation_service")
 def test_completed_augmentation_provides_download(
-    mock_service,
-    field_names,
-    entry_count,
-    format
+    mock_service, field_names, entry_count, format
 ):
     """
     **Feature: web-interface, Property 6: Completed augmentation provides download**
@@ -255,9 +241,12 @@ def test_completed_augmentation_provides_download(
     For any augmentation that completes successfully, the system should provide
     a download endpoint that returns the augmented dataset in the requested format.
     """
+
     async def run_test():
         transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             # Create mock task with completed status
             task_id = f"aug_test_{hash(str(field_names)) % 10000}"
 
@@ -274,19 +263,22 @@ def test_completed_augmentation_provides_download(
                     "success_count": entry_count,
                     "failure_count": 0,
                     "duration": 5.5,
-                    "errors": []
+                    "errors": [],
                 },
-                "error": None
+                "error": None,
             }
 
             mock_service.get_task.return_value = mock_task
 
             # Request download
-            response = await client.get(f"/api/augment/{task_id}/download?format={format}")
+            response = await client.get(
+                f"/api/augment/{task_id}/download?format={format}"
+            )
 
             # Should return 200 OK
-            assert response.status_code == 200, \
-                f"Download should return 200 for completed task, got {response.status_code}"
+            assert (
+                response.status_code == 200
+            ), f"Download should return 200 for completed task, got {response.status_code}"
 
             # Should have appropriate content type
             content_type = response.headers.get("content-type", "")
@@ -294,10 +286,12 @@ def test_completed_augmentation_provides_download(
 
             # Should have content-disposition header for download
             content_disposition = response.headers.get("content-disposition", "")
-            assert "attachment" in content_disposition, \
-                "Response should have attachment content-disposition"
-            assert format in content_disposition, \
-                f"Filename should include format {format}"
+            assert (
+                "attachment" in content_disposition
+            ), "Response should have attachment content-disposition"
+            assert (
+                format in content_disposition
+            ), f"Filename should include format {format}"
 
             # Should have content
             assert len(response.content) > 0, "Download should have content"
@@ -309,23 +303,16 @@ def test_completed_augmentation_provides_download(
 # Property Test 7: Partial augmentation failures preserve data
 # ============================================================================
 
+
 @given(
-    field_names=st.lists(
-        field_name_strategy,
-        min_size=1,
-        max_size=3,
-        unique=True
-    ),
+    field_names=st.lists(field_name_strategy, min_size=1, max_size=3, unique=True),
     total_count=st.integers(min_value=5, max_value=10),
-    failure_count=st.integers(min_value=1, max_value=4)
+    failure_count=st.integers(min_value=1, max_value=4),
 )
 @settings(max_examples=20, deadline=10000)
-@patch('ollaforge.web.routes.augmentation.augmentation_service')
+@patch("ollaforge.web.routes.augmentation.augmentation_service")
 def test_partial_augmentation_failures_preserve_data(
-    mock_service,
-    field_names,
-    total_count,
-    failure_count
+    mock_service, field_names, total_count, failure_count
 ):
     """
     **Feature: web-interface, Property 7: Partial augmentation failures preserve data**
@@ -340,7 +327,9 @@ def test_partial_augmentation_failures_preserve_data(
 
     async def run_test():
         transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             task_id = f"aug_partial_{hash(str(field_names)) % 10000}"
 
             # Create mock entries (only successful ones)
@@ -362,9 +351,9 @@ def test_partial_augmentation_failures_preserve_data(
                     "success_count": success_count,
                     "failure_count": failure_count,
                     "duration": 10.0,
-                    "errors": mock_errors
+                    "errors": mock_errors,
                 },
-                "error": None
+                "error": None,
             }
 
             mock_service.get_task.return_value = mock_task
@@ -376,24 +365,29 @@ def test_partial_augmentation_failures_preserve_data(
             data = response.json()
 
             # Task should be completed (not failed)
-            assert data["status"] == "completed", \
-                "Partial failures should not mark task as failed"
+            assert (
+                data["status"] == "completed"
+            ), "Partial failures should not mark task as failed"
 
             # Result should contain statistics
             result = data.get("result", {})
-            assert result.get("success_count") == success_count, \
-                f"Success count should be {success_count}"
-            assert result.get("failure_count") == failure_count, \
-                f"Failure count should be {failure_count}"
+            assert (
+                result.get("success_count") == success_count
+            ), f"Success count should be {success_count}"
+            assert (
+                result.get("failure_count") == failure_count
+            ), f"Failure count should be {failure_count}"
 
             # Successful entries should be preserved
-            assert len(result.get("entries", [])) == success_count, \
-                f"Should have {success_count} preserved entries"
+            assert (
+                len(result.get("entries", [])) == success_count
+            ), f"Should have {success_count} preserved entries"
 
             # Download should still work
             download_response = await client.get(f"/api/augment/{task_id}/download")
-            assert download_response.status_code == 200, \
-                "Download should work for partial success"
+            assert (
+                download_response.status_code == 200
+            ), "Download should work for partial success"
 
     asyncio.run(run_test())
 
@@ -401,6 +395,7 @@ def test_partial_augmentation_failures_preserve_data(
 # ============================================================================
 # Unit Tests for Augmentation Routes
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_upload_unsupported_format():
@@ -411,15 +406,18 @@ async def test_upload_unsupported_format():
     - 4.4: Unsupported format error
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         # Try to upload unsupported format
         content = b"some random content"
         files = {"file": ("test.xyz", content, "application/octet-stream")}
 
         response = await client.post("/api/augment/upload", files=files)
 
-        assert response.status_code == 415, \
-            f"Unsupported format should return 415, got {response.status_code}"
+        assert (
+            response.status_code == 415
+        ), f"Unsupported format should return 415, got {response.status_code}"
 
         data = response.json()
         assert "detail" in data
@@ -435,15 +433,18 @@ async def test_upload_invalid_jsonl():
     - 2.1: File validation
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         # Upload invalid JSONL
         content = b"not valid json\nalso not valid"
         files = {"file": ("test.jsonl", content, "application/x-ndjson")}
 
         response = await client.post("/api/augment/upload", files=files)
 
-        assert response.status_code == 400, \
-            f"Invalid JSONL should return 400, got {response.status_code}"
+        assert (
+            response.status_code == 400
+        ), f"Invalid JSONL should return 400, got {response.status_code}"
 
 
 @pytest.mark.asyncio
@@ -455,18 +456,21 @@ async def test_preview_file_not_found():
     - 2.3: Error handling
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         payload = {
             "file_id": "nonexistent_file_id",
             "target_field": "output",
             "instruction": "Test",
-            "model": "llama3.2"
+            "model": "llama3.2",
         }
 
         response = await client.post("/api/augment/preview", json=payload)
 
-        assert response.status_code == 404, \
-            f"Non-existent file should return 404, got {response.status_code}"
+        assert (
+            response.status_code == 404
+        ), f"Non-existent file should return 404, got {response.status_code}"
 
 
 @pytest.mark.asyncio
@@ -478,18 +482,21 @@ async def test_augmentation_file_not_found():
     - 2.2: Error handling
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         payload = {
             "file_id": "nonexistent_file_id",
             "target_field": "output",
             "instruction": "Test",
-            "model": "llama3.2"
+            "model": "llama3.2",
         }
 
         response = await client.post("/api/augment", json=payload)
 
-        assert response.status_code == 404, \
-            f"Non-existent file should return 404, got {response.status_code}"
+        assert (
+            response.status_code == 404
+        ), f"Non-existent file should return 404, got {response.status_code}"
 
 
 @pytest.mark.asyncio
@@ -501,11 +508,14 @@ async def test_augmentation_status_not_found():
     - Error handling
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/augment/nonexistent_task_id")
 
-        assert response.status_code == 404, \
-            f"Non-existent task should return 404, got {response.status_code}"
+        assert (
+            response.status_code == 404
+        ), f"Non-existent task should return 404, got {response.status_code}"
 
 
 @pytest.mark.asyncio
@@ -517,7 +527,9 @@ async def test_download_not_completed_task():
     - 2.4: Download only for completed tasks
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/augment/nonexistent_task/download")
 
         assert response.status_code == 404
@@ -532,16 +544,20 @@ async def test_download_invalid_format():
     - 4.4: Unsupported format error
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/augment/some_task/download?format=invalid")
 
-        assert response.status_code == 422, \
-            f"Invalid format should return 422, got {response.status_code}"
+        assert (
+            response.status_code == 422
+        ), f"Invalid format should return 422, got {response.status_code}"
 
 
 # ============================================================================
 # Unit Tests for Augmentation Service
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_augmentation_service_creates_task(augmentation_service):
@@ -566,12 +582,7 @@ async def test_augmentation_service_updates_task(augmentation_service):
     """
     task_id = augmentation_service.create_task()
 
-    augmentation_service.update_task(
-        task_id,
-        status="running",
-        progress=5,
-        total=10
-    )
+    augmentation_service.update_task(task_id, status="running", progress=5, total=10)
 
     task = augmentation_service.get_task(task_id)
     assert task["status"] == "running"

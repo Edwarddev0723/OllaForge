@@ -68,13 +68,15 @@ class ProgressTracker:
             TextColumn("•"),
             TimeRemainingColumn(),
             console=self.console,
-            transient=False
+            transient=False,
         )
 
         self.progress.start()
         self.task_id = self.progress.add_task(description, total=total)
 
-    def update_progress(self, advance: int = 1, description: Optional[str] = None) -> None:
+    def update_progress(
+        self, advance: int = 1, description: Optional[str] = None
+    ) -> None:
         """
         Update the progress bar.
 
@@ -155,7 +157,7 @@ class ProgressTracker:
             Align.center(table),
             title="[bold green]🎉 Generation Complete[/bold green]",
             border_style="green",
-            padding=(1, 2)
+            padding=(1, 2),
         )
 
         self.console.print()
@@ -164,7 +166,9 @@ class ProgressTracker:
         # Display errors if any
         if result.errors:
             self.console.print()
-            self.console.print("[yellow]⚠️  Errors encountered during generation:[/yellow]")
+            self.console.print(
+                "[yellow]⚠️  Errors encountered during generation:[/yellow]"
+            )
             for i, error in enumerate(result.errors[:5], 1):  # Show max 5 errors
                 self.console.print(f"  {i}. [red]{error}[/red]")
 
@@ -221,7 +225,7 @@ class ProgressTracker:
             Align.center(table),
             title="[bold green]🎉 Augmentation Complete[/bold green]",
             border_style="green",
-            padding=(1, 2)
+            padding=(1, 2),
         )
 
         self.console.print()
@@ -230,7 +234,9 @@ class ProgressTracker:
         # Display errors if any
         if result.errors:
             self.console.print()
-            self.console.print("[yellow]⚠️  Errors encountered during augmentation:[/yellow]")
+            self.console.print(
+                "[yellow]⚠️  Errors encountered during augmentation:[/yellow]"
+            )
             for i, error in enumerate(result.errors[:5], 1):  # Show max 5 errors
                 self.console.print(f"  {i}. [red]{error}[/red]")
 

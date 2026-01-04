@@ -45,16 +45,12 @@ class AugmentationService:
     def __del__(self):
         """Cleanup temp directory on service destruction."""
         try:
-            if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+            if hasattr(self, "temp_dir") and os.path.exists(self.temp_dir):
                 shutil.rmtree(self.temp_dir)
         except Exception:
             pass
 
-    async def upload_file(
-        self,
-        file_content: bytes,
-        filename: str
-    ) -> dict[str, Any]:
+    async def upload_file(self, file_content: bytes, filename: str) -> dict[str, Any]:
         """
         Upload and process a dataset file.
 
@@ -87,7 +83,7 @@ class AugmentationService:
 
         def save_and_read():
             # Save file
-            with open(file_path, 'wb') as f:
+            with open(file_path, "wb") as f:
                 f.write(file_content)
 
             # Read and parse file
@@ -104,7 +100,7 @@ class AugmentationService:
                 "entries": entries,
                 "fields": field_names,
                 "entry_count": len(entries),
-                "uploaded_at": datetime.utcnow().isoformat()
+                "uploaded_at": datetime.utcnow().isoformat(),
             }
 
             # Return upload response
@@ -112,14 +108,16 @@ class AugmentationService:
                 "file_id": file_id,
                 "entry_count": len(entries),
                 "fields": field_names,
-                "preview": entries[:3]  # First 3 entries for preview
+                "preview": entries[:3],  # First 3 entries for preview
             }
 
         except Exception as e:
             # Clean up file on error
             if os.path.exists(file_path):
                 os.remove(file_path)
-            raise FileOperationError(f"Failed to process uploaded file: {str(e)}") from e
+            raise FileOperationError(
+                f"Failed to process uploaded file: {str(e)}"
+            ) from e
 
     def get_uploaded_file(self, file_id: str) -> Optional[dict[str, Any]]:
         """
@@ -177,14 +175,11 @@ class AugmentationService:
             "file_id": file_id,
             "entry_count": len(entries),
             "fields": fields,
-            "preview": entries[:3]  # First 3 entries for preview
+            "preview": entries[:3],  # First 3 entries for preview
         }
 
     def validate_field(
-        self,
-        file_id: str,
-        target_field: str,
-        create_new_field: bool = False
+        self, file_id: str, target_field: str, create_new_field: bool = False
     ) -> tuple[bool, Optional[str]]:
         """
         Validate that target field exists or can be created.
@@ -212,7 +207,10 @@ class AugmentationService:
         if create_new_field:
             return True, None
 
-        return False, f"Field '{target_field}' not found. Available fields: {', '.join(fields)}"
+        return (
+            False,
+            f"Field '{target_field}' not found. Available fields: {', '.join(fields)}",
+        )
 
     async def preview_augmentation(
         self,
@@ -222,7 +220,7 @@ class AugmentationService:
         model: str = "llama3.2",
         create_new_field: bool = False,
         context_fields: list[str] = None,
-        preview_count: int = 3
+        preview_count: int = 3,
     ) -> list[dict[str, Any]]:
         """
         Generate preview of augmentation on sample entries.
@@ -259,9 +257,10 @@ class AugmentationService:
             target_field=target_field,
             instruction=instruction,
             model=model,
+            language=OutputLanguage.EN,
             create_new_field=create_new_field,
             context_fields=context_fields,
-            preview_count=preview_count
+            preview_count=preview_count,
         )
 
         # Run preview in thread pool
@@ -277,10 +276,7 @@ class AugmentationService:
             # Format results
             previews = []
             for original, augmented in preview_results:
-                previews.append({
-                    "original": original,
-                    "augmented": augmented
-                })
+                previews.append({"original": original, "augmented": augmented})
 
             return previews
 
@@ -297,7 +293,7 @@ class AugmentationService:
         create_new_field: bool = False,
         context_fields: list[str] = None,
         concurrency: int = 5,
-        progress_callback: Optional[Callable[[int, int], None]] = None
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> dict[str, Any]:
         """
         Augment entire dataset with progress updates.
@@ -335,10 +331,7 @@ class AugmentationService:
         entries = file_info["entries"]
 
         # Create output file path
-        output_file = os.path.join(
-            self.temp_dir,
-            f"augmented_{file_id}.jsonl"
-        )
+        output_file = os.path.join(self.temp_dir, f"augmented_{file_id}.jsonl")
 
         # Create augmentation config
         config = AugmentationConfig(
@@ -349,7 +342,8 @@ class AugmentationService:
             model=model,
             language=language,
             create_new_field=create_new_field,
-            context_fields=context_fields
+            context_fields=context_fields,
+            preview_count=3,
         )
 
         start_time = time.time()
@@ -362,7 +356,7 @@ class AugmentationService:
             if progress_callback:
                 asyncio.run_coroutine_threadsafe(
                     self._async_progress_callback(progress_callback, completed, total),
-                    loop
+                    loop,
                 )
 
         def run_augmentation():
@@ -370,7 +364,7 @@ class AugmentationService:
             result = augmentor.augment_dataset(
                 entries,
                 concurrency=concurrency,
-                progress_callback=sync_progress_callback
+                progress_callback=sync_progress_callback,
             )
             augmented_entries = augmentor.get_augmented_entries()
             return result, augmented_entries
@@ -388,17 +382,14 @@ class AugmentationService:
                 "success_count": result.success_count,
                 "failure_count": result.failure_count,
                 "duration": duration,
-                "errors": result.errors[:10] if result.errors else []  # Limit errors
+                "errors": result.errors[:10] if result.errors else [],  # Limit errors
             }
 
         except Exception as e:
             raise FileOperationError(f"Augmentation failed: {str(e)}") from e
 
     async def _async_progress_callback(
-        self,
-        callback: Callable[[int, int], None],
-        completed: int,
-        total: int
+        self, callback: Callable[[int, int], None], completed: int, total: int
     ):
         """Async wrapper for progress callback."""
         if asyncio.iscoroutinefunction(callback):
@@ -420,7 +411,7 @@ class AugmentationService:
             "total": 0,
             "result": None,
             "error": None,
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.utcnow().isoformat(),
         }
         return task_id
 
@@ -431,7 +422,7 @@ class AugmentationService:
         progress: Optional[int] = None,
         total: Optional[int] = None,
         result: Optional[dict[str, Any]] = None,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ):
         """
         Update task status.

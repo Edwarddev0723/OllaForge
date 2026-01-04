@@ -30,15 +30,14 @@ from .models import BatchProcessingResult, DocProcessingResult
 @dataclass
 class BatchConfig:
     """Configuration for batch processing."""
+
     recursive: bool = True
     file_pattern: Optional[str] = None
     continue_on_error: bool = True
 
 
 def collect_supported_files(
-    directory: Path,
-    pattern: Optional[str] = None,
-    recursive: bool = True
+    directory: Path, pattern: Optional[str] = None, recursive: bool = True
 ) -> list[Path]:
     """
     Collect all supported files from a directory.
@@ -70,9 +69,9 @@ def collect_supported_files(
 
     # Get all files based on recursive setting
     if recursive:
-        all_files = directory.rglob('*')
+        all_files = directory.rglob("*")
     else:
-        all_files = directory.glob('*')
+        all_files = directory.glob("*")
 
     for file_path in all_files:
         # Skip directories
@@ -140,7 +139,7 @@ def aggregate_results(
     file_results: list[DocProcessingResult],
     all_entries: list,
     output_file: str,
-    duration: float
+    duration: float,
 ) -> BatchProcessingResult:
     """
     Aggregate results from multiple file processing operations.
@@ -177,7 +176,7 @@ def aggregate_results(
         output_file=output_file,
         duration=duration,
         file_results=file_results,
-        errors=global_errors
+        errors=global_errors,
     )
 
 
@@ -250,13 +249,13 @@ class BatchProcessor:
             else:
                 raise UnsupportedFormatError(
                     f"Unsupported format: {source.suffix}",
-                    supported_formats=DocumentParserFactory.get_supported_formats()
+                    supported_formats=DocumentParserFactory.get_supported_formats(),
                 )
         elif source.is_dir():
             return collect_supported_files(
                 source,
                 pattern=self.config.file_pattern,
-                recursive=self.config.recursive
+                recursive=self.config.recursive,
             )
         else:
             raise FileNotFoundError(f"Source not found: {source}")
@@ -292,10 +291,7 @@ class BatchProcessor:
             Aggregated batch processing result
         """
         return aggregate_results(
-            self._file_results,
-            self._all_entries,
-            output_file,
-            duration
+            self._file_results, self._all_entries, output_file, duration
         )
 
     def get_entries(self) -> list:

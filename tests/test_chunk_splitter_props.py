@@ -25,6 +25,7 @@ from ollaforge.doc_parser import (
 # Strategies for generating test data
 # ============================================================================
 
+
 @st.composite
 def chunk_configs(draw):
     """Generate valid ChunkConfig instances."""
@@ -49,11 +50,13 @@ def chunk_configs(draw):
 def text_documents(draw, min_length=1, max_length=10000):
     """Generate ParsedDocument instances with text content."""
     # Generate text content
-    content = draw(st.text(
-        alphabet=st.characters(whitelist_categories=('L', 'N', 'P', 'Z')),
-        min_size=min_length,
-        max_size=max_length
-    ))
+    content = draw(
+        st.text(
+            alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z")),
+            min_size=min_length,
+            max_size=max_length,
+        )
+    )
 
     # Ensure content is not just whitespace
     assume(content.strip())
@@ -63,7 +66,7 @@ def text_documents(draw, min_length=1, max_length=10000):
         doc_type=DocumentType.TEXT,
         metadata={},
         sections=[],
-        source_path='test.txt'
+        source_path="test.txt",
     )
 
 
@@ -78,48 +81,55 @@ def markdown_documents(draw, min_sections=1, max_sections=5):
 
     for _i in range(num_sections):
         level = draw(st.integers(min_value=1, max_value=3))
-        title = draw(st.text(
-            alphabet=st.characters(whitelist_categories=('L', 'N')),
-            min_size=1,
-            max_size=30
-        ))
-        section_content = draw(st.text(
-            alphabet=st.characters(whitelist_categories=('L', 'N', 'P', 'Z')),
-            min_size=10,
-            max_size=500
-        ))
+        title = draw(
+            st.text(
+                alphabet=st.characters(whitelist_categories=("L", "N")),
+                min_size=1,
+                max_size=30,
+            )
+        )
+        section_content = draw(
+            st.text(
+                alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z")),
+                min_size=10,
+                max_size=500,
+            )
+        )
 
         # Ensure title and content are not just whitespace
         assume(title.strip())
         assume(section_content.strip())
 
-        heading = '#' * level + ' ' + title
+        heading = "#" * level + " " + title
         content_parts.append(heading)
         content_parts.append(section_content)
 
-        sections.append(DocumentSection(
-            title=title,
-            content=section_content,
-            level=level,
-            start_line=current_line,
-            end_line=current_line + 2
-        ))
+        sections.append(
+            DocumentSection(
+                title=title,
+                content=section_content,
+                level=level,
+                start_line=current_line,
+                end_line=current_line + 2,
+            )
+        )
         current_line += 3
 
-    full_content = '\n\n'.join(content_parts)
+    full_content = "\n\n".join(content_parts)
 
     return ParsedDocument(
         content=full_content,
         doc_type=DocumentType.MARKDOWN,
         metadata={},
         sections=sections,
-        source_path='test.md'
+        source_path="test.md",
     )
 
 
 # ============================================================================
 # Property Tests
 # ============================================================================
+
 
 class TestChunkSizeCompliance:
     """
@@ -132,10 +142,7 @@ class TestChunkSizeCompliance:
     **Validates: Requirements 2.1, 2.5**
     """
 
-    @given(
-        config=chunk_configs(),
-        doc=text_documents(min_length=100, max_length=5000)
-    )
+    @given(config=chunk_configs(), doc=text_documents(min_length=100, max_length=5000))
     @settings(max_examples=20)
     def test_all_chunks_within_size_limit(self, config, doc):
         """
@@ -150,13 +157,13 @@ class TestChunkSizeCompliance:
         chunks = splitter.split(doc)
 
         for chunk in chunks:
-            assert len(chunk.content) <= config.chunk_size, (
-                f"Chunk size {len(chunk.content)} exceeds limit {config.chunk_size}"
-            )
+            assert (
+                len(chunk.content) <= config.chunk_size
+            ), f"Chunk size {len(chunk.content)} exceeds limit {config.chunk_size}"
 
     @given(
         chunk_size=st.integers(min_value=200, max_value=2000),
-        text_length=st.integers(min_value=100, max_value=5000)
+        text_length=st.integers(min_value=100, max_value=5000),
     )
     @settings(max_examples=20)
     def test_fixed_size_chunks_within_limit(self, chunk_size, text_length):
@@ -175,28 +182,25 @@ class TestChunkSizeCompliance:
             chunk_size=chunk_size,
             chunk_overlap=overlap,
             strategy=SplitStrategy.FIXED_SIZE,
-            min_chunk_size=min_size
+            min_chunk_size=min_size,
         )
 
         # Create document with specified length
-        content = 'A' * text_length
+        content = "A" * text_length
         doc = ParsedDocument(
-            content=content,
-            doc_type=DocumentType.TEXT,
-            source_path='test.txt'
+            content=content, doc_type=DocumentType.TEXT, source_path="test.txt"
         )
 
         splitter = ChunkSplitter(config)
         chunks = splitter.split(doc)
 
         for chunk in chunks:
-            assert len(chunk.content) <= chunk_size, (
-                f"Chunk size {len(chunk.content)} exceeds limit {chunk_size}"
-            )
+            assert (
+                len(chunk.content) <= chunk_size
+            ), f"Chunk size {len(chunk.content)} exceeds limit {chunk_size}"
 
     @given(
-        config=chunk_configs(),
-        doc=markdown_documents(min_sections=1, max_sections=3)
+        config=chunk_configs(), doc=markdown_documents(min_sections=1, max_sections=3)
     )
     @settings(max_examples=20)
     def test_hybrid_chunks_within_limit(self, config, doc):
@@ -214,10 +218,9 @@ class TestChunkSizeCompliance:
         chunks = splitter.split(doc)
 
         for chunk in chunks:
-            assert len(chunk.content) <= config.chunk_size, (
-                f"Chunk size {len(chunk.content)} exceeds limit {config.chunk_size}"
-            )
-
+            assert (
+                len(chunk.content) <= config.chunk_size
+            ), f"Chunk size {len(chunk.content)} exceeds limit {config.chunk_size}"
 
 
 class TestSemanticBoundaryPreservation:
@@ -247,7 +250,7 @@ class TestSemanticBoundaryPreservation:
             chunk_size=10000,
             chunk_overlap=200,
             strategy=SplitStrategy.SEMANTIC,
-            min_chunk_size=50
+            min_chunk_size=50,
         )
 
         splitter = ChunkSplitter(config)
@@ -265,7 +268,7 @@ class TestSemanticBoundaryPreservation:
                         found = True
                         # The heading should not be split from its content
                         # Check that the heading marker is present
-                        heading_marker = '#' * section.level + ' ' + section_title
+                        heading_marker = "#" * section.level + " " + section_title
                         if heading_marker in chunk.content:
                             # Heading is properly preserved
                             break
@@ -274,7 +277,7 @@ class TestSemanticBoundaryPreservation:
 
     @given(
         num_paragraphs=st.integers(min_value=2, max_value=5),
-        para_length=st.integers(min_value=50, max_value=200)
+        para_length=st.integers(min_value=50, max_value=200),
     )
     @settings(max_examples=20)
     def test_paragraphs_not_split_when_fit(self, num_paragraphs, para_length):
@@ -287,14 +290,16 @@ class TestSemanticBoundaryPreservation:
         **Validates: Requirements 2.2**
         """
         # Create paragraphs
-        paragraphs = [f"Paragraph {i}: " + "x" * para_length for i in range(num_paragraphs)]
+        paragraphs = [
+            f"Paragraph {i}: " + "x" * para_length for i in range(num_paragraphs)
+        ]
         content = "\n\n".join(paragraphs)
 
         doc = ParsedDocument(
             content=content,
             doc_type=DocumentType.TEXT,
             sections=[],
-            source_path='test.txt'
+            source_path="test.txt",
         )
 
         # Use chunk size large enough to fit each paragraph
@@ -302,7 +307,7 @@ class TestSemanticBoundaryPreservation:
             chunk_size=max(para_length * 2, 500),
             chunk_overlap=50,
             strategy=SplitStrategy.SEMANTIC,
-            min_chunk_size=20
+            min_chunk_size=20,
         )
 
         splitter = ChunkSplitter(config)
@@ -331,7 +336,7 @@ class TestSemanticBoundaryPreservation:
 
     @given(
         num_functions=st.integers(min_value=2, max_value=4),
-        func_body_lines=st.integers(min_value=2, max_value=5)
+        func_body_lines=st.integers(min_value=2, max_value=5),
     )
     @settings(max_examples=20)
     def test_code_blocks_preserved(self, num_functions, func_body_lines):
@@ -353,22 +358,24 @@ class TestSemanticBoundaryPreservation:
             func_content = f"def {func_name}():\n" + "\n".join(body_lines)
 
             content_parts.append(func_content)
-            sections.append(DocumentSection(
-                title=f"def {func_name}",
-                content=func_content,
-                level=1,
-                start_line=i * (func_body_lines + 1),
-                end_line=(i + 1) * (func_body_lines + 1) - 1
-            ))
+            sections.append(
+                DocumentSection(
+                    title=f"def {func_name}",
+                    content=func_content,
+                    level=1,
+                    start_line=i * (func_body_lines + 1),
+                    end_line=(i + 1) * (func_body_lines + 1) - 1,
+                )
+            )
 
         content = "\n\n".join(content_parts)
 
         doc = ParsedDocument(
             content=content,
             doc_type=DocumentType.CODE,
-            metadata={'language': 'python'},
+            metadata={"language": "python"},
             sections=sections,
-            source_path='test.py'
+            source_path="test.py",
         )
 
         # Use chunk size large enough to fit each function
@@ -377,7 +384,7 @@ class TestSemanticBoundaryPreservation:
             chunk_size=max(max_func_size * 2, 500),
             chunk_overlap=50,
             strategy=SplitStrategy.SEMANTIC,
-            min_chunk_size=20
+            min_chunk_size=20,
         )
 
         splitter = ChunkSplitter(config)
@@ -399,7 +406,6 @@ class TestSemanticBoundaryPreservation:
             assert found, f"Function '{func_def}' was split across chunks"
 
 
-
 class TestChunkOverlapCorrectness:
     """
     Property 5: Chunk Overlap Correctness
@@ -414,7 +420,7 @@ class TestChunkOverlapCorrectness:
     @given(
         chunk_size=st.integers(min_value=200, max_value=1000),
         overlap=st.integers(min_value=10, max_value=100),
-        text_length=st.integers(min_value=500, max_value=3000)
+        text_length=st.integers(min_value=500, max_value=3000),
     )
     @settings(max_examples=20)
     def test_fixed_size_overlap_exact(self, chunk_size, overlap, text_length):
@@ -433,15 +439,13 @@ class TestChunkOverlapCorrectness:
             chunk_size=chunk_size,
             chunk_overlap=overlap,
             strategy=SplitStrategy.FIXED_SIZE,
-            min_chunk_size=min(50, chunk_size // 4)
+            min_chunk_size=min(50, chunk_size // 4),
         )
 
         # Create uniform content for predictable overlap
-        content = 'A' * text_length
+        content = "A" * text_length
         doc = ParsedDocument(
-            content=content,
-            doc_type=DocumentType.TEXT,
-            source_path='test.txt'
+            content=content, doc_type=DocumentType.TEXT, source_path="test.txt"
         )
 
         splitter = ChunkSplitter(config)
@@ -482,18 +486,16 @@ class TestChunkOverlapCorrectness:
             chunk_size=chunk_size,
             chunk_overlap=overlap,
             strategy=SplitStrategy.FIXED_SIZE,
-            min_chunk_size=min(50, chunk_size // 4)
+            min_chunk_size=min(50, chunk_size // 4),
         )
 
         # Create content with distinct characters to verify overlap
         # Use a pattern that makes overlap verification clear
         text_length = chunk_size * 3  # Ensure multiple chunks
-        content = ''.join([chr(ord('A') + (i % 26)) for i in range(text_length)])
+        content = "".join([chr(ord("A") + (i % 26)) for i in range(text_length)])
 
         doc = ParsedDocument(
-            content=content,
-            doc_type=DocumentType.TEXT,
-            source_path='test.txt'
+            content=content, doc_type=DocumentType.TEXT, source_path="test.txt"
         )
 
         splitter = ChunkSplitter(config)
@@ -508,9 +510,9 @@ class TestChunkOverlapCorrectness:
             overlap_from_current = current_chunk.content[-overlap:]
             overlap_from_next = next_chunk.content[:overlap]
 
-            assert overlap_from_current == overlap_from_next, (
-                f"Overlap content mismatch between chunks {i} and {i+1}"
-            )
+            assert (
+                overlap_from_current == overlap_from_next
+            ), f"Overlap content mismatch between chunks {i} and {i+1}"
 
     @given(
         chunk_size=st.integers(min_value=300, max_value=800),
@@ -532,17 +534,15 @@ class TestChunkOverlapCorrectness:
             chunk_size=chunk_size,
             chunk_overlap=overlap,
             strategy=SplitStrategy.FIXED_SIZE,
-            min_chunk_size=min(50, chunk_size // 4)
+            min_chunk_size=min(50, chunk_size // 4),
         )
 
         # Create content
         text_length = chunk_size * 4
-        content = 'X' * text_length
+        content = "X" * text_length
 
         doc = ParsedDocument(
-            content=content,
-            doc_type=DocumentType.TEXT,
-            source_path='test.txt'
+            content=content, doc_type=DocumentType.TEXT, source_path="test.txt"
         )
 
         splitter = ChunkSplitter(config)

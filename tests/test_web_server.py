@@ -23,6 +23,7 @@ def client():
 # Unit Tests for CORS Configuration
 # ============================================================================
 
+
 def test_cors_headers_in_responses(client):
     """
     Test that CORS headers are present in API responses.
@@ -41,8 +42,7 @@ def test_cors_headers_in_responses(client):
     # that the middleware is configured (headers will be added when Origin is present)
     # We can verify this by making a request with an Origin header
     response_with_origin = client.get(
-        "/health",
-        headers={"Origin": "http://localhost:3000"}
+        "/health", headers={"Origin": "http://localhost:3000"}
     )
 
     assert response_with_origin.status_code == 200
@@ -63,7 +63,7 @@ def test_cors_allowed_origins_configuration(client):
         headers={
             "Origin": "http://localhost:3000",
             "Access-Control-Request-Method": "GET",
-        }
+        },
     )
 
     # Should return 200 for preflight request
@@ -86,7 +86,7 @@ def test_cors_allows_credentials(client):
         headers={
             "Origin": "http://localhost:3000",
             "Access-Control-Request-Method": "GET",
-        }
+        },
     )
 
     # Should allow credentials
@@ -105,7 +105,7 @@ def test_cors_allows_all_methods(client):
         headers={
             "Origin": "http://localhost:3000",
             "Access-Control-Request-Method": "POST",
-        }
+        },
     )
 
     # Should allow the requested method
@@ -128,7 +128,7 @@ def test_cors_allows_all_headers(client):
             "Origin": "http://localhost:3000",
             "Access-Control-Request-Method": "GET",
             "Access-Control-Request-Headers": "Content-Type,Authorization",
-        }
+        },
     )
 
     # Should allow the requested headers
@@ -141,6 +141,7 @@ def test_cors_allows_all_headers(client):
 # ============================================================================
 # Unit Tests for Basic Endpoints
 # ============================================================================
+
 
 def test_health_endpoint(client):
     """Test that the health check endpoint works."""
@@ -181,22 +182,21 @@ def test_api_returns_json(client):
 
 # Strategy for generating valid HTTP origins
 # Only use origins that are in the default CORS_ORIGINS configuration
-http_origin_strategy = st.sampled_from([
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:8080",
-])
+http_origin_strategy = st.sampled_from(
+    [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8080",
+    ]
+)
 
 # Strategy for generating HTTP methods
-http_method_strategy = st.sampled_from([
-    "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"
-])
-
-
-@given(
-    origin=http_origin_strategy,
-    method=http_method_strategy
+http_method_strategy = st.sampled_from(
+    ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
 )
+
+
+@given(origin=http_origin_strategy, method=http_method_strategy)
 @settings(max_examples=20)
 def test_cors_headers_are_present(origin, method):
     """
@@ -217,28 +217,33 @@ def test_cors_headers_are_present(origin, method):
         headers={
             "Origin": origin,
             "Access-Control-Request-Method": method,
-        }
+        },
     )
 
     # Should return 200 for preflight
-    assert response.status_code == 200, \
-        f"Preflight request should return 200, got {response.status_code}"
+    assert (
+        response.status_code == 200
+    ), f"Preflight request should return 200, got {response.status_code}"
 
     # Verify CORS headers are present
     headers_lower = {k.lower(): v for k, v in response.headers.items()}
 
-    assert "access-control-allow-origin" in headers_lower, \
-        f"Missing access-control-allow-origin header for origin {origin}"
+    assert (
+        "access-control-allow-origin" in headers_lower
+    ), f"Missing access-control-allow-origin header for origin {origin}"
 
-    assert "access-control-allow-methods" in headers_lower, \
-        f"Missing access-control-allow-methods header for method {method}"
+    assert (
+        "access-control-allow-methods" in headers_lower
+    ), f"Missing access-control-allow-methods header for method {method}"
 
-    assert "access-control-allow-credentials" in headers_lower, \
-        "Missing access-control-allow-credentials header"
+    assert (
+        "access-control-allow-credentials" in headers_lower
+    ), "Missing access-control-allow-credentials header"
 
     # Verify credentials are allowed
-    assert headers_lower["access-control-allow-credentials"] == "true", \
-        "CORS should allow credentials"
+    assert (
+        headers_lower["access-control-allow-credentials"] == "true"
+    ), "CORS should allow credentials"
 
 
 @given(endpoint=st.sampled_from(["/health", "/"]))
@@ -254,17 +259,16 @@ def test_cors_headers_on_actual_requests(endpoint):
     client = TestClient(app)
 
     # Make a request with Origin header
-    response = client.get(
-        endpoint,
-        headers={"Origin": "http://localhost:3000"}
-    )
+    response = client.get(endpoint, headers={"Origin": "http://localhost:3000"})
 
     # Should be successful
-    assert response.status_code == 200, \
-        f"Request to {endpoint} should return 200, got {response.status_code}"
+    assert (
+        response.status_code == 200
+    ), f"Request to {endpoint} should return 200, got {response.status_code}"
 
     # Verify CORS header is present
     headers_lower = {k.lower(): v for k, v in response.headers.items()}
 
-    assert "access-control-allow-origin" in headers_lower, \
-        f"Missing access-control-allow-origin header for endpoint {endpoint}"
+    assert (
+        "access-control-allow-origin" in headers_lower
+    ), f"Missing access-control-allow-origin header for endpoint {endpoint}"

@@ -51,54 +51,50 @@ def create_test_client():
 
 # Strategy for valid field names
 field_name_strategy = st.text(
-    alphabet='abcdefghijklmnopqrstuvwxyz_',
-    min_size=1,
-    max_size=15
+    alphabet="abcdefghijklmnopqrstuvwxyz_", min_size=1, max_size=15
 ).filter(lambda x: x[0].isalpha() and x.strip() == x)
 
 # Strategy for simple field values (avoid special characters that break CSV)
 simple_value_strategy = st.text(
-    alphabet='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+    alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ",
     min_size=1,
-    max_size=50
+    max_size=50,
 ).filter(lambda x: x.strip() == x and len(x.strip()) > 0)
 
 # Strategy for supported formats
-supported_format_strategy = st.sampled_from([
-    FileFormat.JSONL,
-    FileFormat.JSON,
-    FileFormat.CSV,
-    FileFormat.TSV
-])
+supported_format_strategy = st.sampled_from(
+    [FileFormat.JSONL, FileFormat.JSON, FileFormat.CSV, FileFormat.TSV]
+)
 
 # Strategy for download format strings
 download_format_strategy = st.sampled_from(["jsonl", "json", "csv", "tsv"])
 
 # Strategy for unsupported file extensions
-unsupported_extension_strategy = st.sampled_from([
-    ".xyz", ".doc", ".pdf", ".exe", ".bin", ".mp3", ".jpg"
-])
+unsupported_extension_strategy = st.sampled_from(
+    [".xyz", ".doc", ".pdf", ".exe", ".bin", ".mp3", ".jpg"]
+)
 
 
 # ============================================================================
 # Helper Functions
 # ============================================================================
 
+
 def create_jsonl_content(entries: list) -> bytes:
     """Create JSONL file content from entries."""
     lines = [json.dumps(entry, ensure_ascii=False) for entry in entries]
-    return '\n'.join(lines).encode('utf-8')
+    return "\n".join(lines).encode("utf-8")
 
 
 def create_json_content(entries: list) -> bytes:
     """Create JSON array file content from entries."""
-    return json.dumps(entries, ensure_ascii=False, indent=2).encode('utf-8')
+    return json.dumps(entries, ensure_ascii=False, indent=2).encode("utf-8")
 
 
-def create_csv_content(entries: list, delimiter: str = ',') -> bytes:
+def create_csv_content(entries: list, delimiter: str = ",") -> bytes:
     """Create CSV/TSV file content from entries."""
     if not entries:
-        return b''
+        return b""
 
     output = io.StringIO()
     fieldnames = list(entries[0].keys())
@@ -106,7 +102,7 @@ def create_csv_content(entries: list, delimiter: str = ',') -> bytes:
     writer.writeheader()
     for entry in entries:
         writer.writerow(entry)
-    return output.getvalue().encode('utf-8')
+    return output.getvalue().encode("utf-8")
 
 
 def create_test_entries(field_names: list, count: int = 3) -> list:
@@ -122,15 +118,11 @@ def create_test_entries(field_names: list, count: int = 3) -> list:
 # Property Test 12: Format support is comprehensive
 # ============================================================================
 
+
 @given(
-    field_names=st.lists(
-        field_name_strategy,
-        min_size=1,
-        max_size=4,
-        unique=True
-    ),
+    field_names=st.lists(field_name_strategy, min_size=1, max_size=4, unique=True),
     entry_count=st.integers(min_value=1, max_value=5),
-    file_format=supported_format_strategy
+    file_format=supported_format_strategy,
 )
 @settings(max_examples=50, deadline=60000)
 def test_format_support_is_comprehensive(field_names, entry_count, file_format):
@@ -141,9 +133,12 @@ def test_format_support_is_comprehensive(field_names, entry_count, file_format):
     For any supported file format (JSONL, JSON, CSV, TSV), the system should
     correctly recognize and parse files in that format.
     """
+
     async def run_test():
         transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             # Create test entries
             entries = create_test_entries(field_names, entry_count)
 
@@ -152,14 +147,14 @@ def test_format_support_is_comprehensive(field_names, entry_count, file_format):
                 FileFormat.JSONL: ".jsonl",
                 FileFormat.JSON: ".json",
                 FileFormat.CSV: ".csv",
-                FileFormat.TSV: ".tsv"
+                FileFormat.TSV: ".tsv",
             }
 
             content_creators = {
                 FileFormat.JSONL: lambda e: create_jsonl_content(e),
                 FileFormat.JSON: lambda e: create_json_content(e),
-                FileFormat.CSV: lambda e: create_csv_content(e, ','),
-                FileFormat.TSV: lambda e: create_csv_content(e, '\t')
+                FileFormat.CSV: lambda e: create_csv_content(e, ","),
+                FileFormat.TSV: lambda e: create_csv_content(e, "\t"),
             }
 
             extension = extension_map[file_format]
@@ -171,20 +166,23 @@ def test_format_support_is_comprehensive(field_names, entry_count, file_format):
             response = await client.post("/api/augment/upload", files=files)
 
             # Should return 200 OK
-            assert response.status_code == 200, \
-                f"Upload of {file_format.value} should return 200, got {response.status_code}: {response.text}"
+            assert (
+                response.status_code == 200
+            ), f"Upload of {file_format.value} should return 200, got {response.status_code}: {response.text}"
 
             data = response.json()
 
             # Should have correct entry count
-            assert data["entry_count"] == entry_count, \
-                f"Entry count should be {entry_count}, got {data['entry_count']}"
+            assert (
+                data["entry_count"] == entry_count
+            ), f"Entry count should be {entry_count}, got {data['entry_count']}"
 
             # Should extract all field names
             returned_fields = set(data["fields"])
             expected_fields = set(field_names)
-            assert returned_fields == expected_fields, \
-                f"Expected fields {expected_fields}, got {returned_fields}"
+            assert (
+                returned_fields == expected_fields
+            ), f"Expected fields {expected_fields}, got {returned_fields}"
 
             # Preview should have entries
             assert len(data["preview"]) > 0, "Preview should have entries"
@@ -196,19 +194,17 @@ def test_format_support_is_comprehensive(field_names, entry_count, file_format):
 # Property Test 13: Format conversion preserves data
 # ============================================================================
 
+
 @given(
-    field_names=st.lists(
-        field_name_strategy,
-        min_size=1,
-        max_size=3,
-        unique=True
-    ),
+    field_names=st.lists(field_name_strategy, min_size=1, max_size=3, unique=True),
     entry_count=st.integers(min_value=1, max_value=5),
     source_format=supported_format_strategy,
-    target_format=download_format_strategy
+    target_format=download_format_strategy,
 )
 @settings(max_examples=50, deadline=60000)
-def test_format_conversion_preserves_data(field_names, entry_count, source_format, target_format):
+def test_format_conversion_preserves_data(
+    field_names, entry_count, source_format, target_format
+):
     """
     **Feature: web-interface, Property 13: Format conversion preserves data**
     **Validates: Requirements 4.3**
@@ -224,9 +220,7 @@ def test_format_conversion_preserves_data(field_names, entry_count, source_forma
 
     # Write to source format
     with tempfile.NamedTemporaryFile(
-        mode='w',
-        suffix=f'.{source_format.value}',
-        delete=False
+        mode="w", suffix=f".{source_format.value}", delete=False
     ) as tmp:
         source_path = tmp.name
 
@@ -237,33 +231,34 @@ def test_format_conversion_preserves_data(field_names, entry_count, source_forma
         read_entries, read_fields = read_file(source_path)
 
         # Verify entry count preserved
-        assert len(read_entries) == entry_count, \
-            f"Entry count should be {entry_count}, got {len(read_entries)}"
+        assert (
+            len(read_entries) == entry_count
+        ), f"Entry count should be {entry_count}, got {len(read_entries)}"
 
         # Verify all fields preserved
-        assert set(read_fields) == set(field_names), \
-            f"Fields should be {set(field_names)}, got {set(read_fields)}"
+        assert set(read_fields) == set(
+            field_names
+        ), f"Fields should be {set(field_names)}, got {set(read_fields)}"
 
         # Verify all values preserved
         for i, entry in enumerate(read_entries):
             for field in field_names:
                 expected_value = f"value{i}"
                 actual_value = entry.get(field, "")
-                assert str(actual_value) == expected_value, \
-                    f"Value for {field} in entry {i} should be '{expected_value}', got '{actual_value}'"
+                assert (
+                    str(actual_value) == expected_value
+                ), f"Value for {field} in entry {i} should be '{expected_value}', got '{actual_value}'"
 
         # Now convert to target format
         target_format_enum = {
             "jsonl": FileFormat.JSONL,
             "json": FileFormat.JSON,
             "csv": FileFormat.CSV,
-            "tsv": FileFormat.TSV
+            "tsv": FileFormat.TSV,
         }[target_format]
 
         with tempfile.NamedTemporaryFile(
-            mode='w',
-            suffix=f'.{target_format}',
-            delete=False
+            mode="w", suffix=f".{target_format}", delete=False
         ) as tmp:
             target_path = tmp.name
 
@@ -274,20 +269,23 @@ def test_format_conversion_preserves_data(field_names, entry_count, source_forma
             final_entries, final_fields = read_file(target_path)
 
             # Verify entry count still preserved
-            assert len(final_entries) == entry_count, \
-                f"Entry count after conversion should be {entry_count}, got {len(final_entries)}"
+            assert (
+                len(final_entries) == entry_count
+            ), f"Entry count after conversion should be {entry_count}, got {len(final_entries)}"
 
             # Verify all fields still preserved
-            assert set(final_fields) == set(field_names), \
-                f"Fields after conversion should be {set(field_names)}, got {set(final_fields)}"
+            assert set(final_fields) == set(
+                field_names
+            ), f"Fields after conversion should be {set(field_names)}, got {set(final_fields)}"
 
             # Verify all values still preserved
             for i, entry in enumerate(final_entries):
                 for field in field_names:
                     expected_value = f"value{i}"
                     actual_value = entry.get(field, "")
-                    assert str(actual_value) == expected_value, \
-                        f"Value for {field} in entry {i} after conversion should be '{expected_value}', got '{actual_value}'"
+                    assert (
+                        str(actual_value) == expected_value
+                    ), f"Value for {field} in entry {i} after conversion should be '{expected_value}', got '{actual_value}'"
 
         finally:
             os.unlink(target_path)
@@ -300,9 +298,8 @@ def test_format_conversion_preserves_data(field_names, entry_count, source_forma
 # Property Test 14: Unsupported formats show errors
 # ============================================================================
 
-@given(
-    extension=unsupported_extension_strategy
-)
+
+@given(extension=unsupported_extension_strategy)
 @settings(max_examples=20, deadline=60000)
 def test_unsupported_formats_show_errors(extension):
     """
@@ -312,9 +309,12 @@ def test_unsupported_formats_show_errors(extension):
     For any unsupported file format uploaded, the system should display
     a clear error message listing the supported formats.
     """
+
     async def run_test():
         transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             # Create dummy content
             content = b"some random content"
             filename = f"test{extension}"
@@ -324,8 +324,9 @@ def test_unsupported_formats_show_errors(extension):
             response = await client.post("/api/augment/upload", files=files)
 
             # Should return 415 Unsupported Media Type
-            assert response.status_code == 415, \
-                f"Unsupported format {extension} should return 415, got {response.status_code}"
+            assert (
+                response.status_code == 415
+            ), f"Unsupported format {extension} should return 415, got {response.status_code}"
 
             data = response.json()
 
@@ -336,14 +337,14 @@ def test_unsupported_formats_show_errors(extension):
 
             # Error should mention unsupported format
             error_str = str(detail).lower()
-            assert "unsupported" in error_str or "format" in error_str, \
-                f"Error should mention unsupported format: {detail}"
+            assert (
+                "unsupported" in error_str or "format" in error_str
+            ), f"Error should mention unsupported format: {detail}"
 
             # Error should list supported formats
             supported = [".jsonl", ".json", ".csv", ".tsv", ".parquet"]
             has_supported_list = any(fmt in str(detail) for fmt in supported)
-            assert has_supported_list, \
-                f"Error should list supported formats: {detail}"
+            assert has_supported_list, f"Error should list supported formats: {detail}"
 
     asyncio.run(run_test())
 
@@ -351,6 +352,7 @@ def test_unsupported_formats_show_errors(extension):
 # ============================================================================
 # Unit Tests for Format Handling
 # ============================================================================
+
 
 class TestFormatDetection:
     """Unit tests for format detection."""
@@ -400,7 +402,7 @@ class TestFormatReadWrite:
         """Test JSONL read/write round-trip."""
         entries = [{"a": "1", "b": "2"}, {"a": "3", "b": "4"}]
 
-        with tempfile.NamedTemporaryFile(suffix='.jsonl', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as tmp:
             tmp_path = tmp.name
 
         try:
@@ -418,7 +420,7 @@ class TestFormatReadWrite:
         """Test JSON read/write round-trip."""
         entries = [{"x": "hello", "y": "world"}]
 
-        with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
             tmp_path = tmp.name
 
         try:
@@ -435,7 +437,7 @@ class TestFormatReadWrite:
         """Test CSV read/write round-trip."""
         entries = [{"col1": "val1", "col2": "val2"}]
 
-        with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
             tmp_path = tmp.name
 
         try:
@@ -453,7 +455,7 @@ class TestFormatReadWrite:
         """Test TSV read/write round-trip."""
         entries = [{"field1": "data1", "field2": "data2"}]
 
-        with tempfile.NamedTemporaryFile(suffix='.tsv', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".tsv", delete=False) as tmp:
             tmp_path = tmp.name
 
         try:
@@ -475,7 +477,7 @@ class TestFormatReadWrite:
     def test_read_invalid_jsonl_raises_error(self):
         """Test that reading invalid JSONL raises FormatError."""
         with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.jsonl', delete=False
+            mode="w", suffix=".jsonl", delete=False
         ) as tmp:
             tmp.write("not valid json\n")
             tmp_path = tmp.name
@@ -519,11 +521,14 @@ class TestSupportedFormats:
 # Unit Tests for Web API Format Handling
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_upload_jsonl_format():
     """Test uploading JSONL format file."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         entries = [{"instruction": "test", "output": "result"}]
         content = create_jsonl_content(entries)
 
@@ -541,7 +546,9 @@ async def test_upload_jsonl_format():
 async def test_upload_json_format():
     """Test uploading JSON array format file."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         entries = [{"field1": "value1"}, {"field1": "value2"}]
         content = create_json_content(entries)
 
@@ -558,9 +565,11 @@ async def test_upload_json_format():
 async def test_upload_csv_format():
     """Test uploading CSV format file."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         entries = [{"col_a": "data1", "col_b": "data2"}]
-        content = create_csv_content(entries, ',')
+        content = create_csv_content(entries, ",")
 
         files = {"file": ("test.csv", content, "text/csv")}
         response = await client.post("/api/augment/upload", files=files)
@@ -576,9 +585,11 @@ async def test_upload_csv_format():
 async def test_upload_tsv_format():
     """Test uploading TSV format file."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         entries = [{"tab_col1": "val1", "tab_col2": "val2"}]
-        content = create_csv_content(entries, '\t')
+        content = create_csv_content(entries, "\t")
 
         files = {"file": ("test.tsv", content, "text/tab-separated-values")}
         response = await client.post("/api/augment/upload", files=files)
@@ -590,20 +601,19 @@ async def test_upload_tsv_format():
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.augmentation.augmentation_service')
+@patch("ollaforge.web.routes.augmentation.augmentation_service")
 async def test_download_jsonl_format(mock_service):
     """Test downloading in JSONL format."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         task_id = "test_download_jsonl"
         mock_service.get_task.return_value = {
             "status": "completed",
             "progress": 1,
             "total": 1,
-            "result": {
-                "entries": [{"field": "value"}],
-                "total": 1
-            }
+            "result": {"entries": [{"field": "value"}], "total": 1},
         }
 
         response = await client.get(f"/api/augment/{task_id}/download?format=jsonl")
@@ -614,20 +624,19 @@ async def test_download_jsonl_format(mock_service):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.augmentation.augmentation_service')
+@patch("ollaforge.web.routes.augmentation.augmentation_service")
 async def test_download_json_format(mock_service):
     """Test downloading in JSON format."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         task_id = "test_download_json"
         mock_service.get_task.return_value = {
             "status": "completed",
             "progress": 1,
             "total": 1,
-            "result": {
-                "entries": [{"field": "value"}],
-                "total": 1
-            }
+            "result": {"entries": [{"field": "value"}], "total": 1},
         }
 
         response = await client.get(f"/api/augment/{task_id}/download?format=json")
@@ -637,20 +646,19 @@ async def test_download_json_format(mock_service):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.augmentation.augmentation_service')
+@patch("ollaforge.web.routes.augmentation.augmentation_service")
 async def test_download_csv_format(mock_service):
     """Test downloading in CSV format."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         task_id = "test_download_csv"
         mock_service.get_task.return_value = {
             "status": "completed",
             "progress": 1,
             "total": 1,
-            "result": {
-                "entries": [{"field": "value"}],
-                "total": 1
-            }
+            "result": {"entries": [{"field": "value"}], "total": 1},
         }
 
         response = await client.get(f"/api/augment/{task_id}/download?format=csv")
@@ -660,20 +668,19 @@ async def test_download_csv_format(mock_service):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.augmentation.augmentation_service')
+@patch("ollaforge.web.routes.augmentation.augmentation_service")
 async def test_download_tsv_format(mock_service):
     """Test downloading in TSV format."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         task_id = "test_download_tsv"
         mock_service.get_task.return_value = {
             "status": "completed",
             "progress": 1,
             "total": 1,
-            "result": {
-                "entries": [{"field": "value"}],
-                "total": 1
-            }
+            "result": {"entries": [{"field": "value"}], "total": 1},
         }
 
         response = await client.get(f"/api/augment/{task_id}/download?format=tsv")
@@ -686,7 +693,9 @@ async def test_download_tsv_format(mock_service):
 async def test_download_invalid_format_rejected():
     """Test that invalid download format is rejected."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/augment/some_task/download?format=invalid")
 
         # Should return 422 for validation error
@@ -697,7 +706,9 @@ async def test_download_invalid_format_rejected():
 async def test_upload_empty_file_rejected():
     """Test that empty files are handled appropriately."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         content = b""
         files = {"file": ("empty.jsonl", content, "application/x-ndjson")}
 
@@ -716,7 +727,9 @@ async def test_upload_empty_file_rejected():
 async def test_upload_malformed_json_rejected():
     """Test that malformed JSON content is rejected."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         content = b'{"incomplete": json'
         files = {"file": ("bad.json", content, "application/json")}
 
@@ -729,12 +742,15 @@ async def test_upload_malformed_json_rejected():
 # Integration Tests for Format Conversion in Downloads
 # ============================================================================
 
+
 @pytest.mark.asyncio
-@patch('ollaforge.web.routes.generation.generation_service')
+@patch("ollaforge.web.routes.generation.generation_service")
 async def test_generation_download_all_formats(mock_service):
     """Test that generation download supports all formats."""
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         task_id = "gen_format_test"
         mock_service.get_task.return_value = {
             "status": "completed",
@@ -743,16 +759,20 @@ async def test_generation_download_all_formats(mock_service):
             "result": {
                 "entries": [
                     {"instruction": "q1", "input": "", "output": "a1"},
-                    {"instruction": "q2", "input": "", "output": "a2"}
+                    {"instruction": "q2", "input": "", "output": "a2"},
                 ],
-                "total": 2
-            }
+                "total": 2,
+            },
         }
 
         for fmt in ["jsonl", "json", "csv", "tsv"]:
-            response = await client.get(f"/api/generate/{task_id}/download?format={fmt}")
+            response = await client.get(
+                f"/api/generate/{task_id}/download?format={fmt}"
+            )
 
-            assert response.status_code == 200, \
-                f"Download in {fmt} format should succeed"
-            assert len(response.content) > 0, \
-                f"Download in {fmt} format should have content"
+            assert (
+                response.status_code == 200
+            ), f"Download in {fmt} format should succeed"
+            assert (
+                len(response.content) > 0
+            ), f"Download in {fmt} format should have content"

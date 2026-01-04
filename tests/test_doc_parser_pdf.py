@@ -25,6 +25,7 @@ from ollaforge.doc_parser import (
 # Test Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def pdf_parser():
     """Create a PDFParser instance."""
@@ -49,7 +50,7 @@ def sample_pdf_path():
     writer.add_blank_page(width=612, height=792)
 
     # Create temporary file
-    with tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="wb", suffix=".pdf", delete=False) as f:
         writer.write(f)
         temp_path = f.name
 
@@ -74,7 +75,7 @@ def multi_page_pdf_path():
     for _i in range(3):
         writer.add_blank_page(width=612, height=792)
 
-    with tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="wb", suffix=".pdf", delete=False) as f:
         writer.write(f)
         temp_path = f.name
 
@@ -94,7 +95,7 @@ def pdf_with_text_path():
         # Fall back to creating a minimal PDF without reportlab
         pytest.skip("reportlab is required for text PDF tests")
 
-    with tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="wb", suffix=".pdf", delete=False) as f:
         temp_path = f.name
 
     # Create PDF with text using reportlab
@@ -120,7 +121,7 @@ def multi_page_pdf_with_text_path():
     except ImportError:
         pytest.skip("reportlab is required for multi-page text PDF tests")
 
-    with tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="wb", suffix=".pdf", delete=False) as f:
         temp_path = f.name
 
     c = canvas.Canvas(temp_path, pagesize=letter)
@@ -151,6 +152,7 @@ def multi_page_pdf_with_text_path():
 # ============================================================================
 # Unit Tests for PDFParser
 # ============================================================================
+
 
 class TestPDFParserBasics:
     """Basic tests for PDFParser functionality."""
@@ -215,7 +217,9 @@ class TestPDFParserMultiPage:
 
         assert doc.metadata["page_count"] == 3
 
-    def test_multi_page_creates_sections_per_page(self, pdf_parser, multi_page_pdf_with_text_path):
+    def test_multi_page_creates_sections_per_page(
+        self, pdf_parser, multi_page_pdf_with_text_path
+    ):
         """Test that multi-page PDFs create sections for each page with content."""
         doc = pdf_parser.parse(multi_page_pdf_with_text_path)
 
@@ -256,7 +260,7 @@ class TestPDFParserErrorHandling:
     def test_invalid_pdf_raises_error(self, pdf_parser):
         """Test that invalid PDF files raise ValueError."""
         # Create a file that is not a valid PDF
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pdf", delete=False) as f:
             f.write("This is not a valid PDF file")
             temp_path = f.name
 
@@ -271,7 +275,7 @@ class TestPDFParserErrorHandling:
     def test_empty_pdf_handling(self, pdf_parser):
         """Test handling of empty PDF files."""
         # Create an empty file with .pdf extension
-        with tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".pdf", delete=False) as f:
             temp_path = f.name
 
         try:

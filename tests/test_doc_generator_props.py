@@ -34,14 +34,17 @@ from ollaforge.models import (
 # Strategies for generating test data
 # ============================================================================
 
+
 @st.composite
 def non_empty_strings(draw, min_size=1, max_size=200):
     """Generate non-empty strings that are not just whitespace."""
-    s = draw(st.text(
-        alphabet=st.characters(whitelist_categories=('L', 'N', 'P')),
-        min_size=min_size,
-        max_size=max_size
-    ))
+    s = draw(
+        st.text(
+            alphabet=st.characters(whitelist_categories=("L", "N", "P")),
+            min_size=min_size,
+            max_size=max_size,
+        )
+    )
     assume(s.strip())
     return s
 
@@ -52,23 +55,21 @@ def sft_entries(draw):
     return DataEntry(
         instruction=draw(non_empty_strings()),
         input=draw(non_empty_strings()),
-        output=draw(non_empty_strings())
+        output=draw(non_empty_strings()),
     )
 
 
 @st.composite
 def pretrain_entries(draw):
     """Generate valid PretrainEntry instances."""
-    return PretrainEntry(
-        text=draw(non_empty_strings(min_size=10, max_size=500))
-    )
+    return PretrainEntry(text=draw(non_empty_strings(min_size=10, max_size=500)))
 
 
 @st.composite
 def conversation_messages(draw, role=None):
     """Generate valid ConversationMessage instances."""
     if role is None:
-        role = draw(st.sampled_from(['system', 'user', 'assistant']))
+        role = draw(st.sampled_from(["system", "user", "assistant"]))
     content = draw(non_empty_strings())
     return ConversationMessage(role=role, content=content)
 
@@ -77,8 +78,8 @@ def conversation_messages(draw, role=None):
 def valid_conversation_entries(draw):
     """Generate valid SFTConversationEntry instances with required roles."""
     # Must have at least one user and one assistant message
-    user_msg = draw(conversation_messages(role='user'))
-    assistant_msg = draw(conversation_messages(role='assistant'))
+    user_msg = draw(conversation_messages(role="user"))
+    assistant_msg = draw(conversation_messages(role="assistant"))
 
     # Optionally add system message
     has_system = draw(st.booleans())
@@ -90,7 +91,7 @@ def valid_conversation_entries(draw):
     # Build conversation list
     conversations = []
     if has_system:
-        conversations.append(draw(conversation_messages(role='system')))
+        conversations.append(draw(conversation_messages(role="system")))
     conversations.append(user_msg)
     conversations.append(assistant_msg)
     conversations.extend(extra_msgs)
@@ -114,6 +115,7 @@ def dpo_entries(draw):
 # ============================================================================
 # Property Tests
 # ============================================================================
+
 
 class TestDatasetEntrySchemaValidation:
     """
@@ -185,10 +187,12 @@ class TestDatasetEntrySchemaValidation:
     @given(
         instruction=st.text(max_size=100),
         input_text=st.text(max_size=100),
-        output_text=st.text(max_size=100)
+        output_text=st.text(max_size=100),
     )
     @settings(max_examples=20)
-    def test_sft_empty_fields_fail_validation(self, instruction, input_text, output_text):
+    def test_sft_empty_fields_fail_validation(
+        self, instruction, input_text, output_text
+    ):
         """
         Feature: document-to-dataset, Property 6: Dataset Entry Schema Validation (SFT Empty)
 
@@ -197,16 +201,10 @@ class TestDatasetEntrySchemaValidation:
         **Validates: Requirements 7.2**
         """
         # If any field is empty or whitespace-only, validation should fail
-        entry = DataEntry(
-            instruction=instruction,
-            input=input_text,
-            output=output_text
-        )
+        entry = DataEntry(instruction=instruction, input=input_text, output=output_text)
 
         has_empty = (
-            not instruction.strip() or
-            not input_text.strip() or
-            not output_text.strip()
+            not instruction.strip() or not input_text.strip() or not output_text.strip()
         )
 
         if has_empty:
@@ -239,16 +237,22 @@ class TestConversationRoleRequirements:
 
         # Verify the roles are present
         roles = [msg.role for msg in entry.conversations]
-        assert 'user' in roles
-        assert 'assistant' in roles
+        assert "user" in roles
+        assert "assistant" in roles
 
     @given(
-        system_msgs=st.lists(conversation_messages(role='system'), min_size=0, max_size=2),
-        user_msgs=st.lists(conversation_messages(role='user'), min_size=0, max_size=3),
-        assistant_msgs=st.lists(conversation_messages(role='assistant'), min_size=0, max_size=3)
+        system_msgs=st.lists(
+            conversation_messages(role="system"), min_size=0, max_size=2
+        ),
+        user_msgs=st.lists(conversation_messages(role="user"), min_size=0, max_size=3),
+        assistant_msgs=st.lists(
+            conversation_messages(role="assistant"), min_size=0, max_size=3
+        ),
     )
     @settings(max_examples=20)
-    def test_missing_roles_fail_validation(self, system_msgs, user_msgs, assistant_msgs):
+    def test_missing_roles_fail_validation(
+        self, system_msgs, user_msgs, assistant_msgs
+    ):
         """
         Feature: document-to-dataset, Property 7: Conversation Role Requirements (Missing)
 
@@ -298,10 +302,7 @@ class TestDPOResponseDifferentiation:
         assert validate_dpo_entry(entry) is True
         assert entry.chosen.strip() != entry.rejected.strip()
 
-    @given(
-        prompt=non_empty_strings(),
-        response=non_empty_strings()
-    )
+    @given(prompt=non_empty_strings(), response=non_empty_strings())
     @settings(max_examples=20)
     def test_identical_responses_fail_validation(self, prompt, response):
         """
@@ -312,9 +313,7 @@ class TestDPOResponseDifferentiation:
         **Validates: Requirements 7.4**
         """
         entry = DPOEntry(
-            prompt=prompt,
-            chosen=response,
-            rejected=response  # Same as chosen
+            prompt=prompt, chosen=response, rejected=response  # Same as chosen
         )
 
         assert validate_dpo_entry(entry) is False
@@ -322,7 +321,7 @@ class TestDPOResponseDifferentiation:
     @given(
         prompt=non_empty_strings(),
         chosen=non_empty_strings(),
-        rejected=non_empty_strings()
+        rejected=non_empty_strings(),
     )
     @settings(max_examples=20)
     def test_dpo_validation_depends_on_difference(self, prompt, chosen, rejected):
@@ -458,12 +457,14 @@ class TestSerializationRoundTrip:
         assert restored.rejected == entry.rejected
 
     @given(
-        dataset_type=st.sampled_from([
-            DatasetType.SFT,
-            DatasetType.PRETRAIN,
-            DatasetType.SFT_CONVERSATION,
-            DatasetType.DPO
-        ])
+        dataset_type=st.sampled_from(
+            [
+                DatasetType.SFT,
+                DatasetType.PRETRAIN,
+                DatasetType.SFT_CONVERSATION,
+                DatasetType.DPO,
+            ]
+        )
     )
     @settings(max_examples=20)
     def test_round_trip_preserves_validity(self, dataset_type):
@@ -477,22 +478,20 @@ class TestSerializationRoundTrip:
         # Generate appropriate entry based on type
         if dataset_type == DatasetType.SFT:
             entry = DataEntry(
-                instruction="Test instruction",
-                input="Test input",
-                output="Test output"
+                instruction="Test instruction", input="Test input", output="Test output"
             )
         elif dataset_type == DatasetType.PRETRAIN:
             entry = PretrainEntry(text="Test pre-training text content")
         elif dataset_type == DatasetType.SFT_CONVERSATION:
-            entry = SFTConversationEntry(conversations=[
-                ConversationMessage(role='user', content='Hello'),
-                ConversationMessage(role='assistant', content='Hi there!')
-            ])
+            entry = SFTConversationEntry(
+                conversations=[
+                    ConversationMessage(role="user", content="Hello"),
+                    ConversationMessage(role="assistant", content="Hi there!"),
+                ]
+            )
         else:  # DPO
             entry = DPOEntry(
-                prompt="Test prompt",
-                chosen="Good response",
-                rejected="Bad response"
+                prompt="Test prompt", chosen="Good response", rejected="Bad response"
             )
 
         # Verify original is valid

@@ -63,6 +63,7 @@ class DocGenerationConfig:
     Requirements satisfied:
     - 3.5: Configuration for Ollama model usage
     """
+
     dataset_type: DatasetType = DatasetType.SFT
     model: str = "llama3.2"
     language: OutputLanguage = OutputLanguage.EN
@@ -117,8 +118,7 @@ class DocumentDatasetGenerator:
         self._qc_controller: Optional[QualityController] = None
         if config.qc_enabled and config.language == OutputLanguage.ZH_TW:
             self._qc_controller = QualityController(
-                enabled=True,
-                confidence_threshold=config.qc_confidence
+                enabled=True, confidence_threshold=config.qc_confidence
             )
 
     @property
@@ -129,7 +129,7 @@ class DocumentDatasetGenerator:
     def generate_from_chunks(
         self,
         chunks: list[TextChunk],
-        progress_callback: Optional[Callable[[int, int], None]] = None
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> list[DatasetEntry]:
         """
         Generate dataset entries from document chunks.
@@ -156,8 +156,7 @@ class DocumentDatasetGenerator:
 
                 # Validate and filter entries
                 valid_entries = [
-                    entry for entry in chunk_entries
-                    if self._validate_entry(entry)
+                    entry for entry in chunk_entries if self._validate_entry(entry)
                 ]
 
                 # Apply QC filtering if enabled for zh-tw
@@ -241,18 +240,18 @@ class DocumentDatasetGenerator:
             response = ollama.chat(
                 model=self.config.model,
                 messages=[
-                    {'role': 'system', 'content': self._get_system_prompt()},
-                    {'role': 'user', 'content': prompt}
+                    {"role": "system", "content": self._get_system_prompt()},
+                    {"role": "user", "content": prompt},
                 ],
                 format=json_schema,
                 options={
-                    'temperature': 0.7,
-                    'top_p': 0.9,
-                }
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                },
             )
 
-            if 'message' in response and 'content' in response['message']:
-                raw_content = response['message']['content']
+            if "message" in response and "content" in response["message"]:
+                raw_content = response["message"]["content"]
                 entries = self._parse_response(raw_content)
 
         except Exception:
@@ -274,7 +273,11 @@ class DocumentDatasetGenerator:
         Requirements satisfied:
         - 3.1, 3.2, 3.3, 3.4: Format-specific prompts
         """
-        lang_hint = " 請用繁體中文（台灣用語）回答。" if self.config.language == OutputLanguage.ZH_TW else ""
+        lang_hint = (
+            " 請用繁體中文（台灣用語）回答。"
+            if self.config.language == OutputLanguage.ZH_TW
+            else ""
+        )
         count = self.config.entries_per_chunk
 
         base_prompt = f"""Based on the following document content, generate {count} training examples.
@@ -287,23 +290,31 @@ Document Content:
 """
 
         if self.config.dataset_type == DatasetType.SFT:
-            return base_prompt + f"""Generate {count} SFT (Supervised Fine-Tuning) examples in JSON array format.
+            return (
+                base_prompt
+                + f"""Generate {count} SFT (Supervised Fine-Tuning) examples in JSON array format.
 Each example should have:
 - instruction: A clear task or question based on the document
 - input: Relevant context from the document
 - output: The expected answer or completion
 
 Output ONLY a JSON array with {count} objects.{lang_hint}"""
+            )
 
         elif self.config.dataset_type == DatasetType.PRETRAIN:
-            return base_prompt + f"""Generate {count} pre-training text samples in JSON array format.
+            return (
+                base_prompt
+                + f"""Generate {count} pre-training text samples in JSON array format.
 Each example should have:
 - text: A coherent, informative paragraph derived from or inspired by the document
 
 Output ONLY a JSON array with {count} objects.{lang_hint}"""
+            )
 
         elif self.config.dataset_type == DatasetType.SFT_CONVERSATION:
-            return base_prompt + f"""Generate {count} multi-turn conversation examples in JSON array format.
+            return (
+                base_prompt
+                + f"""Generate {count} multi-turn conversation examples in JSON array format.
 Each example should have:
 - conversations: An array of messages with role (system/user/assistant) and content
 
@@ -313,9 +324,12 @@ Requirements:
 - Include realistic dialogue patterns
 
 Output ONLY a JSON array with {count} objects.{lang_hint}"""
+            )
 
         elif self.config.dataset_type == DatasetType.DPO:
-            return base_prompt + f"""Generate {count} DPO (Direct Preference Optimization) examples in JSON array format.
+            return (
+                base_prompt
+                + f"""Generate {count} DPO (Direct Preference Optimization) examples in JSON array format.
 Each example should have:
 - prompt: A question or instruction based on the document
 - chosen: A high-quality, preferred response
@@ -326,6 +340,7 @@ Requirements:
 - Both responses should be different from each other
 
 Output ONLY a JSON array with {count} objects.{lang_hint}"""
+            )
 
         return base_prompt
 
@@ -371,18 +386,16 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                 "properties": {
                     "instruction": {"type": "string"},
                     "input": {"type": "string"},
-                    "output": {"type": "string"}
+                    "output": {"type": "string"},
                 },
-                "required": ["instruction", "input", "output"]
+                "required": ["instruction", "input", "output"],
             }
 
         elif self.config.dataset_type == DatasetType.PRETRAIN:
             entry_schema = {
                 "type": "object",
-                "properties": {
-                    "text": {"type": "string"}
-                },
-                "required": ["text"]
+                "properties": {"text": {"type": "string"}},
+                "required": ["text"],
             }
 
         elif self.config.dataset_type == DatasetType.SFT_CONVERSATION:
@@ -390,19 +403,16 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                 "type": "object",
                 "properties": {
                     "role": {"type": "string", "enum": ["system", "user", "assistant"]},
-                    "content": {"type": "string"}
+                    "content": {"type": "string"},
                 },
-                "required": ["role", "content"]
+                "required": ["role", "content"],
             }
             entry_schema = {
                 "type": "object",
                 "properties": {
-                    "conversations": {
-                        "type": "array",
-                        "items": message_schema
-                    }
+                    "conversations": {"type": "array", "items": message_schema}
                 },
-                "required": ["conversations"]
+                "required": ["conversations"],
             }
 
         elif self.config.dataset_type == DatasetType.DPO:
@@ -411,9 +421,9 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                 "properties": {
                     "prompt": {"type": "string"},
                     "chosen": {"type": "string"},
-                    "rejected": {"type": "string"}
+                    "rejected": {"type": "string"},
                 },
-                "required": ["prompt", "chosen", "rejected"]
+                "required": ["prompt", "chosen", "rejected"],
             }
 
         else:
@@ -423,16 +433,13 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                 "properties": {
                     "instruction": {"type": "string"},
                     "input": {"type": "string"},
-                    "output": {"type": "string"}
+                    "output": {"type": "string"},
                 },
-                "required": ["instruction", "input", "output"]
+                "required": ["instruction", "input", "output"],
             }
 
         # Return array schema for batch generation
-        return {
-            "type": "array",
-            "items": entry_schema
-        }
+        return {"type": "array", "items": entry_schema}
 
     def _parse_response(self, raw_content: str) -> list[DatasetEntry]:
         """
@@ -482,30 +489,29 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
         try:
             if self.config.dataset_type == DatasetType.SFT:
                 return DataEntry(
-                    instruction=str(data.get('instruction', '')),
-                    input=str(data.get('input', '')),
-                    output=str(data.get('output', ''))
+                    instruction=str(data.get("instruction", "")),
+                    input=str(data.get("input", "")),
+                    output=str(data.get("output", "")),
                 )
 
             elif self.config.dataset_type == DatasetType.PRETRAIN:
-                return PretrainEntry(
-                    text=str(data.get('text', ''))
-                )
+                return PretrainEntry(text=str(data.get("text", "")))
 
             elif self.config.dataset_type == DatasetType.SFT_CONVERSATION:
-                conversations_data = data.get('conversations', [])
+                conversations_data = data.get("conversations", [])
                 if not isinstance(conversations_data, list):
                     return None
 
                 conversations = []
                 for msg in conversations_data:
-                    if isinstance(msg, dict) and 'role' in msg and 'content' in msg:
-                        role = msg['role']
-                        if role in ('system', 'user', 'assistant'):
-                            conversations.append(ConversationMessage(
-                                role=role,
-                                content=str(msg['content'])
-                            ))
+                    if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                        role = msg["role"]
+                        if role in ("system", "user", "assistant"):
+                            conversations.append(
+                                ConversationMessage(
+                                    role=role, content=str(msg["content"])
+                                )
+                            )
 
                 if conversations:
                     return SFTConversationEntry(conversations=conversations)
@@ -513,9 +519,9 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
 
             elif self.config.dataset_type == DatasetType.DPO:
                 return DPOEntry(
-                    prompt=str(data.get('prompt', '')),
-                    chosen=str(data.get('chosen', '')),
-                    rejected=str(data.get('rejected', ''))
+                    prompt=str(data.get("prompt", "")),
+                    chosen=str(data.get("chosen", "")),
+                    rejected=str(data.get("rejected", "")),
                 )
 
         except Exception:
@@ -545,6 +551,7 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
 # ============================================================================
 # Validation Functions (exported for property testing)
 # ============================================================================
+
 
 def validate_entry(entry: DatasetEntry, dataset_type: DatasetType) -> bool:
     """
@@ -653,9 +660,9 @@ def validate_conversation_entry(entry: DatasetEntry) -> bool:
         if not msg.content or not msg.content.strip():
             return False
 
-        if msg.role == 'user':
+        if msg.role == "user":
             has_user = True
-        elif msg.role == 'assistant':
+        elif msg.role == "assistant":
             has_assistant = True
 
     # Must have at least one user and one assistant message
@@ -708,26 +715,24 @@ def entry_to_dict(entry: DatasetEntry) -> dict:
     """
     if isinstance(entry, DataEntry):
         return {
-            'instruction': entry.instruction,
-            'input': entry.input,
-            'output': entry.output
+            "instruction": entry.instruction,
+            "input": entry.input,
+            "output": entry.output,
         }
     elif isinstance(entry, PretrainEntry):
-        return {
-            'text': entry.text
-        }
+        return {"text": entry.text}
     elif isinstance(entry, SFTConversationEntry):
         return {
-            'conversations': [
-                {'role': msg.role, 'content': msg.content}
+            "conversations": [
+                {"role": msg.role, "content": msg.content}
                 for msg in entry.conversations
             ]
         }
     elif isinstance(entry, DPOEntry):
         return {
-            'prompt': entry.prompt,
-            'chosen': entry.chosen,
-            'rejected': entry.rejected
+            "prompt": entry.prompt,
+            "chosen": entry.chosen,
+            "rejected": entry.rejected,
         }
 
     return {}
@@ -750,30 +755,27 @@ def dict_to_entry(data: dict, dataset_type: DatasetType) -> Optional[DatasetEntr
     try:
         if dataset_type == DatasetType.SFT:
             return DataEntry(
-                instruction=str(data.get('instruction', '')),
-                input=str(data.get('input', '')),
-                output=str(data.get('output', ''))
+                instruction=str(data.get("instruction", "")),
+                input=str(data.get("input", "")),
+                output=str(data.get("output", "")),
             )
 
         elif dataset_type == DatasetType.PRETRAIN:
-            return PretrainEntry(
-                text=str(data.get('text', ''))
-            )
+            return PretrainEntry(text=str(data.get("text", "")))
 
         elif dataset_type == DatasetType.SFT_CONVERSATION:
-            conversations_data = data.get('conversations', [])
+            conversations_data = data.get("conversations", [])
             if not isinstance(conversations_data, list):
                 return None
 
             conversations = []
             for msg in conversations_data:
-                if isinstance(msg, dict) and 'role' in msg and 'content' in msg:
-                    role = msg['role']
-                    if role in ('system', 'user', 'assistant'):
-                        conversations.append(ConversationMessage(
-                            role=role,
-                            content=str(msg['content'])
-                        ))
+                if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                    role = msg["role"]
+                    if role in ("system", "user", "assistant"):
+                        conversations.append(
+                            ConversationMessage(role=role, content=str(msg["content"]))
+                        )
 
             if conversations:
                 return SFTConversationEntry(conversations=conversations)
@@ -781,9 +783,9 @@ def dict_to_entry(data: dict, dataset_type: DatasetType) -> Optional[DatasetEntr
 
         elif dataset_type == DatasetType.DPO:
             return DPOEntry(
-                prompt=str(data.get('prompt', '')),
-                chosen=str(data.get('chosen', '')),
-                rejected=str(data.get('rejected', ''))
+                prompt=str(data.get("prompt", "")),
+                chosen=str(data.get("chosen", "")),
+                rejected=str(data.get("rejected", "")),
             )
 
     except Exception:

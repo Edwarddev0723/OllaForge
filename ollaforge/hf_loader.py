@@ -27,6 +27,7 @@ console = Console()
 
 class HuggingFaceLoaderError(Exception):
     """Raised when HuggingFace dataset loading fails."""
+
     pass
 
 
@@ -45,18 +46,22 @@ def is_huggingface_dataset(input_str: str) -> bool:
         True if it looks like a HuggingFace dataset identifier
     """
     # Skip if it looks like a file path
-    if input_str.startswith('/') or input_str.startswith('./') or input_str.startswith('..'):
+    if (
+        input_str.startswith("/")
+        or input_str.startswith("./")
+        or input_str.startswith("..")
+    ):
         return False
 
     # Skip if it has a file extension
-    common_extensions = ['.jsonl', '.json', '.csv', '.tsv', '.parquet', '.txt', '.xlsx']
+    common_extensions = [".jsonl", ".json", ".csv", ".tsv", ".parquet", ".txt", ".xlsx"]
     for ext in common_extensions:
         if input_str.lower().endswith(ext):
             return False
 
     # Check for HuggingFace pattern: username/dataset-name
     # Allow alphanumeric, hyphens, underscores, and dots
-    hf_pattern = r'^[a-zA-Z0-9_-]+/[a-zA-Z0-9._-]+$'
+    hf_pattern = r"^[a-zA-Z0-9_-]+/[a-zA-Z0-9._-]+$"
     return bool(re.match(hf_pattern, input_str))
 
 
@@ -101,10 +106,14 @@ def load_huggingface_dataset(
         # Try to get available configs if not specified
         if config_name is None:
             try:
-                configs = get_dataset_config_names(dataset_name, trust_remote_code=trust_remote_code)
+                configs = get_dataset_config_names(
+                    dataset_name, trust_remote_code=trust_remote_code
+                )
                 if configs and len(configs) > 1:
                     console.print(f"[dim]Available configs: {', '.join(configs)}[/dim]")
-                    console.print("[dim]Using default config. Specify with --config if needed.[/dim]")
+                    console.print(
+                        "[dim]Using default config. Specify with --config if needed.[/dim]"
+                    )
             except Exception:
                 pass  # Config detection failed, proceed without config
 
@@ -156,7 +165,9 @@ def load_huggingface_dataset(
                 if progress_callback and (i + 1) % 100 == 0:
                     progress_callback(i + 1, total)
 
-        console.print(f"[green]✅ Loaded {len(entries)} entries from {dataset_name}[/green]")
+        console.print(
+            f"[green]✅ Loaded {len(entries)} entries from {dataset_name}[/green]"
+        )
         console.print(f"[dim]Fields: {', '.join(sorted(field_names))}[/dim]")
 
         return entries, sorted(field_names)
@@ -186,7 +197,9 @@ def load_huggingface_dataset(
             )
 
 
-def get_dataset_info(dataset_name: str, trust_remote_code: bool = False) -> dict[str, Any]:
+def get_dataset_info(
+    dataset_name: str, trust_remote_code: bool = False
+) -> dict[str, Any]:
     """
     Get information about a HuggingFace dataset without loading it.
 
@@ -212,12 +225,16 @@ def get_dataset_info(dataset_name: str, trust_remote_code: bool = False) -> dict
         # Get available configs
         configs = []
         try:
-            configs = get_dataset_config_names(dataset_name, trust_remote_code=trust_remote_code)
+            configs = get_dataset_config_names(
+                dataset_name, trust_remote_code=trust_remote_code
+            )
         except Exception:
             pass
 
         # Get dataset builder info
-        builder = load_dataset_builder(dataset_name, trust_remote_code=trust_remote_code)
+        builder = load_dataset_builder(
+            dataset_name, trust_remote_code=trust_remote_code
+        )
 
         info = {
             "name": dataset_name,
@@ -230,8 +247,7 @@ def get_dataset_info(dataset_name: str, trust_remote_code: bool = False) -> dict
         # Get features (field names and types)
         if builder.info.features:
             info["features"] = {
-                name: str(feature)
-                for name, feature in builder.info.features.items()
+                name: str(feature) for name, feature in builder.info.features.items()
             }
 
         # Get available splits
@@ -246,7 +262,9 @@ def get_dataset_info(dataset_name: str, trust_remote_code: bool = False) -> dict
         )
 
 
-def list_dataset_splits(dataset_name: str, config_name: Optional[str] = None) -> list[str]:
+def list_dataset_splits(
+    dataset_name: str, config_name: Optional[str] = None
+) -> list[str]:
     """
     List available splits for a HuggingFace dataset.
 

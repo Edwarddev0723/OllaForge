@@ -34,7 +34,7 @@ valid_data_entry_strategy = st.builds(
     DataEntry,
     instruction=st.text(min_size=1),
     input=st.text(min_size=1),
-    output=st.text(min_size=1)
+    output=st.text(min_size=1),
 )
 
 
@@ -56,7 +56,7 @@ def test_jsonl_format_compliance(entries):
         assert os.path.exists(output_path)
 
         # Read file line by line and verify each line is valid JSON
-        with open(output_path, encoding='utf-8') as f:
+        with open(output_path, encoding="utf-8") as f:
             lines = f.readlines()
 
         # Should have same number of lines as entries
@@ -73,15 +73,17 @@ def test_jsonl_format_compliance(entries):
                 assert isinstance(parsed, dict), f"Line {i+1} is not a JSON object"
 
                 # Should contain required fields
-                assert 'instruction' in parsed, f"Line {i+1} missing 'instruction' field"
-                assert 'input' in parsed, f"Line {i+1} missing 'input' field"
-                assert 'output' in parsed, f"Line {i+1} missing 'output' field"
+                assert (
+                    "instruction" in parsed
+                ), f"Line {i+1} missing 'instruction' field"
+                assert "input" in parsed, f"Line {i+1} missing 'input' field"
+                assert "output" in parsed, f"Line {i+1} missing 'output' field"
 
                 # Values should match original entry
                 original_entry = entries[i]
-                assert parsed['instruction'] == original_entry.instruction
-                assert parsed['input'] == original_entry.input
-                assert parsed['output'] == original_entry.output
+                assert parsed["instruction"] == original_entry.instruction
+                assert parsed["input"] == original_entry.input
+                assert parsed["output"] == original_entry.output
 
             except json.JSONDecodeError as e:
                 pytest.fail(f"Line {i+1} is not valid JSON: {line} - Error: {e}")
@@ -112,24 +114,26 @@ def test_output_validation(entries):
         # Each read entry should be a valid dictionary with required fields
         for i, read_entry in enumerate(read_entries):
             assert isinstance(read_entry, dict)
-            assert 'instruction' in read_entry
-            assert 'input' in read_entry
-            assert 'output' in read_entry
+            assert "instruction" in read_entry
+            assert "input" in read_entry
+            assert "output" in read_entry
 
             # Values should match original
             original = entries[i]
-            assert read_entry['instruction'] == original.instruction
-            assert read_entry['input'] == original.input
-            assert read_entry['output'] == original.output
+            assert read_entry["instruction"] == original.instruction
+            assert read_entry["input"] == original.input
+            assert read_entry["output"] == original.output
 
 
 @given(
     entries=st.lists(valid_data_entry_strategy, min_size=1, max_size=5),
     filename=st.text(
-        alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_characters='/<>:"|?*\\'),
+        alphabet=st.characters(
+            min_codepoint=32, max_codepoint=126, blacklist_characters='/<>:"|?*\\'
+        ),
         min_size=1,
-        max_size=50
-    ).filter(lambda x: x.strip() and not x.startswith('.') and '\x00' not in x)
+        max_size=50,
+    ).filter(lambda x: x.strip() and not x.startswith(".") and "\x00" not in x),
 )
 def test_file_overwrite_handling(entries, filename):
     """
@@ -142,7 +146,7 @@ def test_file_overwrite_handling(entries, filename):
         output_path = os.path.join(temp_dir, filename.strip())
 
         # Create initial file with some content
-        initial_entries = entries[:len(entries)//2] if len(entries) > 1 else entries
+        initial_entries = entries[: len(entries) // 2] if len(entries) > 1 else entries
         write_jsonl_file(initial_entries, output_path)
 
         # Verify file exists
@@ -207,7 +211,7 @@ def test_append_functionality():
         # Append more entries
         additional_entries = [
             DataEntry(instruction="second", input="input2", output="output2"),
-            DataEntry(instruction="third", input="input3", output="output3")
+            DataEntry(instruction="third", input="input3", output="output3"),
         ]
         append_jsonl_entries(additional_entries, output_path)
 
@@ -215,9 +219,9 @@ def test_append_functionality():
         all_entries = read_jsonl_file(output_path)
         assert len(all_entries) == 3
 
-        assert all_entries[0]['instruction'] == "first"
-        assert all_entries[1]['instruction'] == "second"
-        assert all_entries[2]['instruction'] == "third"
+        assert all_entries[0]["instruction"] == "first"
+        assert all_entries[1]["instruction"] == "second"
+        assert all_entries[2]["instruction"] == "third"
 
 
 def test_validation_with_invalid_jsonl():
@@ -226,9 +230,9 @@ def test_validation_with_invalid_jsonl():
         invalid_path = os.path.join(temp_dir, "invalid.jsonl")
 
         # Create file with invalid JSON
-        with open(invalid_path, 'w') as f:
+        with open(invalid_path, "w") as f:
             f.write('{"valid": "json"}\n')
-            f.write('invalid json line\n')
+            f.write("invalid json line\n")
             f.write('{"another": "valid"}\n')
 
         # Should fail validation
@@ -236,6 +240,7 @@ def test_validation_with_invalid_jsonl():
 
 
 # Edge case tests for Requirements 6.3 and 6.5
+
 
 def test_disk_space_checking():
     """Test disk space insufficient scenarios - Requirements 6.3"""
@@ -279,7 +284,7 @@ def test_partial_backup_creation():
         # Create test entries
         entries = [
             DataEntry(instruction="test1", input="input1", output="output1"),
-            DataEntry(instruction="test2", input="input2", output="output2")
+            DataEntry(instruction="test2", input="input2", output="output2"),
         ]
 
         # Create partial backup
@@ -292,8 +297,8 @@ def test_partial_backup_creation():
         # Verify backup content
         backup_entries = read_jsonl_file(backup_path)
         assert len(backup_entries) == 2
-        assert backup_entries[0]['instruction'] == "test1"
-        assert backup_entries[1]['instruction'] == "test2"
+        assert backup_entries[0]["instruction"] == "test1"
+        assert backup_entries[1]["instruction"] == "test2"
 
 
 def test_partial_backup_with_empty_entries():
@@ -318,7 +323,7 @@ def test_interruption_handling_setup():
     assert is_interrupted() is False
 
 
-@patch('ollaforge.file_manager.os.statvfs')
+@patch("ollaforge.file_manager.os.statvfs")
 def test_disk_space_with_mocked_statvfs(mock_statvfs):
     """Test disk space checking with mocked system calls."""
     # Mock insufficient space
@@ -349,7 +354,7 @@ def test_write_jsonl_with_disk_space_check():
         assert os.path.exists(output_path)
 
 
-@patch('ollaforge.file_manager.check_disk_space')
+@patch("ollaforge.file_manager.check_disk_space")
 def test_write_jsonl_with_insufficient_disk_space(mock_check_disk_space):
     """Test JSONL writing when disk space is insufficient."""
     # Mock disk space check to raise DiskSpaceError
@@ -433,8 +438,14 @@ def test_file_operations_with_unicode_content():
         # Create entries with Unicode content
         unicode_entries = [
             DataEntry(instruction="测试指令", input="输入内容", output="输出结果"),
-            DataEntry(instruction="🚀 Rocket test", input="emoji input 🎉", output="emoji output ✅"),
-            DataEntry(instruction="Ñoño niño", input="café résumé", output="naïve façade"),
+            DataEntry(
+                instruction="🚀 Rocket test",
+                input="emoji input 🎉",
+                output="emoji output ✅",
+            ),
+            DataEntry(
+                instruction="Ñoño niño", input="café résumé", output="naïve façade"
+            ),
         ]
 
         # Should handle Unicode content without issues
@@ -443,9 +454,9 @@ def test_file_operations_with_unicode_content():
         # Verify content can be read back correctly
         read_entries = read_jsonl_file(output_path)
         assert len(read_entries) == 3
-        assert read_entries[0]['instruction'] == "测试指令"
-        assert read_entries[1]['instruction'] == "🚀 Rocket test"
-        assert read_entries[2]['instruction'] == "Ñoño niño"
+        assert read_entries[0]["instruction"] == "测试指令"
+        assert read_entries[1]["instruction"] == "🚀 Rocket test"
+        assert read_entries[2]["instruction"] == "Ñoño niño"
 
 
 def test_file_operations_with_very_large_entries():
@@ -456,9 +467,19 @@ def test_file_operations_with_very_large_entries():
         # Create entries with very large content
         large_content = "x" * 100000  # 100KB of content
         large_entries = [
-            DataEntry(instruction=large_content, input="small input", output="small output"),
-            DataEntry(instruction="small instruction", input=large_content, output="small output"),
-            DataEntry(instruction="small instruction", input="small input", output=large_content),
+            DataEntry(
+                instruction=large_content, input="small input", output="small output"
+            ),
+            DataEntry(
+                instruction="small instruction",
+                input=large_content,
+                output="small output",
+            ),
+            DataEntry(
+                instruction="small instruction",
+                input="small input",
+                output=large_content,
+            ),
         ]
 
         # Should handle large entries
@@ -467,7 +488,7 @@ def test_file_operations_with_very_large_entries():
         # Verify content
         read_entries = read_jsonl_file(output_path)
         assert len(read_entries) == 3
-        assert len(read_entries[0]['instruction']) == 100000
+        assert len(read_entries[0]["instruction"]) == 100000
 
 
 def test_atomic_write_failure_recovery():
@@ -477,7 +498,7 @@ def test_atomic_write_failure_recovery():
         entries = [DataEntry(instruction="test", input="test", output="test")]
 
         # Mock a failure during the atomic move operation
-        with patch('shutil.move') as mock_move:
+        with patch("shutil.move") as mock_move:
             mock_move.side_effect = OSError("Disk full")
 
             with pytest.raises(FileOperationError, match="Failed to write JSONL file"):
@@ -502,7 +523,9 @@ def test_concurrent_file_access():
         assert len(read_entries) == 1
 
         # Test appending to existing file
-        additional_entries = [DataEntry(instruction="test2", input="test2", output="test2")]
+        additional_entries = [
+            DataEntry(instruction="test2", input="test2", output="test2")
+        ]
         append_jsonl_entries(additional_entries, output_path)
 
         # Verify both entries exist
@@ -517,7 +540,9 @@ def test_file_operations_with_network_drive_simulation():
         entries = [DataEntry(instruction="test", input="test", output="test")]
 
         # Mock network-related failures
-        with patch('tempfile.NamedTemporaryFile', side_effect=OSError("Network path not found")):
+        with patch(
+            "tempfile.NamedTemporaryFile", side_effect=OSError("Network path not found")
+        ):
             with pytest.raises(FileOperationError):
                 write_jsonl_file(entries, output_path)
 
@@ -554,9 +579,9 @@ def test_file_validation_with_corrupted_content():
         # Test with mixed valid/invalid content
         corrupted_path = os.path.join(temp_dir, "corrupted.jsonl")
 
-        with open(corrupted_path, 'w', encoding='utf-8') as f:
+        with open(corrupted_path, "w", encoding="utf-8") as f:
             f.write('{"valid": "json"}\n')
-            f.write('invalid json line\n')
+            f.write("invalid json line\n")
             f.write('{"another": "valid"}\n')
             f.write('{"incomplete": "json"\n')  # Missing closing brace
             f.write('{"valid": "final"}\n')
@@ -566,7 +591,7 @@ def test_file_validation_with_corrupted_content():
 
         # Test with completely empty file
         empty_path = os.path.join(temp_dir, "empty.jsonl")
-        with open(empty_path, 'w') as f:
+        with open(empty_path, "w") as f:
             pass
 
         # Empty file should be considered valid
@@ -574,8 +599,8 @@ def test_file_validation_with_corrupted_content():
 
         # Test with file containing only whitespace
         whitespace_path = os.path.join(temp_dir, "whitespace.jsonl")
-        with open(whitespace_path, 'w') as f:
-            f.write('   \n\n  \t  \n')
+        with open(whitespace_path, "w") as f:
+            f.write("   \n\n  \t  \n")
 
         # Whitespace-only file should be considered valid
         assert validate_jsonl_file(whitespace_path) is True
@@ -593,7 +618,7 @@ def test_disk_space_monitoring_during_write():
         ]
 
         # Test with mocked insufficient space during write
-        with patch('os.statvfs') as mock_statvfs:
+        with patch("os.statvfs") as mock_statvfs:
             mock_stat = MagicMock()
             mock_stat.f_bavail = 1  # Only 1 block available
             mock_stat.f_frsize = 1024  # 1KB per block
@@ -649,7 +674,7 @@ def test_partial_backup_with_filesystem_errors():
     entries = [DataEntry(instruction="test", input="test", output="test")]
 
     # Test with path that cannot be created
-    with patch('pathlib.Path.mkdir') as mock_mkdir:
+    with patch("pathlib.Path.mkdir") as mock_mkdir:
         mock_mkdir.side_effect = OSError("Read-only file system")
 
         with pytest.raises(FileOperationError, match="Failed to create partial backup"):
@@ -673,8 +698,8 @@ def test_signal_handler_edge_cases():
     assert is_interrupted() is False
 
 
-
 # Tests for dataset augmentation file operations (Requirements 1.1, 1.3, 1.4)
+
 
 def test_read_jsonl_with_field_names():
     """Test reading JSONL file with field names extraction - Requirements 1.1, 1.4"""
@@ -682,10 +707,14 @@ def test_read_jsonl_with_field_names():
         test_path = os.path.join(temp_dir, "test.jsonl")
 
         # Create test file with various fields
-        with open(test_path, 'w', encoding='utf-8') as f:
+        with open(test_path, "w", encoding="utf-8") as f:
             f.write('{"instruction": "test1", "input": "in1", "output": "out1"}\n')
-            f.write('{"instruction": "test2", "input": "in2", "output": "out2", "extra": "field"}\n')
-            f.write('{"instruction": "test3", "input": "in3", "output": "out3", "another": "one"}\n')
+            f.write(
+                '{"instruction": "test2", "input": "in2", "output": "out2", "extra": "field"}\n'
+            )
+            f.write(
+                '{"instruction": "test3", "input": "in3", "output": "out3", "another": "one"}\n'
+            )
 
         # Test with return_field_names=True
         entries, field_names = read_jsonl_file(test_path, return_field_names=True)
@@ -693,7 +722,13 @@ def test_read_jsonl_with_field_names():
         assert len(entries) == 3
         assert isinstance(field_names, list)
         # Should have all unique fields sorted
-        assert set(field_names) == {"instruction", "input", "output", "extra", "another"}
+        assert set(field_names) == {
+            "instruction",
+            "input",
+            "output",
+            "extra",
+            "another",
+        }
         # Should be sorted
         assert field_names == sorted(field_names)
 
@@ -710,7 +745,7 @@ def test_read_jsonl_field_names_empty_file():
         test_path = os.path.join(temp_dir, "empty.jsonl")
 
         # Create empty file
-        with open(test_path, 'w'):
+        with open(test_path, "w"):
             pass
 
         entries, field_names = read_jsonl_file(test_path, return_field_names=True)
@@ -725,10 +760,10 @@ def test_read_jsonl_error_with_line_number():
         test_path = os.path.join(temp_dir, "invalid.jsonl")
 
         # Create file with invalid JSON on line 3
-        with open(test_path, 'w', encoding='utf-8') as f:
+        with open(test_path, "w", encoding="utf-8") as f:
             f.write('{"valid": "json"}\n')
             f.write('{"also": "valid"}\n')
-            f.write('invalid json here\n')
+            f.write("invalid json here\n")
             f.write('{"more": "valid"}\n')
 
         with pytest.raises(FileOperationError) as exc_info:
@@ -744,9 +779,9 @@ def test_read_jsonl_error_non_object_json():
         test_path = os.path.join(temp_dir, "array.jsonl")
 
         # Create file with JSON array instead of object
-        with open(test_path, 'w', encoding='utf-8') as f:
+        with open(test_path, "w", encoding="utf-8") as f:
             f.write('{"valid": "object"}\n')
-            f.write('[1, 2, 3]\n')  # Array, not object
+            f.write("[1, 2, 3]\n")  # Array, not object
 
         with pytest.raises(FileOperationError) as exc_info:
             read_jsonl_file(test_path)
@@ -763,7 +798,7 @@ def test_read_jsonl_field_names_with_unicode():
         test_path = os.path.join(temp_dir, "unicode_fields.jsonl")
 
         # Create file with Unicode field names
-        with open(test_path, 'w', encoding='utf-8') as f:
+        with open(test_path, "w", encoding="utf-8") as f:
             f.write('{"指令": "test1", "輸入": "in1", "輸出": "out1"}\n')
             f.write('{"指令": "test2", "輸入": "in2", "輸出": "out2"}\n')
 
@@ -779,7 +814,7 @@ def test_read_jsonl_field_names_varying_fields():
         test_path = os.path.join(temp_dir, "varying.jsonl")
 
         # Create file where each entry has different fields
-        with open(test_path, 'w', encoding='utf-8') as f:
+        with open(test_path, "w", encoding="utf-8") as f:
             f.write('{"a": 1}\n')
             f.write('{"b": 2}\n')
             f.write('{"c": 3}\n')
@@ -799,30 +834,32 @@ valid_json_object_strategy = st.dictionaries(
         st.integers(),
         st.floats(allow_nan=False, allow_infinity=False),
         st.booleans(),
-        st.none()
+        st.none(),
     ),
     min_size=1,
-    max_size=5
+    max_size=5,
 ).map(lambda d: json.dumps(d))
 
 
 # Strategy for generating invalid JSON strings (not parseable as JSON)
 invalid_json_strategy = st.one_of(
     # Incomplete JSON objects (exclude newline characters to avoid line count issues)
-    st.text(min_size=1, max_size=50, alphabet=st.characters(blacklist_characters='\r\n')).filter(
-        lambda x: x.strip() and not _is_valid_json(x)
-    ),
+    st.text(
+        min_size=1, max_size=50, alphabet=st.characters(blacklist_characters="\r\n")
+    ).filter(lambda x: x.strip() and not _is_valid_json(x)),
     # Strings that look like JSON but are malformed
-    st.sampled_from([
-        'invalid json here',
-        '{missing: quotes}',
-        '{"unclosed": "string',
-        '{"missing": }',
-        '{incomplete',
-        'not json at all',
-        '{"trailing": "comma",}',
-        '[1, 2, 3]',  # Array instead of object - also invalid for our use case
-    ])
+    st.sampled_from(
+        [
+            "invalid json here",
+            "{missing: quotes}",
+            '{"unclosed": "string',
+            '{"missing": }',
+            "{incomplete",
+            "not json at all",
+            '{"trailing": "comma",}',
+            "[1, 2, 3]",  # Array instead of object - also invalid for our use case
+        ]
+    ),
 )
 
 
@@ -838,9 +875,11 @@ def _is_valid_json(s: str) -> bool:
 @given(
     valid_lines_before=st.lists(valid_json_object_strategy, min_size=0, max_size=10),
     invalid_line=invalid_json_strategy,
-    valid_lines_after=st.lists(valid_json_object_strategy, min_size=0, max_size=5)
+    valid_lines_after=st.lists(valid_json_object_strategy, min_size=0, max_size=5),
 )
-def test_invalid_jsonl_error_reports_line_number(valid_lines_before, invalid_line, valid_lines_after):
+def test_invalid_jsonl_error_reports_line_number(
+    valid_lines_before, invalid_line, valid_lines_after
+):
     """
     **Feature: dataset-augmentation, Property 2: Invalid JSONL Error Reporting**
     **Validates: Requirements 1.3**
@@ -854,9 +893,9 @@ def test_invalid_jsonl_error_reports_line_number(valid_lines_before, invalid_lin
         # Build the file content with valid lines before, invalid line, then valid lines after
         all_lines = valid_lines_before + [invalid_line] + valid_lines_after
 
-        with open(test_path, 'w', encoding='utf-8') as f:
+        with open(test_path, "w", encoding="utf-8") as f:
             for line in all_lines:
-                f.write(line + '\n')
+                f.write(line + "\n")
 
         # The expected line number of the first invalid line (1-indexed)
         expected_line_num = len(valid_lines_before) + 1
@@ -875,7 +914,9 @@ def test_invalid_jsonl_error_reports_line_number(valid_lines_before, invalid_lin
 
 # Strategy for generating valid dictionary entries for augmentation
 augmentation_entry_strategy = st.dictionaries(
-    keys=st.text(min_size=1, max_size=30).filter(lambda x: x.strip() and '\x00' not in x),
+    keys=st.text(min_size=1, max_size=30).filter(
+        lambda x: x.strip() and "\x00" not in x
+    ),
     values=st.one_of(
         st.text(max_size=100),
         st.integers(),
@@ -886,11 +927,11 @@ augmentation_entry_strategy = st.dictionaries(
         st.dictionaries(
             keys=st.text(min_size=1, max_size=10).filter(lambda x: x.strip()),
             values=st.one_of(st.text(max_size=20), st.integers()),
-            max_size=3
-        )
+            max_size=3,
+        ),
     ),
     min_size=1,
-    max_size=10
+    max_size=10,
 )
 
 
@@ -914,9 +955,9 @@ def test_json_round_trip_consistency(entry):
     deserialized = json.loads(json_string)
 
     # The round-trip should produce an equivalent dictionary
-    assert deserialized == entry, (
-        f"Round-trip failed: original={entry}, deserialized={deserialized}"
-    )
+    assert (
+        deserialized == entry
+    ), f"Round-trip failed: original={entry}, deserialized={deserialized}"
 
 
 @given(entries=st.lists(augmentation_entry_strategy, min_size=1, max_size=10))
@@ -934,21 +975,21 @@ def test_jsonl_file_round_trip_consistency(entries):
         test_path = os.path.join(temp_dir, "round_trip_test.jsonl")
 
         # Write entries to JSONL file manually (simulating augmentation output)
-        with open(test_path, 'w', encoding='utf-8') as f:
+        with open(test_path, "w", encoding="utf-8") as f:
             for entry in entries:
                 json_line = json.dumps(entry)
-                f.write(json_line + '\n')
+                f.write(json_line + "\n")
 
         # Read entries back using the file_manager function
         read_entries = read_jsonl_file(test_path)
 
         # Should have same number of entries
-        assert len(read_entries) == len(entries), (
-            f"Entry count mismatch: wrote {len(entries)}, read {len(read_entries)}"
-        )
+        assert len(read_entries) == len(
+            entries
+        ), f"Entry count mismatch: wrote {len(entries)}, read {len(read_entries)}"
 
         # Each entry should be equivalent
         for i, (original, read_back) in enumerate(zip(entries, read_entries)):
-            assert read_back == original, (
-                f"Entry {i} mismatch: original={original}, read_back={read_back}"
-            )
+            assert (
+                read_back == original
+            ), f"Entry {i} mismatch: original={original}, read_back={read_back}"

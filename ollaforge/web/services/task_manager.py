@@ -25,6 +25,7 @@ from typing import Any, Callable, Optional
 
 class TaskStatus(Enum):
     """Task status enumeration."""
+
     PENDING = "pending"
     QUEUED = "queued"
     RUNNING = "running"
@@ -36,6 +37,7 @@ class TaskStatus(Enum):
 
 class TaskType(Enum):
     """Task type enumeration."""
+
     GENERATION = "generation"
     AUGMENTATION = "augmentation"
 
@@ -43,6 +45,7 @@ class TaskType(Enum):
 @dataclass
 class Task:
     """Task data class."""
+
     task_id: str
     task_type: TaskType
     status: TaskStatus
@@ -69,17 +72,19 @@ class Task:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "started_at": self.started_at,
-            "completed_at": self.completed_at
+            "completed_at": self.completed_at,
         }
 
 
 class TaskTimeoutError(Exception):
     """Raised when a task exceeds its timeout."""
+
     pass
 
 
 class TaskQueueFullError(Exception):
     """Raised when the task queue is full."""
+
     pass
 
 
@@ -105,7 +110,7 @@ class TaskManager:
         self,
         max_concurrent_tasks: int = 5,
         max_queue_size: int = 100,
-        default_timeout: float = 3600.0  # 1 hour default
+        default_timeout: float = 3600.0,  # 1 hour default
     ):
         """
         Initialize the task manager.
@@ -134,9 +139,7 @@ class TaskManager:
         self._running_futures: dict[str, asyncio.Task] = {}
 
     def create_task(
-        self,
-        task_type: TaskType,
-        timeout_seconds: Optional[float] = None
+        self, task_type: TaskType, timeout_seconds: Optional[float] = None
     ) -> str:
         """
         Create a new task and return its ID.
@@ -155,7 +158,7 @@ class TaskManager:
             task_id=task_id,
             task_type=task_type,
             status=TaskStatus.PENDING,
-            timeout_seconds=timeout_seconds or self.default_timeout
+            timeout_seconds=timeout_seconds or self.default_timeout,
         )
 
         self.tasks[task_id] = task
@@ -165,7 +168,7 @@ class TaskManager:
         self,
         task_id: str,
         coroutine: Callable[[], Awaitable[dict[str, Any]]],
-        on_progress: Optional[Callable[[int, int], None]] = None
+        on_progress: Optional[Callable[[int, int], None]] = None,
     ) -> None:
         """
         Submit a task for execution.
@@ -205,7 +208,7 @@ class TaskManager:
         self,
         task_id: str,
         coroutine: Callable[[], Awaitable[dict[str, Any]]],
-        on_progress: Optional[Callable[[int, int], None]] = None
+        on_progress: Optional[Callable[[int, int], None]] = None,
     ) -> None:
         """
         Execute a task with concurrency control and timeout.
@@ -242,8 +245,7 @@ class TaskManager:
                 try:
                     # Execute with timeout
                     result = await asyncio.wait_for(
-                        future,
-                        timeout=task.timeout_seconds
+                        future, timeout=task.timeout_seconds
                     )
 
                     # Task completed successfully
@@ -287,7 +289,7 @@ class TaskManager:
         progress: Optional[int] = None,
         total: Optional[int] = None,
         result: Optional[dict[str, Any]] = None,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ) -> bool:
         """
         Update task status.
@@ -363,7 +365,11 @@ class TaskManager:
             return False
 
         # Can only cancel pending, queued, or running tasks
-        if task.status not in [TaskStatus.PENDING, TaskStatus.QUEUED, TaskStatus.RUNNING]:
+        if task.status not in [
+            TaskStatus.PENDING,
+            TaskStatus.QUEUED,
+            TaskStatus.RUNNING,
+        ]:
             return False
 
         # Cancel running future if exists
@@ -419,14 +425,14 @@ class TaskManager:
             "queued_count": self._queued_count,
             "max_concurrent": self.max_concurrent_tasks,
             "max_queue_size": self.max_queue_size,
-            "status_counts": status_counts
+            "status_counts": status_counts,
         }
 
     def list_tasks(
         self,
         task_type: Optional[TaskType] = None,
         status: Optional[TaskStatus] = None,
-        limit: int = 100
+        limit: int = 100,
     ) -> list[dict[str, Any]]:
         """
         List tasks with optional filtering.
@@ -469,8 +475,10 @@ class TaskManager:
         for task_id, task in self.tasks.items():
             # Only clean up finished tasks
             if task.status not in [
-                TaskStatus.COMPLETED, TaskStatus.FAILED,
-                TaskStatus.TIMEOUT, TaskStatus.CANCELLED
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+                TaskStatus.TIMEOUT,
+                TaskStatus.CANCELLED,
             ]:
                 continue
 

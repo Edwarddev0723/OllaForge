@@ -45,7 +45,8 @@ DEFAULT_BATCH_SIZE = 5
 # Forces model to output valid JSON, eliminating parsing errors
 # ============================================================================
 
-def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) -> dict:
+
+def _get_json_schema_for_type(dataset_type: "DatasetType", batch_size: int = 1) -> dict:
     """
     Get JSON schema for structured output based on dataset type.
 
@@ -67,37 +68,32 @@ def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) 
         "properties": {
             "instruction": {"type": "string"},
             "input": {"type": "string"},
-            "output": {"type": "string"}
+            "output": {"type": "string"},
         },
-        "required": ["instruction", "input", "output"]
+        "required": ["instruction", "input", "output"],
     }
 
     pretrain_entry_schema = {
         "type": "object",
-        "properties": {
-            "text": {"type": "string"}
-        },
-        "required": ["text"]
+        "properties": {"text": {"type": "string"}},
+        "required": ["text"],
     }
 
     conversation_message_schema = {
         "type": "object",
         "properties": {
             "role": {"type": "string", "enum": ["system", "user", "assistant"]},
-            "content": {"type": "string"}
+            "content": {"type": "string"},
         },
-        "required": ["role", "content"]
+        "required": ["role", "content"],
     }
 
     sft_conversation_entry_schema = {
         "type": "object",
         "properties": {
-            "conversations": {
-                "type": "array",
-                "items": conversation_message_schema
-            }
+            "conversations": {"type": "array", "items": conversation_message_schema}
         },
-        "required": ["conversations"]
+        "required": ["conversations"],
     }
 
     dpo_entry_schema = {
@@ -105,9 +101,9 @@ def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) 
         "properties": {
             "prompt": {"type": "string"},
             "chosen": {"type": "string"},
-            "rejected": {"type": "string"}
+            "rejected": {"type": "string"},
         },
-        "required": ["prompt", "chosen", "rejected"]
+        "required": ["prompt", "chosen", "rejected"],
     }
 
     # Select schema based on dataset type
@@ -115,33 +111,37 @@ def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) 
         DatasetType.SFT: sft_entry_schema,
         DatasetType.PRETRAIN: pretrain_entry_schema,
         DatasetType.SFT_CONVERSATION: sft_conversation_entry_schema,
-        DatasetType.DPO: dpo_entry_schema
+        DatasetType.DPO: dpo_entry_schema,
     }.get(dataset_type, sft_entry_schema)
 
     # For batch generation, wrap in array
     if batch_size > 1:
-        return {
-            "type": "array",
-            "items": entry_schema
-        }
+        return {"type": "array", "items": entry_schema}
 
     return entry_schema
 
 
 class OllamaConnectionError(Exception):
     """Raised when connection to Ollama API fails."""
+
     pass
 
 
 class OllamaGenerationError(Exception):
     """Raised when generation request fails."""
+
     pass
 
 
-def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int,
-                    dataset_type: DatasetType = DatasetType.SFT,
-                    language: OutputLanguage = OutputLanguage.EN,
-                    use_structured_output: bool = True) -> dict[str, Any]:
+def _generate_batch(
+    topic: str,
+    model: str,
+    batch_size: int,
+    batch_number: int,
+    dataset_type: DatasetType = DatasetType.SFT,
+    language: OutputLanguage = OutputLanguage.EN,
+    use_structured_output: bool = True,
+) -> dict[str, Any]:
     """
     Generate a batch of entries in a single API call.
 
@@ -158,47 +158,55 @@ def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int,
         Dict with 'raw_content' (JSON array string) or 'error'
     """
     try:
-        system_prompt = _create_system_prompt_batch(topic, batch_size, dataset_type, language)
-        user_prompt = _create_user_prompt_batch(topic, batch_size, batch_number, dataset_type, language)
+        system_prompt = _create_system_prompt_batch(
+            topic, batch_size, dataset_type, language
+        )
+        user_prompt = _create_user_prompt_batch(
+            topic, batch_size, batch_number, dataset_type, language
+        )
 
         # Build request parameters
         chat_params = {
-            'model': model,
-            'messages': [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_prompt}
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
-            'options': {
-                'temperature': 0.8,  # Slightly higher for diversity
-                'top_p': 0.9,
-            }
+            "options": {
+                "temperature": 0.8,  # Slightly higher for diversity
+                "top_p": 0.9,
+            },
         }
 
         # Add structured output (JSON schema) if enabled
         # This forces the model to only output valid JSON tokens
         if use_structured_output:
             json_schema = _get_json_schema_for_type(dataset_type, batch_size)
-            chat_params['format'] = json_schema
+            chat_params["format"] = json_schema
 
         response = ollama.chat(**chat_params)
 
-        if 'message' in response and 'content' in response['message']:
+        if "message" in response and "content" in response["message"]:
             return {
-                'raw_content': response['message']['content'],
-                'batch_number': batch_number,
-                'is_batch': True,
-                'dataset_type': dataset_type.value
+                "raw_content": response["message"]["content"],
+                "batch_number": batch_number,
+                "is_batch": True,
+                "dataset_type": dataset_type.value,
             }
         else:
-            return {'error': 'Invalid response format', 'batch_number': batch_number}
+            return {"error": "Invalid response format", "batch_number": batch_number}
 
     except Exception as e:
-        return {'error': str(e), 'batch_number': batch_number}
+        return {"error": str(e), "batch_number": batch_number}
 
 
-def _generate_single_entry(topic: str, model: str, entry_number: int,
-                           dataset_type: DatasetType = DatasetType.SFT,
-                           language: OutputLanguage = OutputLanguage.EN) -> dict[str, Any]:
+def _generate_single_entry(
+    topic: str,
+    model: str,
+    entry_number: int,
+    dataset_type: DatasetType = DatasetType.SFT,
+    language: OutputLanguage = OutputLanguage.EN,
+) -> dict[str, Any]:
     """Generate a single data entry."""
     try:
         system_prompt = _create_system_prompt_single(topic, dataset_type, language)
@@ -207,23 +215,23 @@ def _generate_single_entry(topic: str, model: str, entry_number: int,
         response = ollama.chat(
             model=model,
             messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
             options={
-                'temperature': 0.7,
-                'top_p': 0.9,
-            }
+                "temperature": 0.7,
+                "top_p": 0.9,
+            },
         )
 
-        if 'message' in response and 'content' in response['message']:
+        if "message" in response and "content" in response["message"]:
             return {
-                'raw_content': response['message']['content'],
-                'entry_number': entry_number,
-                'dataset_type': dataset_type.value
+                "raw_content": response["message"]["content"],
+                "entry_number": entry_number,
+                "dataset_type": dataset_type.value,
             }
         else:
-            return {'error': 'Invalid response format', 'entry_number': entry_number}
+            return {"error": "Invalid response format", "entry_number": entry_number}
 
     except Exception as e:
         error_msg = str(e).lower()
@@ -236,12 +244,17 @@ def _generate_single_entry(topic: str, model: str, entry_number: int,
         elif "connection" in error_msg or "refused" in error_msg:
             raise OllamaConnectionError(f"Failed to connect: {str(e)}") from e
         else:
-            return {'error': str(e), 'entry_number': entry_number}
+            return {"error": str(e), "entry_number": entry_number}
 
 
-def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: int,
-                        dataset_type: DatasetType = DatasetType.SFT,
-                        language: OutputLanguage = OutputLanguage.EN) -> list[dict[str, Any]]:
+def generate_data_batch(
+    topic: str,
+    model: str,
+    batch_size: int,
+    batch_number: int,
+    dataset_type: DatasetType = DatasetType.SFT,
+    language: OutputLanguage = OutputLanguage.EN,
+) -> list[dict[str, Any]]:
     """
     Generate multiple entries in a single API call (batch mode).
 
@@ -256,10 +269,12 @@ def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: i
     Returns:
         List of dicts with 'raw_content' for each entry
     """
-    result = _generate_batch(topic, model, batch_size, batch_number, dataset_type, language)
+    result = _generate_batch(
+        topic, model, batch_size, batch_number, dataset_type, language
+    )
 
-    if 'error' in result:
-        error_msg = result['error'].lower()
+    if "error" in result:
+        error_msg = result["error"].lower()
         if "model" in error_msg and "not found" in error_msg:
             raise OllamaGenerationError(f"Model not found: {result['error']}")
         return []
@@ -268,10 +283,14 @@ def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: i
     return [result]
 
 
-def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
-                  concurrency: int = DEFAULT_CONCURRENCY,
-                  dataset_type: DatasetType = DatasetType.SFT,
-                  language: OutputLanguage = OutputLanguage.EN) -> list[dict[str, Any]]:
+def generate_data(
+    topic: str,
+    model: str = "gpt-oss:20b",
+    count: int = 1,
+    concurrency: int = DEFAULT_CONCURRENCY,
+    dataset_type: DatasetType = DatasetType.SFT,
+    language: OutputLanguage = OutputLanguage.EN,
+) -> list[dict[str, Any]]:
     """
     Generate structured data entries using Ollama API.
     Uses batch generation for efficiency.
@@ -294,8 +313,10 @@ def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
         if count <= 3:
             generated_entries = []
             for i in range(count):
-                result = _generate_single_entry(topic, model, i + 1, dataset_type, language)
-                if 'raw_content' in result:
+                result = _generate_single_entry(
+                    topic, model, i + 1, dataset_type, language
+                )
+                if "raw_content" in result:
                     generated_entries.append(result)
             return generated_entries
 
@@ -330,7 +351,7 @@ def generate_data_concurrent(
     dataset_type: DatasetType = DatasetType.SFT,
     language: OutputLanguage = OutputLanguage.EN,
     progress_callback: Optional[Callable[[int, int], None]] = None,
-    use_structured_output: bool = True
+    use_structured_output: bool = True,
 ) -> list[dict[str, Any]]:
     """
     Generate data using concurrent batch requests (funnel architecture).
@@ -376,16 +397,22 @@ def generate_data_concurrent(
         current_batch_size = min(batch_size, remaining)
 
         return _generate_batch(
-            topic, model, current_batch_size, batch_num + 1,
-            dataset_type, language, use_structured_output
+            topic,
+            model,
+            current_batch_size,
+            batch_num + 1,
+            dataset_type,
+            language,
+            use_structured_output,
         )
 
     # Use ThreadPoolExecutor for concurrent requests
-    with concurrent.futures.ThreadPoolExecutor(max_workers=actual_concurrent) as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=actual_concurrent
+    ) as executor:
         # Submit all batch requests
         future_to_batch = {
-            executor.submit(generate_batch_wrapper, i): i
-            for i in range(num_batches)
+            executor.submit(generate_batch_wrapper, i): i for i in range(num_batches)
         }
 
         # Collect results as they complete
@@ -393,7 +420,7 @@ def generate_data_concurrent(
             batch_num = future_to_batch[future]
             try:
                 result = future.result()
-                if 'raw_content' in result:
+                if "raw_content" in result:
                     all_responses.append(result)
             except Exception as e:
                 # Log error but continue with other batches
@@ -467,8 +494,11 @@ def _get_language_instruction(language: OutputLanguage) -> str:
     return ""
 
 
-def _create_system_prompt_single(topic: str, dataset_type: DatasetType = DatasetType.SFT,
-                                  language: OutputLanguage = OutputLanguage.EN) -> str:
+def _create_system_prompt_single(
+    topic: str,
+    dataset_type: DatasetType = DatasetType.SFT,
+    language: OutputLanguage = OutputLanguage.EN,
+) -> str:
     """Create system prompt for single JSON output based on dataset type."""
 
     lang_instruction = _get_language_instruction(language)
@@ -527,9 +557,12 @@ No markdown, no explanation, just JSON.{lang_instruction}"""
     return _create_system_prompt_single(topic, DatasetType.SFT, language)
 
 
-def _create_system_prompt_batch(topic: str, batch_size: int,
-                                 dataset_type: DatasetType = DatasetType.SFT,
-                                 language: OutputLanguage = OutputLanguage.EN) -> str:
+def _create_system_prompt_batch(
+    topic: str,
+    batch_size: int,
+    dataset_type: DatasetType = DatasetType.SFT,
+    language: OutputLanguage = OutputLanguage.EN,
+) -> str:
     """Create system prompt for batch JSON output based on dataset type."""
 
     lang_instruction = _get_language_instruction(language)
@@ -651,33 +684,44 @@ IMPORTANT:
     return _create_system_prompt_batch(topic, batch_size, DatasetType.SFT, language)
 
 
-def _create_user_prompt(topic: str, entry_number: int,
-                        dataset_type: DatasetType = DatasetType.SFT,
-                        language: OutputLanguage = OutputLanguage.EN) -> str:
+def _create_user_prompt(
+    topic: str,
+    entry_number: int,
+    dataset_type: DatasetType = DatasetType.SFT,
+    language: OutputLanguage = OutputLanguage.EN,
+) -> str:
     """Create user prompt for single entry generation."""
     type_hint = {
         DatasetType.SFT: "instruction/input/output",
         DatasetType.PRETRAIN: "text",
         DatasetType.SFT_CONVERSATION: "conversation",
-        DatasetType.DPO: "prompt/chosen/rejected"
+        DatasetType.DPO: "prompt/chosen/rejected",
     }.get(dataset_type, "")
 
-    lang_hint = " 請用繁體中文（台灣用語）回答。" if language == OutputLanguage.ZH_TW else ""
+    lang_hint = (
+        " 請用繁體中文（台灣用語）回答。" if language == OutputLanguage.ZH_TW else ""
+    )
     return f"Generate {type_hint} example #{entry_number} for: {topic}. JSON only.{lang_hint}"
 
 
-def _create_user_prompt_batch(topic: str, batch_size: int, batch_number: int,
-                               dataset_type: DatasetType = DatasetType.SFT,
-                               language: OutputLanguage = OutputLanguage.EN) -> str:
+def _create_user_prompt_batch(
+    topic: str,
+    batch_size: int,
+    batch_number: int,
+    dataset_type: DatasetType = DatasetType.SFT,
+    language: OutputLanguage = OutputLanguage.EN,
+) -> str:
     """Create user prompt for batch generation."""
     type_hint = {
         DatasetType.SFT: "instruction/input/output",
         DatasetType.PRETRAIN: "text",
         DatasetType.SFT_CONVERSATION: "conversation",
-        DatasetType.DPO: "prompt/chosen/rejected"
+        DatasetType.DPO: "prompt/chosen/rejected",
     }.get(dataset_type, "")
 
-    lang_hint = " 請用繁體中文（台灣用語）回答。" if language == OutputLanguage.ZH_TW else ""
+    lang_hint = (
+        " 請用繁體中文（台灣用語）回答。" if language == OutputLanguage.ZH_TW else ""
+    )
     return f"Generate {batch_size} unique {type_hint} examples (batch {batch_number}) for: {topic}. JSON array only.{lang_hint}"
 
 
@@ -696,17 +740,17 @@ def get_available_models() -> list[str]:
         if not isinstance(response, dict):
             raise OllamaConnectionError("Invalid response format from Ollama API")
 
-        if 'models' not in response:
+        if "models" not in response:
             raise OllamaConnectionError("Malformed response: missing 'models' key")
 
-        models = response['models']
+        models = response["models"]
         if not isinstance(models, list):
             raise OllamaConnectionError("Malformed response: 'models' is not a list")
 
         model_names = []
         for model in models:
-            if isinstance(model, dict) and 'name' in model:
-                model_names.append(model['name'])
+            if isinstance(model, dict) and "name" in model:
+                model_names.append(model["name"])
             # Skip malformed model entries but don't fail completely
 
         return model_names

@@ -55,7 +55,7 @@ def create_augmentation_prompt(
     target_field: str,
     instruction: str,
     context_fields: list[str],
-    language: OutputLanguage
+    language: OutputLanguage,
 ) -> tuple[str, str]:
     """
     Create system and user prompts for augmentation.
@@ -87,7 +87,9 @@ def create_augmentation_prompt(
     if language == OutputLanguage.ZH_TW:
         lang_instruction = "\n\n請使用繁體中文（台灣用語）回應。"
     elif language == OutputLanguage.ZH_CN:
-        lang_instruction = "\n\n请使用简体中文（中国大陆用语）回应，内容须符合中国文化习惯与价值观。"
+        lang_instruction = (
+            "\n\n请使用简体中文（中国大陆用语）回应，内容须符合中国文化习惯与价值观。"
+        )
 
     system_prompt = f"""You are a data augmentation assistant. Your task is to generate or modify the "{target_field}" field based on the given instruction and context.
 
@@ -159,6 +161,7 @@ class DatasetAugmentor:
 
             # Display format information
             from .formats import detect_format, get_format_description
+
             try:
                 file_format = detect_format(self.config.input_file)
                 format_desc = get_format_description(file_format)
@@ -172,10 +175,11 @@ class DatasetAugmentor:
             # If multi-format reading fails, try legacy JSONL reading for backward compatibility
             if "format error" in str(e).lower():
                 try:
-                    self.console.print("[yellow]⚠️  Multi-format reading failed, trying JSONL format...[/yellow]")
+                    self.console.print(
+                        "[yellow]⚠️  Multi-format reading failed, trying JSONL format...[/yellow]"
+                    )
                     entries, field_names = read_jsonl_file(
-                        self.config.input_file,
-                        return_field_names=True
+                        self.config.input_file, return_field_names=True
                     )
                     return entries, field_names
                 except FileOperationError:
@@ -202,12 +206,12 @@ class DatasetAugmentor:
         - 2.2: Reject non-existing fields with available field list
         """
         return validate_target_field(
-            entries,
-            field,
-            create_new_field=self.config.create_new_field
+            entries, field, create_new_field=self.config.create_new_field
         )
 
-    def augment_entry(self, entry: dict[str, Any]) -> tuple[dict[str, Any], Optional[str]]:
+    def augment_entry(
+        self, entry: dict[str, Any]
+    ) -> tuple[dict[str, Any], Optional[str]]:
         """
         Augment a single entry using the AI model.
 
@@ -234,27 +238,27 @@ class DatasetAugmentor:
                 target_field=self.config.target_field,
                 instruction=self.config.instruction,
                 context_fields=self.config.context_fields,
-                language=self.config.language
+                language=self.config.language,
             )
 
             # Call Ollama API
             response = ollama.chat(
                 model=self.config.model,
                 messages=[
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': user_prompt}
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
                 ],
                 options={
-                    'temperature': 0.7,
-                    'top_p': 0.9,
-                }
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                },
             )
 
             # Extract response content
-            if 'message' not in response or 'content' not in response['message']:
+            if "message" not in response or "content" not in response["message"]:
                 return entry, "Invalid response format from AI model"
 
-            augmented_value = response['message']['content'].strip()
+            augmented_value = response["message"]["content"].strip()
 
             # Update the target field
             augmented[self.config.target_field] = augmented_value
@@ -296,7 +300,7 @@ class DatasetAugmentor:
         self,
         entries: list[dict[str, Any]],
         concurrency: int = 5,
-        progress_callback: Optional[Callable[[int, int], None]] = None
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> AugmentationResult:
         """
         Augment entire dataset with concurrent processing.
@@ -330,7 +334,9 @@ class DatasetAugmentor:
         progress_tracker = ProgressTracker(self.console)
         progress_tracker.start_progress(total_entries, "Augmenting")
 
-        def process_entry(index_entry: tuple[int, dict[str, Any]]) -> tuple[int, dict[str, Any], Optional[str]]:
+        def process_entry(
+            index_entry: tuple[int, dict[str, Any]],
+        ) -> tuple[int, dict[str, Any], Optional[str]]:
             """Process a single entry and return (index, result, error)."""
             index, entry = index_entry
             augmented, error = self.augment_entry(entry)
@@ -390,7 +396,7 @@ class DatasetAugmentor:
             failure_count=failure_count,
             output_file=self.config.output_file,
             duration=duration,
-            errors=errors
+            errors=errors,
         )
 
     def get_augmented_entries(self) -> list[dict[str, Any]]:
@@ -400,9 +406,11 @@ class DatasetAugmentor:
         Returns:
             List of augmented entries, or empty list if no augmentation has been run
         """
-        return getattr(self, '_augmented_entries', [])
+        return getattr(self, "_augmented_entries", [])
 
-    def preview(self, entries: list[dict[str, Any]]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    def preview(
+        self, entries: list[dict[str, Any]]
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         """
         Generate preview of augmentation on sample entries.
 

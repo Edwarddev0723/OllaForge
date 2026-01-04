@@ -28,27 +28,29 @@ from ollaforge.models import DocProcessingResult
 
 # Strategy for generating valid filenames (without extension)
 valid_filename_chars = st.text(
-    alphabet=st.characters(whitelist_categories=('L', 'N'), whitelist_characters='_-'),
+    alphabet=st.characters(whitelist_categories=("L", "N"), whitelist_characters="_-"),
     min_size=1,
-    max_size=20
-).filter(lambda x: x.strip() and not x.startswith('.') and not x.startswith('-'))
+    max_size=20,
+).filter(lambda x: x.strip() and not x.startswith(".") and not x.startswith("-"))
 
 # Strategy for generating supported file extensions
-supported_extensions = st.sampled_from(['.md', '.txt', '.html', '.json', '.py', '.js'])
+supported_extensions = st.sampled_from([".md", ".txt", ".html", ".json", ".py", ".js"])
 
 # Strategy for generating glob patterns
-glob_patterns = st.sampled_from([
-    '*.md',
-    '*.txt',
-    '*.py',
-    '*.json',
-    '*.html',
-    '*.js',
-    'test_*',
-    '*_test.*',
-    'readme*',
-    '*config*',
-])
+glob_patterns = st.sampled_from(
+    [
+        "*.md",
+        "*.txt",
+        "*.py",
+        "*.json",
+        "*.html",
+        "*.js",
+        "test_*",
+        "*_test.*",
+        "readme*",
+        "*config*",
+    ]
+)
 
 
 @st.composite
@@ -72,6 +74,7 @@ def file_list_with_mixed_extensions(draw, min_files: int = 1, max_files: int = 1
 # ============================================================================
 # Property Tests for Pattern Filtering
 # ============================================================================
+
 
 @given(data=st.data())
 @settings(max_examples=20)
@@ -107,18 +110,21 @@ def test_pattern_filtering_correctness_extension_patterns(data):
 
         # Verify: all filtered files match the pattern
         for f in filtered:
-            assert matches_pattern(f.name, pattern), \
-                f"File '{f.name}' should match pattern '{pattern}'"
+            assert matches_pattern(
+                f.name, pattern
+            ), f"File '{f.name}' should match pattern '{pattern}'"
 
         # Verify: no files that match the pattern are excluded
         expected_matches = [f for f in created_files if f.suffix == target_ext]
         for expected in expected_matches:
-            assert expected in filtered, \
-                f"File '{expected.name}' matches pattern '{pattern}' but was excluded"
+            assert (
+                expected in filtered
+            ), f"File '{expected.name}' matches pattern '{pattern}' but was excluded"
 
         # Verify: count matches
-        assert len(filtered) == len(expected_matches), \
-            f"Expected {len(expected_matches)} files, got {len(filtered)}"
+        assert len(filtered) == len(
+            expected_matches
+        ), f"Expected {len(expected_matches)} files, got {len(filtered)}"
 
 
 @given(data=st.data())
@@ -167,14 +173,16 @@ def test_pattern_filtering_correctness_prefix_patterns(data):
 
         # Verify: all filtered files match the pattern
         for f in filtered:
-            assert f.name.startswith(prefix), \
-                f"File '{f.name}' should start with '{prefix}'"
+            assert f.name.startswith(
+                prefix
+            ), f"File '{f.name}' should start with '{prefix}'"
 
         # Verify: all files with prefix are included
         for f in created_files:
             if f.name.startswith(prefix):
-                assert f in filtered, \
-                    f"File '{f.name}' starts with '{prefix}' but was excluded"
+                assert (
+                    f in filtered
+                ), f"File '{f.name}' starts with '{prefix}' but was excluded"
 
 
 @given(data=st.data())
@@ -196,8 +204,9 @@ def test_matches_pattern_consistency(data):
     expected = fnmatch.fnmatch(filename, pattern)
     actual = matches_pattern(filename, pattern)
 
-    assert actual == expected, \
-        f"matches_pattern('{filename}', '{pattern}') = {actual}, expected {expected}"
+    assert (
+        actual == expected
+    ), f"matches_pattern('{filename}', '{pattern}') = {actual}, expected {expected}"
 
 
 @given(data=st.data())
@@ -211,7 +220,9 @@ def test_filter_preserves_all_matching_files(data):
     the files that match the pattern.
     """
     # Generate files
-    all_filenames = data.draw(file_list_with_mixed_extensions(min_files=5, max_files=20))
+    all_filenames = data.draw(
+        file_list_with_mixed_extensions(min_files=5, max_files=20)
+    )
     pattern = data.draw(glob_patterns)
 
     # Create Path objects
@@ -226,13 +237,15 @@ def test_filter_preserves_all_matching_files(data):
         should_match = matches_pattern(f.name, pattern)
         is_in_filtered = f in filtered_set
 
-        assert should_match == is_in_filtered, \
-            f"File '{f.name}' matches={should_match} but in_filtered={is_in_filtered} for pattern '{pattern}'"
+        assert (
+            should_match == is_in_filtered
+        ), f"File '{f.name}' matches={should_match} but in_filtered={is_in_filtered} for pattern '{pattern}'"
 
 
 # ============================================================================
 # Property Tests for Multi-File Result Aggregation
 # ============================================================================
+
 
 @given(data=st.data())
 @settings(max_examples=20)
@@ -255,18 +268,23 @@ def test_multi_file_result_aggregation_entry_count(data):
     for i in range(num_files):
         # Generate entries for this file
         num_entries = data.draw(st.integers(min_value=0, max_value=20))
-        file_entries = [{"id": f"file{i}_entry{j}", "content": f"content_{j}"} for j in range(num_entries)]
+        file_entries = [
+            {"id": f"file{i}_entry{j}", "content": f"content_{j}"}
+            for j in range(num_entries)
+        ]
 
         # Decide if this file succeeds or fails
         has_errors = data.draw(st.booleans())
         errors = [f"Error in file {i}"] if has_errors else []
 
-        file_results.append(DocProcessingResult(
-            source_file=f"/path/to/file{i}.md",
-            chunks_processed=data.draw(st.integers(min_value=0, max_value=10)),
-            entries_generated=num_entries,
-            errors=errors
-        ))
+        file_results.append(
+            DocProcessingResult(
+                source_file=f"/path/to/file{i}.md",
+                chunks_processed=data.draw(st.integers(min_value=0, max_value=10)),
+                entries_generated=num_entries,
+                errors=errors,
+            )
+        )
 
         # Only count entries from successful files
         if not has_errors:
@@ -278,24 +296,28 @@ def test_multi_file_result_aggregation_entry_count(data):
         file_results=file_results,
         all_entries=all_entries,
         output_file="output.jsonl",
-        duration=10.0
+        duration=10.0,
     )
 
     # Verify total entry count
-    assert result.total_entries == len(all_entries), \
-        f"Expected {len(all_entries)} total entries, got {result.total_entries}"
+    assert result.total_entries == len(
+        all_entries
+    ), f"Expected {len(all_entries)} total entries, got {result.total_entries}"
 
     # Verify file counts
-    assert result.total_files == num_files, \
-        f"Expected {num_files} total files, got {result.total_files}"
+    assert (
+        result.total_files == num_files
+    ), f"Expected {num_files} total files, got {result.total_files}"
 
     successful = sum(1 for r in file_results if not r.errors)
     failed = sum(1 for r in file_results if r.errors)
 
-    assert result.successful_files == successful, \
-        f"Expected {successful} successful files, got {result.successful_files}"
-    assert result.failed_files == failed, \
-        f"Expected {failed} failed files, got {result.failed_files}"
+    assert (
+        result.successful_files == successful
+    ), f"Expected {successful} successful files, got {result.successful_files}"
+    assert (
+        result.failed_files == failed
+    ), f"Expected {failed} failed files, got {result.failed_files}"
 
 
 @given(data=st.data())
@@ -323,8 +345,9 @@ def test_merge_entries_preserves_all_entries(data):
     merged = merge_entries(entries_lists)
 
     # Verify total count
-    assert len(merged) == expected_total, \
-        f"Expected {expected_total} merged entries, got {len(merged)}"
+    assert (
+        len(merged) == expected_total
+    ), f"Expected {expected_total} merged entries, got {len(merged)}"
 
     # Verify all entries are present
     all_original = []
@@ -332,8 +355,7 @@ def test_merge_entries_preserves_all_entries(data):
         all_original.extend(lst)
 
     for entry in all_original:
-        assert entry in merged, \
-            f"Entry {entry} should be in merged result"
+        assert entry in merged, f"Entry {entry} should be in merged result"
 
 
 @given(data=st.data())
@@ -352,37 +374,44 @@ def test_aggregation_preserves_file_results(data):
     file_results: list[DocProcessingResult] = []
 
     for i in range(num_files):
-        file_results.append(DocProcessingResult(
-            source_file=f"/path/to/file{i}.md",
-            chunks_processed=data.draw(st.integers(min_value=0, max_value=10)),
-            entries_generated=data.draw(st.integers(min_value=0, max_value=20)),
-            errors=[]
-        ))
+        file_results.append(
+            DocProcessingResult(
+                source_file=f"/path/to/file{i}.md",
+                chunks_processed=data.draw(st.integers(min_value=0, max_value=10)),
+                entries_generated=data.draw(st.integers(min_value=0, max_value=20)),
+                errors=[],
+            )
+        )
 
     # Aggregate results
     result = aggregate_results(
         file_results=file_results,
         all_entries=[],
         output_file="output.jsonl",
-        duration=10.0
+        duration=10.0,
     )
 
     # Verify all file results are preserved
-    assert len(result.file_results) == len(file_results), \
-        f"Expected {len(file_results)} file results, got {len(result.file_results)}"
+    assert len(result.file_results) == len(
+        file_results
+    ), f"Expected {len(file_results)} file results, got {len(result.file_results)}"
 
     for original, aggregated in zip(file_results, result.file_results):
-        assert original.source_file == aggregated.source_file, \
-            f"Source file mismatch: {original.source_file} != {aggregated.source_file}"
-        assert original.chunks_processed == aggregated.chunks_processed, \
-            "Chunks processed mismatch"
-        assert original.entries_generated == aggregated.entries_generated, \
-            "Entries generated mismatch"
+        assert (
+            original.source_file == aggregated.source_file
+        ), f"Source file mismatch: {original.source_file} != {aggregated.source_file}"
+        assert (
+            original.chunks_processed == aggregated.chunks_processed
+        ), "Chunks processed mismatch"
+        assert (
+            original.entries_generated == aggregated.entries_generated
+        ), "Entries generated mismatch"
 
 
 # ============================================================================
 # Additional Property Tests for Batch Processor
 # ============================================================================
+
 
 @given(data=st.data())
 @settings(max_examples=20, deadline=None)
@@ -397,8 +426,8 @@ def test_collect_supported_files_returns_only_supported(data):
     from ollaforge.doc_parser import DocumentParserFactory
 
     # Generate files with mixed extensions (some supported, some not)
-    supported_exts = ['.md', '.txt', '.html', '.json', '.py']
-    unsupported_exts = ['.xyz', '.abc', '.unsupported']
+    supported_exts = [".md", ".txt", ".html", ".json", ".py"]
+    unsupported_exts = [".xyz", ".abc", ".unsupported"]
 
     num_supported = data.draw(st.integers(min_value=1, max_value=5))
     num_unsupported = data.draw(st.integers(min_value=1, max_value=5))
@@ -427,13 +456,15 @@ def test_collect_supported_files_returns_only_supported(data):
 
         # Verify: all collected files have supported extensions
         for f in collected:
-            assert DocumentParserFactory.is_supported(str(f)), \
-                f"File '{f.name}' should have a supported extension"
+            assert DocumentParserFactory.is_supported(
+                str(f)
+            ), f"File '{f.name}' should have a supported extension"
 
         # Verify: no unsupported files are collected
         for f in collected:
-            assert f.suffix not in unsupported_exts, \
-                f"File '{f.name}' has unsupported extension but was collected"
+            assert (
+                f.suffix not in unsupported_exts
+            ), f"File '{f.name}' has unsupported extension but was collected"
 
 
 @given(data=st.data())
@@ -471,15 +502,18 @@ def test_collect_with_pattern_filters_correctly(data):
 
         # Verify: only files matching pattern are collected
         for f in collected:
-            assert matches_pattern(f.name, pattern), \
-                f"File '{f.name}' should match pattern '{pattern}'"
+            assert matches_pattern(
+                f.name, pattern
+            ), f"File '{f.name}' should match pattern '{pattern}'"
 
         # Verify: matching files with supported extensions are included
         for filename in matching_files + matching_diff_ext:
-            assert filename in collected_names, \
-                f"File '{filename}' matches pattern but was not collected"
+            assert (
+                filename in collected_names
+            ), f"File '{filename}' matches pattern but was not collected"
 
         # Verify: non-matching files are excluded
         for filename in non_matching_same_ext:
-            assert filename not in collected_names, \
-                f"File '{filename}' doesn't match pattern but was collected"
+            assert (
+                filename not in collected_names
+            ), f"File '{filename}' doesn't match pattern but was collected"

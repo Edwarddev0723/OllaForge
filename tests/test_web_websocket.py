@@ -40,17 +40,13 @@ def ws_manager_instance():
 
 # Strategy for session IDs
 sid_strategy = st.text(
-    alphabet='abcdefghijklmnopqrstuvwxyz0123456789',
-    min_size=8,
-    max_size=16
+    alphabet="abcdefghijklmnopqrstuvwxyz0123456789", min_size=8, max_size=16
 )
 
 # Strategy for task IDs
 task_id_strategy = st.text(
-    alphabet='abcdefghijklmnopqrstuvwxyz0123456789_',
-    min_size=5,
-    max_size=20
-).filter(lambda x: x.startswith('gen_') or x.startswith('aug_') or len(x) > 5)
+    alphabet="abcdefghijklmnopqrstuvwxyz0123456789_", min_size=5, max_size=20
+).filter(lambda x: x.startswith("gen_") or x.startswith("aug_") or len(x) > 5)
 
 # Strategy for progress values
 progress_strategy = st.integers(min_value=0, max_value=1000)
@@ -63,10 +59,11 @@ status_strategy = st.sampled_from(["pending", "running", "completed", "failed"])
 # Property Test 8: Progress indicators show during operations
 # ============================================================================
 
+
 @given(
     task_id=task_id_strategy,
     progress=progress_strategy,
-    total=st.integers(min_value=1, max_value=1000)
+    total=st.integers(min_value=1, max_value=1000),
 )
 @settings(max_examples=20, deadline=10000)
 def test_progress_indicators_show_during_operations(task_id, progress, total):
@@ -92,10 +89,7 @@ def test_progress_indicators_show_during_operations(task_id, progress, total):
 
         # Emit progress
         await manager.emit_progress(
-            task_id=task_id,
-            progress=progress,
-            total=total,
-            status="running"
+            task_id=task_id, progress=progress, total=total, status="running"
         )
 
         # Verify emit was called
@@ -126,10 +120,11 @@ def test_progress_indicators_show_during_operations(task_id, progress, total):
 # Property Test 9: Progress updates in real-time
 # ============================================================================
 
+
 @given(
     task_id=task_id_strategy,
     num_updates=st.integers(min_value=2, max_value=10),
-    total=st.integers(min_value=10, max_value=100)
+    total=st.integers(min_value=10, max_value=100),
 )
 @settings(max_examples=20, deadline=15000)
 def test_progress_updates_in_real_time(task_id, num_updates, total):
@@ -144,6 +139,7 @@ def test_progress_updates_in_real_time(task_id, num_updates, total):
     3. Timestamps in chronological order (proving real-time emission)
     4. Each update emitted individually (not batched)
     """
+
     async def run_test():
         manager = WebSocketManager()
         mock_sio = AsyncMock()
@@ -160,15 +156,13 @@ def test_progress_updates_in_real_time(task_id, num_updates, total):
             progress = min((i + 1) * (total // num_updates), total)
             progress_values.append(progress)
             await manager.emit_progress(
-                task_id=task_id,
-                progress=progress,
-                total=total,
-                status="running"
+                task_id=task_id, progress=progress, total=total, status="running"
             )
 
         # Verify all updates were emitted (not batched)
-        assert mock_sio.emit.call_count == num_updates, \
-            f"Expected {num_updates} individual emissions, got {mock_sio.emit.call_count}"
+        assert (
+            mock_sio.emit.call_count == num_updates
+        ), f"Expected {num_updates} individual emissions, got {mock_sio.emit.call_count}"
 
         # Verify progress values and timestamps
         emitted_progress = []
@@ -178,18 +172,21 @@ def test_progress_updates_in_real_time(task_id, num_updates, total):
             emitted_progress.append(event_data["progress"])
 
             # Each update must contain a timestamp for real-time tracking
-            assert "timestamp" in event_data, \
-                "Each progress update must include a timestamp"
+            assert (
+                "timestamp" in event_data
+            ), "Each progress update must include a timestamp"
             timestamps.append(event_data["timestamp"])
 
         # Progress values should be emitted in order
-        assert emitted_progress == progress_values, \
-            "Progress values should be emitted in order"
+        assert (
+            emitted_progress == progress_values
+        ), "Progress values should be emitted in order"
 
         # Timestamps should be in chronological order (real-time emission)
         for i in range(1, len(timestamps)):
-            assert timestamps[i] >= timestamps[i-1], \
-                f"Timestamps should be in chronological order: {timestamps[i-1]} should be <= {timestamps[i]}"
+            assert (
+                timestamps[i] >= timestamps[i - 1]
+            ), f"Timestamps should be in chronological order: {timestamps[i-1]} should be <= {timestamps[i]}"
 
     asyncio.run(run_test())
 
@@ -198,11 +195,12 @@ def test_progress_updates_in_real_time(task_id, num_updates, total):
 # Property Test 10: Completion shows statistics
 # ============================================================================
 
+
 @given(
     task_id=task_id_strategy,
     total=st.integers(min_value=1, max_value=100),
     success_count=st.integers(min_value=0, max_value=100),
-    duration=st.floats(min_value=0.1, max_value=1000.0)
+    duration=st.floats(min_value=0.1, max_value=1000.0),
 )
 @settings(max_examples=20, deadline=10000)
 def test_completion_shows_statistics(task_id, total, success_count, duration):
@@ -233,7 +231,7 @@ def test_completion_shows_statistics(task_id, total, success_count, duration):
             total=total,
             success_count=success_count,
             failure_count=failure_count,
-            duration=duration
+            duration=duration,
         )
 
         # Verify emit was called
@@ -260,10 +258,11 @@ def test_completion_shows_statistics(task_id, total, success_count, duration):
 # Property Test 11: Errors don't stop progress display
 # ============================================================================
 
+
 @given(
     task_id=task_id_strategy,
     error_message=st.text(min_size=1, max_size=100).filter(lambda x: x.strip()),
-    error_type=st.sampled_from(["error", "warning", "item_error"])
+    error_type=st.sampled_from(["error", "warning", "item_error"]),
 )
 @settings(max_examples=20, deadline=10000)
 def test_errors_dont_stop_progress_display(task_id, error_message, error_type):
@@ -274,6 +273,7 @@ def test_errors_dont_stop_progress_display(task_id, error_message, error_type):
     For any error during processing, the error should be emitted as an event
     without stopping the progress tracking mechanism.
     """
+
     async def run_test():
         manager = WebSocketManager()
         mock_sio = AsyncMock()
@@ -286,25 +286,17 @@ def test_errors_dont_stop_progress_display(task_id, error_message, error_type):
 
         # Emit progress first
         await manager.emit_progress(
-            task_id=task_id,
-            progress=5,
-            total=10,
-            status="running"
+            task_id=task_id, progress=5, total=10, status="running"
         )
 
         # Emit error (should not affect progress tracking)
         await manager.emit_error(
-            task_id=task_id,
-            error=error_message,
-            error_type=error_type
+            task_id=task_id, error=error_message, error_type=error_type
         )
 
         # Emit more progress (should still work)
         await manager.emit_progress(
-            task_id=task_id,
-            progress=6,
-            total=10,
-            status="running"
+            task_id=task_id, progress=6, total=10, status="running"
         )
 
         # Verify all events were emitted
@@ -327,6 +319,7 @@ def test_errors_dont_stop_progress_display(task_id, error_message, error_type):
 # ============================================================================
 # Unit Tests for WebSocket Manager
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_websocket_manager_connect(ws_manager_instance):
@@ -473,10 +466,7 @@ async def test_websocket_manager_emit_to_subscribers(ws_manager_instance):
 
     # Emit progress
     await ws_manager_instance.emit_progress(
-        task_id=task_id,
-        progress=5,
-        total=10,
-        status="running"
+        task_id=task_id, progress=5, total=10, status="running"
     )
 
     # Verify emit was called for each subscriber
@@ -493,10 +483,7 @@ async def test_websocket_manager_no_emit_without_subscribers(ws_manager_instance
 
     # Emit progress without any subscribers
     await ws_manager_instance.emit_progress(
-        task_id=task_id,
-        progress=5,
-        total=10,
-        status="running"
+        task_id=task_id, progress=5, total=10, status="running"
     )
 
     # Verify no emit was called
@@ -526,7 +513,7 @@ async def test_websocket_manager_emit_completed(ws_manager_instance):
         success_count=95,
         failure_count=5,
         duration=45.5,
-        message="Test completed"
+        message="Test completed",
     )
 
     # Verify emit
@@ -564,7 +551,7 @@ async def test_websocket_manager_emit_error(ws_manager_instance):
         task_id=task_id,
         error="Test error message",
         error_type="item_error",
-        details={"item_index": 5}
+        details={"item_index": 5},
     )
 
     # Verify emit
@@ -596,7 +583,7 @@ async def test_websocket_manager_emit_failed(ws_manager_instance):
     await ws_manager_instance.emit_failed(
         task_id=task_id,
         error="Task failed completely",
-        details={"reason": "connection_lost"}
+        details={"reason": "connection_lost"},
     )
 
     # Verify emit
@@ -639,16 +626,14 @@ async def test_websocket_manager_percentage_calculation(ws_manager_instance):
         ws_manager_instance._sio.reset_mock()
 
         await ws_manager_instance.emit_progress(
-            task_id=task_id,
-            progress=progress,
-            total=total,
-            status="running"
+            task_id=task_id, progress=progress, total=total, status="running"
         )
 
         call_args = ws_manager_instance._sio.emit.call_args
         event_data = call_args[0][1]
-        assert event_data["percentage"] == expected_percentage, \
-            f"Expected {expected_percentage}% for {progress}/{total}"
+        assert (
+            event_data["percentage"] == expected_percentage
+        ), f"Expected {expected_percentage}% for {progress}/{total}"
 
 
 @pytest.mark.asyncio
@@ -668,10 +653,7 @@ async def test_websocket_manager_handles_emit_exception(ws_manager_instance):
 
     # Should not raise
     await ws_manager_instance.emit_progress(
-        task_id=task_id,
-        progress=5,
-        total=10,
-        status="running"
+        task_id=task_id, progress=5, total=10, status="running"
     )
 
     # Test passed if no exception was raised

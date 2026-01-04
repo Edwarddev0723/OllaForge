@@ -45,7 +45,7 @@ class TestQCIntegration:
             dataset_type=DatasetType.SFT,
             language=OutputLanguage.ZH_TW,
             qc_enabled=True,
-            qc_confidence=0.9
+            qc_confidence=0.9,
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -63,7 +63,7 @@ class TestQCIntegration:
             dataset_type=DatasetType.SFT,
             language=OutputLanguage.EN,
             qc_enabled=True,
-            qc_confidence=0.9
+            qc_confidence=0.9,
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -80,7 +80,7 @@ class TestQCIntegration:
             dataset_type=DatasetType.SFT,
             language=OutputLanguage.ZH_TW,
             qc_enabled=False,
-            qc_confidence=0.9
+            qc_confidence=0.9,
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -97,7 +97,7 @@ class TestQCIntegration:
             dataset_type=DatasetType.SFT,
             language=OutputLanguage.ZH_TW,
             qc_enabled=True,
-            qc_confidence=0.85
+            qc_confidence=0.85,
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -112,9 +112,7 @@ class TestQCIntegration:
         **Validates: Requirements 7.5**
         """
         config = DocGenerationConfig(
-            dataset_type=DatasetType.SFT,
-            language=OutputLanguage.EN,
-            qc_enabled=True
+            dataset_type=DatasetType.SFT, language=OutputLanguage.EN, qc_enabled=True
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -128,18 +126,16 @@ class TestQCIntegration:
         **Validates: Requirements 7.5, 7.6**
         """
         config = DocGenerationConfig(
-            dataset_type=DatasetType.SFT,
-            language=OutputLanguage.ZH_TW,
-            qc_enabled=True
+            dataset_type=DatasetType.SFT, language=OutputLanguage.ZH_TW, qc_enabled=True
         )
 
         generator = DocumentDatasetGenerator(config)
         stats = generator.get_qc_stats()
 
         assert stats is not None
-        assert 'total_checked' in stats
-        assert 'passed' in stats
-        assert 'failed' in stats
+        assert "total_checked" in stats
+        assert "passed" in stats
+        assert "failed" in stats
 
 
 class TestQCFiltering:
@@ -156,9 +152,7 @@ class TestQCFiltering:
         **Validates: Requirements 7.5, 7.6**
         """
         config = DocGenerationConfig(
-            dataset_type=DatasetType.SFT,
-            language=OutputLanguage.ZH_TW,
-            qc_enabled=True
+            dataset_type=DatasetType.SFT, language=OutputLanguage.ZH_TW, qc_enabled=True
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -171,7 +165,7 @@ class TestQCFiltering:
             DataEntry(
                 instruction="這個軟體的介面設計得很好",
                 input="請說明",
-                output="這是台灣繁體中文"
+                output="這是台灣繁體中文",
             )
         ]
 
@@ -187,22 +181,20 @@ class TestQCFiltering:
         **Validates: Requirements 7.5, 7.6**
         """
         config = DocGenerationConfig(
-            dataset_type=DatasetType.SFT,
-            language=OutputLanguage.ZH_TW,
-            qc_enabled=True
+            dataset_type=DatasetType.SFT, language=OutputLanguage.ZH_TW, qc_enabled=True
         )
 
         generator = DocumentDatasetGenerator(config)
 
         # Mock the QC controller to fail
         generator._qc_controller = MagicMock(spec=QualityController)
-        generator._qc_controller.check_entry.return_value = (False, ['instruction'])
+        generator._qc_controller.check_entry.return_value = (False, ["instruction"])
 
         entries = [
             DataEntry(
                 instruction="这个软件的界面设计得很好",  # Mainland Chinese
                 input="请说明",
-                output="这是简体中文"
+                output="这是简体中文",
             )
         ]
 
@@ -217,9 +209,7 @@ class TestQCFiltering:
         **Validates: Requirements 7.5, 7.6**
         """
         config = DocGenerationConfig(
-            dataset_type=DatasetType.SFT,
-            language=OutputLanguage.ZH_TW,
-            qc_enabled=True
+            dataset_type=DatasetType.SFT, language=OutputLanguage.ZH_TW, qc_enabled=True
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -227,9 +217,9 @@ class TestQCFiltering:
         # Mock the QC controller to pass first, fail second
         generator._qc_controller = MagicMock(spec=QualityController)
         generator._qc_controller.check_entry.side_effect = [
-            (True, []),   # First entry passes
-            (False, ['instruction']),  # Second entry fails
-            (True, []),   # Third entry passes
+            (True, []),  # First entry passes
+            (False, ["instruction"]),  # Second entry fails
+            (True, []),  # Third entry passes
         ]
 
         entries = [
@@ -253,7 +243,7 @@ class TestQCFiltering:
         config = DocGenerationConfig(
             dataset_type=DatasetType.SFT,
             language=OutputLanguage.EN,  # English, so no QC
-            qc_enabled=True
+            qc_enabled=True,
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -285,7 +275,7 @@ class TestQCWithDifferentEntryTypes:
         config = DocGenerationConfig(
             dataset_type=DatasetType.PRETRAIN,
             language=OutputLanguage.ZH_TW,
-            qc_enabled=True
+            qc_enabled=True,
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -294,9 +284,7 @@ class TestQCWithDifferentEntryTypes:
         generator._qc_controller = MagicMock(spec=QualityController)
         generator._qc_controller.check_entry.return_value = (True, [])
 
-        entries = [
-            PretrainEntry(text="這是台灣繁體中文的預訓練文本")
-        ]
+        entries = [PretrainEntry(text="這是台灣繁體中文的預訓練文本")]
 
         filtered = generator._apply_qc_filter(entries)
 
@@ -313,7 +301,7 @@ class TestQCWithDifferentEntryTypes:
         config = DocGenerationConfig(
             dataset_type=DatasetType.SFT_CONVERSATION,
             language=OutputLanguage.ZH_TW,
-            qc_enabled=True
+            qc_enabled=True,
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -323,10 +311,14 @@ class TestQCWithDifferentEntryTypes:
         generator._qc_controller.check_entry.return_value = (True, [])
 
         entries = [
-            SFTConversationEntry(conversations=[
-                ConversationMessage(role='user', content='你好'),
-                ConversationMessage(role='assistant', content='您好！有什麼可以幫助您的？')
-            ])
+            SFTConversationEntry(
+                conversations=[
+                    ConversationMessage(role="user", content="你好"),
+                    ConversationMessage(
+                        role="assistant", content="您好！有什麼可以幫助您的？"
+                    ),
+                ]
+            )
         ]
 
         filtered = generator._apply_qc_filter(entries)
@@ -340,9 +332,7 @@ class TestQCWithDifferentEntryTypes:
         **Validates: Requirements 7.5, 7.6**
         """
         config = DocGenerationConfig(
-            dataset_type=DatasetType.DPO,
-            language=OutputLanguage.ZH_TW,
-            qc_enabled=True
+            dataset_type=DatasetType.DPO, language=OutputLanguage.ZH_TW, qc_enabled=True
         )
 
         generator = DocumentDatasetGenerator(config)
@@ -355,7 +345,7 @@ class TestQCWithDifferentEntryTypes:
             DPOEntry(
                 prompt="什麼是軟體工程？",
                 chosen="軟體工程是一門研究如何系統化開發軟體的學科。",
-                rejected="软件工程是一门研究如何系统化开发软件的学科。"
+                rejected="软件工程是一门研究如何系统化开发软件的学科。",
             )
         ]
 
@@ -378,19 +368,17 @@ class TestQCStatsTracking:
         **Validates: Requirements 7.5, 7.6**
         """
         config = DocGenerationConfig(
-            dataset_type=DatasetType.SFT,
-            language=OutputLanguage.ZH_TW,
-            qc_enabled=True
+            dataset_type=DatasetType.SFT, language=OutputLanguage.ZH_TW, qc_enabled=True
         )
 
         generator = DocumentDatasetGenerator(config)
 
         # Create a real QC controller but mock the actual validation
-        with patch('ollaforge.qc.validate_entry_chinese') as mock_validate:
+        with patch("ollaforge.qc.validate_entry_chinese") as mock_validate:
             # First entry passes, second fails
             mock_validate.side_effect = [
                 (True, []),
-                (False, ['instruction']),
+                (False, ["instruction"]),
             ]
 
             entries = [
@@ -403,6 +391,6 @@ class TestQCStatsTracking:
             stats = generator.get_qc_stats()
 
             assert stats is not None
-            assert stats['total_checked'] == 2
-            assert stats['passed'] == 1
-            assert stats['failed'] == 1
+            assert stats["total_checked"] == 2
+            assert stats["passed"] == 1
+            assert stats["failed"] == 1

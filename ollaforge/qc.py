@@ -33,6 +33,7 @@ def _get_torch():
     if _torch is None:
         try:
             import torch
+
             _torch = torch
         except ImportError:
             return None
@@ -84,10 +85,14 @@ def load_qc_model(force_reload: bool = False) -> tuple[Any, Any, str]:
         # Force CPU for BERT to keep MPS/GPU free for LLM generation
         _device = get_device(force_cpu=True)
 
-        console.print(f"[dim]Loading QC model on {_device} (keeping GPU free for LLM)...[/dim]")
+        console.print(
+            f"[dim]Loading QC model on {_device} (keeping GPU free for LLM)...[/dim]"
+        )
 
         _tokenizer = AutoTokenizer.from_pretrained(REPO_ID, cache_dir=".cache")
-        _model = AutoModelForSequenceClassification.from_pretrained(REPO_ID, cache_dir=".cache")
+        _model = AutoModelForSequenceClassification.from_pretrained(
+            REPO_ID, cache_dir=".cache"
+        )
         _model.to(_device).eval()
 
         console.print("[green]✓ QC model loaded successfully[/green]")
@@ -103,7 +108,9 @@ def load_qc_model(force_reload: bool = False) -> tuple[Any, Any, str]:
         return None, None, None
 
 
-def chunk_encode(text: str, tokenizer: Any, max_len: int = MAX_LEN, stride: int = STRIDE) -> list[dict]:
+def chunk_encode(
+    text: str, tokenizer: Any, max_len: int = MAX_LEN, stride: int = STRIDE
+) -> list[dict]:
     """
     Encode text with chunking for long texts.
 
@@ -116,7 +123,9 @@ def chunk_encode(text: str, tokenizer: Any, max_len: int = MAX_LEN, stride: int 
     Returns:
         List of encoded chunks
     """
-    ids = tokenizer(text, add_special_tokens=False, return_attention_mask=False)["input_ids"]
+    ids = tokenizer(text, add_special_tokens=False, return_attention_mask=False)[
+        "input_ids"
+    ]
 
     if len(ids) <= max_len - 2:
         enc = tokenizer(
@@ -124,7 +133,7 @@ def chunk_encode(text: str, tokenizer: Any, max_len: int = MAX_LEN, stride: int 
             truncation=True,
             max_length=max_len,
             return_attention_mask=True,
-            return_tensors="pt"
+            return_tensors="pt",
         )
         return [enc]
 
@@ -135,13 +144,13 @@ def chunk_encode(text: str, tokenizer: Any, max_len: int = MAX_LEN, stride: int 
         stride=stride,
         return_overflowing_tokens=True,
         return_attention_mask=True,
-        return_tensors="pt"
+        return_tensors="pt",
     )
 
     return [
         {
-            "input_ids": enc["input_ids"][i:i+1],
-            "attention_mask": enc["attention_mask"][i:i+1]
+            "input_ids": enc["input_ids"][i : i + 1],
+            "attention_mask": enc["attention_mask"][i : i + 1],
         }
         for i in range(len(enc["input_ids"]))
     ]
@@ -176,7 +185,7 @@ def predict_language(text: str) -> Optional[dict[str, Any]]:
             for ch in chunks:
                 logits = model(
                     input_ids=ch["input_ids"].to(device),
-                    attention_mask=ch["attention_mask"].to(device)
+                    attention_mask=ch["attention_mask"].to(device),
                 ).logits
                 probs_all.append(F.softmax(logits, dim=-1).cpu())
 
@@ -201,8 +210,7 @@ def predict_language(text: str) -> Optional[dict[str, Any]]:
 
 
 def is_taiwan_chinese(
-    text: str,
-    confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD
+    text: str, confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD
 ) -> tuple[bool, Optional[dict[str, Any]]]:
     """
     Check if text is authentic Taiwan Traditional Chinese.
@@ -227,7 +235,7 @@ def is_taiwan_chinese(
 
 def validate_entry_chinese(
     entry_dict: dict[str, Any],
-    confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD
+    confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
 ) -> tuple[bool, list[str]]:
     """
     Validate all text fields in an entry for Taiwan Chinese.
@@ -288,7 +296,7 @@ class QualityController:
         self,
         enabled: bool = True,
         confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
-        estimated_pass_rate: float = DEFAULT_PASS_RATE
+        estimated_pass_rate: float = DEFAULT_PASS_RATE,
     ):
         """
         Initialize the Quality Controller.
@@ -327,7 +335,9 @@ class QualityController:
         buffer_ratio = 1.0 / self.estimated_pass_rate
 
         # Clamp to reasonable bounds
-        buffer_ratio = max(self.MIN_BUFFER_RATIO, min(self.MAX_BUFFER_RATIO, buffer_ratio))
+        buffer_ratio = max(
+            self.MIN_BUFFER_RATIO, min(self.MAX_BUFFER_RATIO, buffer_ratio)
+        )
 
         # Calculate request count and round up
         request_count = int(target_count * buffer_ratio + 0.5)
@@ -350,8 +360,7 @@ class QualityController:
         self.stats["total_checked"] += 1
 
         passed, failed_fields = validate_entry_chinese(
-            entry_dict,
-            self.confidence_threshold
+            entry_dict, self.confidence_threshold
         )
 
         if passed:
@@ -372,7 +381,9 @@ class QualityController:
         if self.stats["total_checked"] > 0:
             actual_rate = self.stats["passed"] / self.stats["total_checked"]
             # Blend with previous estimate (exponential moving average)
-            self.estimated_pass_rate = 0.7 * actual_rate + 0.3 * self.estimated_pass_rate
+            self.estimated_pass_rate = (
+                0.7 * actual_rate + 0.3 * self.estimated_pass_rate
+            )
         return self.estimated_pass_rate
 
     def get_stats(self) -> dict[str, Any]:
@@ -397,12 +408,12 @@ class QualityController:
 # --- Quick test ---
 if __name__ == "__main__":
     tests = [
-        "這個軟件的界面設計得很好。",      # Mainland
-        "這個軟體的介面設計得很好。",      # Taiwan
+        "這個軟件的界面設計得很好。",  # Mainland
+        "這個軟體的介面設計得很好。",  # Taiwan
         "我需要下載這個程序到計算機上。",  # Mainland
-        "我需要下載這個程式到電腦上。",    # Taiwan
-        "請問您的網絡連接正常嗎？",        # Mainland
-        "請問您的網路連線正常嗎？",        # Taiwan
+        "我需要下載這個程式到電腦上。",  # Taiwan
+        "請問您的網絡連接正常嗎？",  # Mainland
+        "請問您的網路連線正常嗎？",  # Taiwan
     ]
 
     print("=" * 60)
@@ -413,6 +424,8 @@ if __name__ == "__main__":
         result = predict_language(t)
         if result:
             status = "✅ Taiwan" if result["is_taiwan"] else "❌ Mainland"
-            print(f"{status} | conf={result['confidence']:.2%} | {result['text_preview']}")
+            print(
+                f"{status} | conf={result['confidence']:.2%} | {result['text_preview']}"
+            )
         else:
             print(f"⚠️ QC unavailable | {t[:50]}")

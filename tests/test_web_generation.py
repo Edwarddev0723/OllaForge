@@ -46,32 +46,29 @@ def generation_service():
 
 # Strategy for valid topics (simple ASCII strings to avoid encoding issues)
 topic_strategy = st.text(
-    alphabet='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?-',
+    alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?-",
     min_size=1,
-    max_size=100
+    max_size=100,
 ).filter(lambda x: x.strip())
 
 # Strategy for valid counts (1-100 for testing)
 count_strategy = st.integers(min_value=1, max_value=100)
 
 # Strategy for model names
-model_strategy = st.sampled_from([
-    "llama3.2", "mistral", "gpt-oss:20b", "qwen2.5:7b"
-])
+model_strategy = st.sampled_from(["llama3.2", "mistral", "gpt-oss:20b", "qwen2.5:7b"])
 
 # Strategy for dataset types
-dataset_type_strategy = st.sampled_from([
-    DatasetType.SFT,
-    DatasetType.PRETRAIN,
-    DatasetType.SFT_CONVERSATION,
-    DatasetType.DPO
-])
+dataset_type_strategy = st.sampled_from(
+    [
+        DatasetType.SFT,
+        DatasetType.PRETRAIN,
+        DatasetType.SFT_CONVERSATION,
+        DatasetType.DPO,
+    ]
+)
 
 # Strategy for output languages
-language_strategy = st.sampled_from([
-    OutputLanguage.EN,
-    OutputLanguage.ZH_TW
-])
+language_strategy = st.sampled_from([OutputLanguage.EN, OutputLanguage.ZH_TW])
 
 # Strategy for QC settings
 qc_enabled_strategy = st.booleans()
@@ -82,6 +79,7 @@ qc_confidence_strategy = st.floats(min_value=0.0, max_value=1.0)
 # Property Test 1: Valid generation parameters initiate processing
 # ============================================================================
 
+
 @given(
     topic=topic_strategy,
     count=st.integers(min_value=1, max_value=50),  # Reduced range for faster tests
@@ -89,17 +87,11 @@ qc_confidence_strategy = st.floats(min_value=0.0, max_value=1.0)
     dataset_type=dataset_type_strategy,
     language=language_strategy,
     qc_enabled=qc_enabled_strategy,
-    qc_confidence=qc_confidence_strategy
+    qc_confidence=qc_confidence_strategy,
 )
 @settings(max_examples=20, deadline=60000)  # 60 second deadline per example
 def test_valid_generation_parameters_initiate_processing(
-    topic,
-    count,
-    model,
-    dataset_type,
-    language,
-    qc_enabled,
-    qc_confidence
+    topic, count, model, dataset_type, language, qc_enabled, qc_confidence
 ):
     """
     **Feature: web-interface, Property 1: Valid generation parameters initiate processing**
@@ -109,10 +101,13 @@ def test_valid_generation_parameters_initiate_processing(
     submitting the form should initiate dataset generation and return a task ID with
     pending status.
     """
+
     async def run_test():
         # Create async client
         transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             # Prepare request payload
             payload = {
                 "topic": topic,
@@ -121,15 +116,16 @@ def test_valid_generation_parameters_initiate_processing(
                 "dataset_type": dataset_type.value,
                 "language": language.value,
                 "qc_enabled": qc_enabled,
-                "qc_confidence": qc_confidence
+                "qc_confidence": qc_confidence,
             }
 
             # Make request to start generation
             response = await client.post("/api/generate", json=payload)
 
             # Should return 200 OK
-            assert response.status_code == 200, \
-                f"Valid generation request should return 200, got {response.status_code}: {response.text}"
+            assert (
+                response.status_code == 200
+            ), f"Valid generation request should return 200, got {response.status_code}: {response.text}"
 
             # Parse response
             data = response.json()
@@ -144,16 +140,19 @@ def test_valid_generation_parameters_initiate_processing(
             assert len(data["task_id"]) > 0, "task_id should not be empty"
 
             # Status should be pending (task just created)
-            assert data["status"] in ["pending", "running"], \
-                f"Initial status should be pending or running, got {data['status']}"
+            assert data["status"] in [
+                "pending",
+                "running",
+            ], f"Initial status should be pending or running, got {data['status']}"
 
             # Should be able to query task status
             task_id = data["task_id"]
             status_response = await client.get(f"/api/generate/{task_id}")
 
             # Status endpoint should work
-            assert status_response.status_code == 200, \
-                f"Status query should return 200, got {status_response.status_code}"
+            assert (
+                status_response.status_code == 200
+            ), f"Status query should return 200, got {status_response.status_code}"
 
             status_data = status_response.json()
             assert status_data["task_id"] == task_id, "Task ID should match"
@@ -169,19 +168,15 @@ def test_valid_generation_parameters_initiate_processing(
 # Property Test 2: Completed generation provides download
 # ============================================================================
 
+
 @given(
     topic=topic_strategy,
     count=st.integers(min_value=1, max_value=10),  # Small count for faster tests
-    format=st.sampled_from(["jsonl", "json", "csv", "tsv"])
+    format=st.sampled_from(["jsonl", "json", "csv", "tsv"]),
 )
 @settings(max_examples=20, deadline=10000)
-@patch('ollaforge.web.routes.generation.generation_service')
-def test_completed_generation_provides_download(
-    mock_service,
-    topic,
-    count,
-    format
-):
+@patch("ollaforge.web.routes.generation.generation_service")
+def test_completed_generation_provides_download(mock_service, topic, count, format):
     """
     **Feature: web-interface, Property 2: Completed generation provides download**
     **Validates: Requirements 1.3**
@@ -189,19 +184,20 @@ def test_completed_generation_provides_download(
     For any dataset generation that completes successfully, the system should provide
     a download endpoint that returns the generated dataset in the requested format.
     """
+
     async def run_test():
         # Create async client
         transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             # Create mock task with completed status
             task_id = f"gen_test_{hash(topic) % 10000}"
 
             # Create mock entries
             mock_entries = [
                 DataEntry(
-                    instruction=f"Task {i}",
-                    input=f"Input {i}",
-                    output=f"Output {i}"
+                    instruction=f"Task {i}", input=f"Input {i}", output=f"Output {i}"
                 )
                 for i in range(count)
             ]
@@ -210,23 +206,22 @@ def test_completed_generation_provides_download(
                 "status": "completed",
                 "progress": count,
                 "total": count,
-                "result": {
-                    "entries": mock_entries,
-                    "total": count,
-                    "duration": 10.5
-                },
-                "error": None
+                "result": {"entries": mock_entries, "total": count, "duration": 10.5},
+                "error": None,
             }
 
             # Configure mock service
             mock_service.get_task.return_value = mock_task
 
             # Request download
-            response = await client.get(f"/api/generate/{task_id}/download?format={format}")
+            response = await client.get(
+                f"/api/generate/{task_id}/download?format={format}"
+            )
 
             # Should return 200 OK
-            assert response.status_code == 200, \
-                f"Download should return 200 for completed task, got {response.status_code}"
+            assert (
+                response.status_code == 200
+            ), f"Download should return 200 for completed task, got {response.status_code}"
 
             # Should have appropriate content type
             content_type = response.headers.get("content-type", "")
@@ -234,10 +229,12 @@ def test_completed_generation_provides_download(
 
             # Should have content-disposition header for download
             content_disposition = response.headers.get("content-disposition", "")
-            assert "attachment" in content_disposition, \
-                "Response should have attachment content-disposition"
-            assert format in content_disposition, \
-                f"Filename should include format {format}"
+            assert (
+                "attachment" in content_disposition
+            ), "Response should have attachment content-disposition"
+            assert (
+                format in content_disposition
+            ), f"Filename should include format {format}"
 
             # Should have content
             assert len(response.content) > 0, "Download should have content"
@@ -249,19 +246,15 @@ def test_completed_generation_provides_download(
 # Property Test 3: Generation failures display errors
 # ============================================================================
 
+
 @given(
     topic=topic_strategy,
     count=count_strategy,
-    error_type=st.sampled_from(["connection", "generation", "unexpected"])
+    error_type=st.sampled_from(["connection", "generation", "unexpected"]),
 )
 @settings(max_examples=20, deadline=10000)
-@patch('ollaforge.web.routes.generation.generation_service')
-def test_generation_failures_display_errors(
-    mock_service,
-    topic,
-    count,
-    error_type
-):
+@patch("ollaforge.web.routes.generation.generation_service")
+def test_generation_failures_display_errors(mock_service, topic, count, error_type):
     """
     **Feature: web-interface, Property 3: Generation failures display errors**
     **Validates: Requirements 1.4**
@@ -269,10 +262,13 @@ def test_generation_failures_display_errors(
     For any dataset generation that fails, the system should display a clear error
     message indicating what went wrong.
     """
+
     async def run_test():
         # Create async client
         transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             # Create mock task with failed status
             task_id = f"gen_test_{hash(topic) % 10000}"
 
@@ -280,7 +276,7 @@ def test_generation_failures_display_errors(
             error_messages = {
                 "connection": "Ollama service unavailable: Connection refused",
                 "generation": "Generation failed: Model not found",
-                "unexpected": "Unexpected error: Internal server error"
+                "unexpected": "Unexpected error: Internal server error",
             }
 
             mock_task = {
@@ -288,7 +284,7 @@ def test_generation_failures_display_errors(
                 "progress": 0,
                 "total": count,
                 "result": None,
-                "error": error_messages[error_type]
+                "error": error_messages[error_type],
             }
 
             # Configure mock service
@@ -298,15 +294,17 @@ def test_generation_failures_display_errors(
             response = await client.get(f"/api/generate/{task_id}")
 
             # Should return 200 OK (status query succeeds even if task failed)
-            assert response.status_code == 200, \
-                f"Status query should return 200, got {response.status_code}"
+            assert (
+                response.status_code == 200
+            ), f"Status query should return 200, got {response.status_code}"
 
             # Parse response
             data = response.json()
 
             # Should indicate failure
-            assert data["status"] == "failed", \
-                f"Status should be 'failed', got {data['status']}"
+            assert (
+                data["status"] == "failed"
+            ), f"Status should be 'failed', got {data['status']}"
 
             # Should have error message
             assert "error" in data, "Failed task should include error field"
@@ -317,11 +315,17 @@ def test_generation_failures_display_errors(
             # Error message should be descriptive
             error_msg = data["error"].lower()
             if error_type == "connection":
-                assert "ollama" in error_msg or "connection" in error_msg or "unavailable" in error_msg, \
-                    "Connection error should mention Ollama or connection"
+                assert (
+                    "ollama" in error_msg
+                    or "connection" in error_msg
+                    or "unavailable" in error_msg
+                ), "Connection error should mention Ollama or connection"
             elif error_type == "generation":
-                assert "generation" in error_msg or "failed" in error_msg or "model" in error_msg, \
-                    "Generation error should mention generation or model"
+                assert (
+                    "generation" in error_msg
+                    or "failed" in error_msg
+                    or "model" in error_msg
+                ), "Generation error should mention generation or model"
 
     asyncio.run(run_test())
 
@@ -329,6 +333,7 @@ def test_generation_failures_display_errors(
 # ============================================================================
 # Unit Tests for Generation Routes
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_generation_route_parameter_validation():
@@ -339,18 +344,18 @@ async def test_generation_route_parameter_validation():
     - 1.2: Parameter validation
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         # Test with missing required field (topic)
-        payload = {
-            "count": 10,
-            "model": "llama3.2"
-        }
+        payload = {"count": 10, "model": "llama3.2"}
 
         response = await client.post("/api/generate", json=payload)
 
         # Should return 422 Unprocessable Entity (validation error)
-        assert response.status_code == 422, \
-            f"Missing required field should return 422, got {response.status_code}"
+        assert (
+            response.status_code == 422
+        ), f"Missing required field should return 422, got {response.status_code}"
 
 
 @pytest.mark.asyncio
@@ -362,19 +367,18 @@ async def test_generation_route_count_validation():
     - 1.2: Parameter validation
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         # Test with invalid count (0)
-        payload = {
-            "topic": "Test topic",
-            "count": 0,
-            "model": "llama3.2"
-        }
+        payload = {"topic": "Test topic", "count": 0, "model": "llama3.2"}
 
         response = await client.post("/api/generate", json=payload)
 
         # Should return 422 (validation error)
-        assert response.status_code == 422, \
-            f"Invalid count should return 422, got {response.status_code}"
+        assert (
+            response.status_code == 422
+        ), f"Invalid count should return 422, got {response.status_code}"
 
         # Test with negative count
         payload["count"] = -5
@@ -391,12 +395,15 @@ async def test_generation_status_not_found():
     - 1.4: Error handling
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         response = await client.get("/api/generate/nonexistent_task_id")
 
         # Should return 404 Not Found
-        assert response.status_code == 404, \
-            f"Non-existent task should return 404, got {response.status_code}"
+        assert (
+            response.status_code == 404
+        ), f"Non-existent task should return 404, got {response.status_code}"
 
         # Should have error details
         data = response.json()
@@ -412,7 +419,9 @@ async def test_download_not_completed_task():
     - 1.3: Download only for completed tasks
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         # This will fail because the task doesn't exist
         response = await client.get("/api/generate/nonexistent_task/download")
 
@@ -429,18 +438,22 @@ async def test_download_invalid_format():
     - 4.4: Unsupported format error
     """
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         # Try to download with invalid format
         response = await client.get("/api/generate/some_task/download?format=invalid")
 
         # Should return 422 (validation error) due to regex constraint
-        assert response.status_code == 422, \
-            f"Invalid format should return 422, got {response.status_code}"
+        assert (
+            response.status_code == 422
+        ), f"Invalid format should return 422, got {response.status_code}"
 
 
 # ============================================================================
 # Unit Tests for Generation Service
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_generation_service_creates_task(generation_service):
@@ -468,12 +481,7 @@ async def test_generation_service_updates_task(generation_service):
     task_id = generation_service.create_task()
 
     # Update task
-    generation_service.update_task(
-        task_id,
-        status="running",
-        progress=5,
-        total=10
-    )
+    generation_service.update_task(task_id, status="running", progress=5, total=10)
 
     # Verify update
     task = generation_service.get_task(task_id)
@@ -500,12 +508,10 @@ async def test_generation_service_deletes_task(generation_service):
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.services.generation.generate_data_concurrent')
-@patch('ollaforge.web.services.generation.process_model_response')
+@patch("ollaforge.web.services.generation.generate_data_concurrent")
+@patch("ollaforge.web.services.generation.process_model_response")
 async def test_generation_service_handles_ollama_connection_error(
-    mock_process,
-    mock_generate,
-    generation_service
+    mock_process, mock_generate, generation_service
 ):
     """
     Test that generation service handles Ollama connection errors.
@@ -519,17 +525,14 @@ async def test_generation_service_handles_ollama_connection_error(
     # Attempt generation
     with pytest.raises(OllamaConnectionError):
         await generation_service.generate_dataset(
-            topic="Test",
-            count=5,
-            model="llama3.2"
+            topic="Test", count=5, model="llama3.2"
         )
 
 
 @pytest.mark.asyncio
-@patch('ollaforge.web.services.generation.generate_data_concurrent')
+@patch("ollaforge.web.services.generation.generate_data_concurrent")
 async def test_generation_service_handles_generation_error(
-    mock_generate,
-    generation_service
+    mock_generate, generation_service
 ):
     """
     Test that generation service handles generation errors.
@@ -543,7 +546,5 @@ async def test_generation_service_handles_generation_error(
     # Attempt generation
     with pytest.raises(OllamaGenerationError):
         await generation_service.generate_dataset(
-            topic="Test",
-            count=5,
-            model="nonexistent_model"
+            topic="Test", count=5, model="nonexistent_model"
         )

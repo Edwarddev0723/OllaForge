@@ -37,49 +37,65 @@ class DatasetType(str, Enum):
     - SFT_CONVERSATION: Multi-turn conversation format
     - DPO: Direct Preference Optimization with chosen/rejected pairs
     """
-    SFT = "sft"                      # 推理資料集 (Supervised Fine-tuning)
-    PRETRAIN = "pretrain"            # Pre-trained stage
-    SFT_CONVERSATION = "sft_conv"    # Supervised Fine-tuning (conversation)
-    DPO = "dpo"                      # Preference Stage (DPO)
+
+    SFT = "sft"  # 推理資料集 (Supervised Fine-tuning)
+    PRETRAIN = "pretrain"  # Pre-trained stage
+    SFT_CONVERSATION = "sft_conv"  # Supervised Fine-tuning (conversation)
+    DPO = "dpo"  # Preference Stage (DPO)
 
 
 class OutputLanguage(str, Enum):
     """
     Supported output languages for generated datasets.
     """
-    EN = "en"           # English
-    ZH_TW = "zh-tw"     # 繁體中文（台灣用語）
-    ZH_CN = "zh-cn"     # 简体中文（中国大陆用语）
+
+    EN = "en"  # English
+    ZH_TW = "zh-tw"  # 繁體中文（台灣用語）
+    ZH_CN = "zh-cn"  # 简体中文（中国大陆用语）
 
 
 class GenerationConfig(BaseModel):
     """Configuration for dataset generation."""
-    topic: str = Field(..., description="Description of the dataset content to generate")
-    count: int = Field(10, ge=1, le=10000, description="Number of data entries to generate")
+
+    topic: str = Field(
+        ..., description="Description of the dataset content to generate"
+    )
+    count: int = Field(
+        10, ge=1, le=10000, description="Number of data entries to generate"
+    )
     model: str = Field("gpt-oss:20b", description="Ollama model to use")
     output: str = Field("dataset.jsonl", description="Output filename")
-    dataset_type: DatasetType = Field(DatasetType.SFT, description="Type of dataset to generate")
-    language: OutputLanguage = Field(OutputLanguage.EN, description="Output language for generated content")
-    qc_enabled: bool = Field(True, description="Enable QC for Traditional Chinese (Taiwan)")
-    qc_confidence: float = Field(0.9, ge=0.0, le=1.0, description="QC confidence threshold for Taiwan Chinese")
+    dataset_type: DatasetType = Field(
+        DatasetType.SFT, description="Type of dataset to generate"
+    )
+    language: OutputLanguage = Field(
+        OutputLanguage.EN, description="Output language for generated content"
+    )
+    qc_enabled: bool = Field(
+        True, description="Enable QC for Traditional Chinese (Taiwan)"
+    )
+    qc_confidence: float = Field(
+        0.9, ge=0.0, le=1.0, description="QC confidence threshold for Taiwan Chinese"
+    )
 
-    @validator('topic')
+    @validator("topic")
     def topic_must_not_be_empty(cls, v):
         if not v or not v.strip():
-            raise ValueError('Topic cannot be empty')
+            raise ValueError("Topic cannot be empty")
         return v.strip()
 
-    @validator('output')
+    @validator("output")
     def output_must_be_valid_path(cls, v):
         # Basic validation for output path
         if not v or not v.strip():
-            raise ValueError('Output filename cannot be empty')
+            raise ValueError("Output filename cannot be empty")
         return v.strip()
 
 
 # ============================================================================
 # Dataset Entry Models - HuggingFace/LLaMA-Factory Compatible Formats
 # ============================================================================
+
 
 class DataEntry(BaseModel):
     """
@@ -89,6 +105,7 @@ class DataEntry(BaseModel):
     Example:
     {"instruction": "Summarize the text", "input": "Long text...", "output": "Summary..."}
     """
+
     instruction: str = Field(..., description="The instruction or task description")
     input: str = Field(..., description="The input context or data")
     output: str = Field(..., description="The expected output or response")
@@ -102,12 +119,16 @@ class PretrainEntry(BaseModel):
     Example:
     {"text": "This is a long document for pre-training..."}
     """
+
     text: str = Field(..., description="Raw text content for pre-training")
 
 
 class ConversationMessage(BaseModel):
     """Single message in a conversation."""
-    role: Literal["system", "user", "assistant"] = Field(..., description="Role of the speaker")
+
+    role: Literal["system", "user", "assistant"] = Field(
+        ..., description="Role of the speaker"
+    )
     content: str = Field(..., description="Message content")
 
 
@@ -123,7 +144,10 @@ class SFTConversationEntry(BaseModel):
         {"role": "assistant", "content": "Hi! How can I help?"}
     ]}
     """
-    conversations: list[ConversationMessage] = Field(..., description="List of conversation turns")
+
+    conversations: list[ConversationMessage] = Field(
+        ..., description="List of conversation turns"
+    )
 
 
 class DPOEntry(BaseModel):
@@ -138,6 +162,7 @@ class DPOEntry(BaseModel):
         "rejected": "France is a country in Europe."
     }
     """
+
     prompt: str = Field(..., description="The input prompt/question")
     chosen: str = Field(..., description="The preferred/better response")
     rejected: str = Field(..., description="The less preferred/worse response")
@@ -149,11 +174,18 @@ DatasetEntry = Union[DataEntry, PretrainEntry, SFTConversationEntry, DPOEntry]
 
 class GenerationResult(BaseModel):
     """Result of a dataset generation operation."""
-    success_count: int = Field(..., ge=0, description="Number of successfully generated entries")
-    total_requested: int = Field(..., ge=0, description="Total number of entries requested")
+
+    success_count: int = Field(
+        ..., ge=0, description="Number of successfully generated entries"
+    )
+    total_requested: int = Field(
+        ..., ge=0, description="Total number of entries requested"
+    )
     output_file: str = Field(..., description="Path to the output file")
     duration: float = Field(..., ge=0, description="Total generation time in seconds")
-    errors: list[str] = Field(default_factory=list, description="List of error messages encountered")
+    errors: list[str] = Field(
+        default_factory=list, description="List of error messages encountered"
+    )
 
     @property
     def success_rate(self) -> float:
@@ -166,6 +198,7 @@ class GenerationResult(BaseModel):
 # ============================================================================
 # Dataset Augmentation Models
 # ============================================================================
+
 
 class AugmentationConfig(BaseModel):
     """
@@ -180,6 +213,7 @@ class AugmentationConfig(BaseModel):
     - 2.3: Augmentation instruction handling
     - 2.4: New field creation support
     """
+
     input_file: str = Field(..., description="Path to source JSONL file")
     output_file: str = Field(..., description="Path to output JSONL file")
     target_field: str = Field(..., description="Field name to augment or create")
@@ -187,40 +221,45 @@ class AugmentationConfig(BaseModel):
     model: str = Field("llama3.2", description="Ollama model to use")
     language: OutputLanguage = Field(OutputLanguage.EN, description="Output language")
     create_new_field: bool = Field(False, description="Whether to create a new field")
-    context_fields: list[str] = Field(default_factory=list, description="Additional fields to include as context")
-    preview_count: int = Field(3, ge=1, le=10, description="Number of entries for preview")
+    context_fields: list[str] = Field(
+        default_factory=list, description="Additional fields to include as context"
+    )
+    preview_count: int = Field(
+        3, ge=1, le=10, description="Number of entries for preview"
+    )
 
-    @validator('input_file')
+    @validator("input_file")
     def input_file_must_be_valid(cls, v):
         """Validate that input file path is not empty."""
         if not v or not v.strip():
-            raise ValueError('Input file path cannot be empty')
+            raise ValueError("Input file path cannot be empty")
         return v.strip()
 
-    @validator('output_file')
+    @validator("output_file")
     def output_file_must_be_valid(cls, v):
         """Validate that output file path is not empty."""
         if not v or not v.strip():
-            raise ValueError('Output file path cannot be empty')
+            raise ValueError("Output file path cannot be empty")
         return v.strip()
 
-    @validator('target_field')
+    @validator("target_field")
     def target_field_must_be_valid(cls, v):
         """Validate that target field name is not empty."""
         if not v or not v.strip():
-            raise ValueError('Target field name cannot be empty')
+            raise ValueError("Target field name cannot be empty")
         return v.strip()
 
-    @validator('instruction')
+    @validator("instruction")
     def instruction_must_not_be_empty(cls, v):
         """Validate that instruction is not empty."""
         if not v or not v.strip():
-            raise ValueError('Augmentation instruction cannot be empty')
+            raise ValueError("Augmentation instruction cannot be empty")
         return v.strip()
 
 
 class FieldValidationError(Exception):
     """Raised when field validation fails."""
+
     def __init__(self, message: str, available_fields: list[str]):
         self.message = message
         self.available_fields = available_fields
@@ -228,9 +267,7 @@ class FieldValidationError(Exception):
 
 
 def validate_target_field(
-    entries: list[dict],
-    target_field: str,
-    create_new_field: bool = False
+    entries: list[dict], target_field: str, create_new_field: bool = False
 ) -> bool:
     """
     Validate that target field exists in dataset entries or can be created.
@@ -255,7 +292,7 @@ def validate_target_field(
             return True
         raise FieldValidationError(
             f"Cannot validate field '{target_field}': dataset is empty",
-            available_fields=[]
+            available_fields=[],
         )
 
     # Collect all unique field names from all entries
@@ -275,7 +312,7 @@ def validate_target_field(
     # Field doesn't exist and we're not creating new - raise error
     raise FieldValidationError(
         f"Field '{target_field}' not found in dataset",
-        available_fields=sorted(available_fields)
+        available_fields=sorted(available_fields),
     )
 
 
@@ -290,6 +327,7 @@ class AugmentationResult(BaseModel):
     - 5.2: Summary statistics (total, success, failures)
     - 5.3: Error accumulation and reporting
     """
+
     total_entries: int = Field(..., ge=0, description="Total entries in source dataset")
     success_count: int = Field(..., ge=0, description="Successfully augmented entries")
     failure_count: int = Field(..., ge=0, description="Failed augmentation attempts")
@@ -309,6 +347,7 @@ class AugmentationResult(BaseModel):
 # Document to Dataset Models
 # ============================================================================
 
+
 class DocToDatasetConfig(BaseModel):
     """
     Configuration for document-to-dataset conversion.
@@ -325,45 +364,54 @@ class DocToDatasetConfig(BaseModel):
     - 4.9: Output language specification (en, zh-tw)
     - 5.6: Parameter validation before generation
     """
+
     source_path: str = Field(..., description="Source document or directory path")
     output_file: str = Field("dataset.jsonl", description="Output dataset file path")
     dataset_type: DatasetType = Field(DatasetType.SFT, description="Dataset type")
     model: str = Field("llama3.2", description="Ollama model to use")
     language: OutputLanguage = Field(OutputLanguage.EN, description="Output language")
-    chunk_size: int = Field(2000, ge=500, le=10000, description="Chunk size in characters")
+    chunk_size: int = Field(
+        2000, ge=500, le=10000, description="Chunk size in characters"
+    )
     chunk_overlap: int = Field(200, ge=0, le=1000, description="Overlap between chunks")
-    entries_per_chunk: int = Field(3, ge=1, le=10, description="Entries to generate per chunk")
-    file_pattern: Optional[str] = Field(None, description="File pattern for directory processing")
+    entries_per_chunk: int = Field(
+        3, ge=1, le=10, description="Entries to generate per chunk"
+    )
+    file_pattern: Optional[str] = Field(
+        None, description="File pattern for directory processing"
+    )
     recursive: bool = Field(True, description="Recursively process directories")
     qc_enabled: bool = Field(True, description="Enable quality control")
-    qc_confidence: float = Field(0.9, ge=0.0, le=1.0, description="QC confidence threshold")
+    qc_confidence: float = Field(
+        0.9, ge=0.0, le=1.0, description="QC confidence threshold"
+    )
 
-    @validator('source_path')
+    @validator("source_path")
     def source_path_must_not_be_empty(cls, v):
         """Validate that source path is not empty."""
         if not v or not v.strip():
-            raise ValueError('Source path cannot be empty')
+            raise ValueError("Source path cannot be empty")
         return v.strip()
 
-    @validator('output_file')
+    @validator("output_file")
     def output_file_must_be_valid(cls, v):
         """Validate that output file path is not empty."""
         if not v or not v.strip():
-            raise ValueError('Output file path cannot be empty')
+            raise ValueError("Output file path cannot be empty")
         return v.strip()
 
-    @validator('model')
+    @validator("model")
     def model_must_not_be_empty(cls, v):
         """Validate that model name is not empty."""
         if not v or not v.strip():
-            raise ValueError('Model name cannot be empty')
+            raise ValueError("Model name cannot be empty")
         return v.strip()
 
-    @validator('chunk_overlap')
+    @validator("chunk_overlap")
     def overlap_must_be_less_than_size(cls, v, values):
         """Validate that chunk overlap is less than chunk size."""
-        if 'chunk_size' in values and v >= values['chunk_size']:
-            raise ValueError('Chunk overlap must be less than chunk size')
+        if "chunk_size" in values and v >= values["chunk_size"]:
+            raise ValueError("Chunk overlap must be less than chunk size")
         return v
 
 
@@ -378,6 +426,7 @@ class DocProcessingResult(BaseModel):
     - 6.4: Per-file progress tracking
     - 6.6: Individual file failure reporting
     """
+
     source_file: str = Field(..., description="Source file path")
     chunks_processed: int = Field(..., ge=0, description="Number of chunks processed")
     entries_generated: int = Field(..., ge=0, description="Number of entries generated")
@@ -401,6 +450,7 @@ class BatchProcessingResult(BaseModel):
     - 6.5: Combined results from all files
     - 6.6: Failure reporting with continuation
     """
+
     total_files: int = Field(..., ge=0, description="Total number of files")
     successful_files: int = Field(..., ge=0, description="Successfully processed files")
     failed_files: int = Field(..., ge=0, description="Failed files")
@@ -419,16 +469,16 @@ class BatchProcessingResult(BaseModel):
             return 0.0
         return (self.successful_files / self.total_files) * 100
 
-    @validator('successful_files')
+    @validator("successful_files")
     def successful_must_not_exceed_total(cls, v, values):
         """Validate that successful files don't exceed total."""
-        if 'total_files' in values and v > values['total_files']:
-            raise ValueError('Successful files cannot exceed total files')
+        if "total_files" in values and v > values["total_files"]:
+            raise ValueError("Successful files cannot exceed total files")
         return v
 
-    @validator('failed_files')
+    @validator("failed_files")
     def failed_must_not_exceed_total(cls, v, values):
         """Validate that failed files don't exceed total."""
-        if 'total_files' in values and v > values['total_files']:
-            raise ValueError('Failed files cannot exceed total files')
+        if "total_files" in values and v > values["total_files"]:
+            raise ValueError("Failed files cannot exceed total files")
         return v
