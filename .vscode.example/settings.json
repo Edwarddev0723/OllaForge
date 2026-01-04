@@ -1,0 +1,32 @@
+{
+    // Python settings
+    "python.defaultInterpreterPath": "${workspaceFolder}/ollaforge_env/bin/python",
+    "python.analysis.typeCheckingMode": "basic",
+    
+    // Editor settings
+    "editor.formatOnSave": true,
+    "editor.rulers": [88],
+    
+    // Python formatting
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
+    },
+    
+    // File associations
+    "files.associations": {
+        "*.jsonl": "json"
+    },
+    
+    // Exclude from search
+    "search.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.mypy_cache": true,
+        "**/.hypothesis": true,
+        "**/ollaforge_env": true,
+        "**/node_modules": true
+    }
+}

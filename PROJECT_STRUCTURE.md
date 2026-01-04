@@ -15,13 +15,18 @@ OllaForge/
 │   │   └── release.yml         # 發布流程
 │   └── PULL_REQUEST_TEMPLATE.md
 │
-├── .kiro/                      # Kiro 規格文件
+├── .kiro/                      # Kiro 規格文件 (內部設計文檔)
 │   └── specs/
-│       ├── dataset-augmentation/
-│       ├── ollama-cli-generator/
-│       └── web-interface/
+│       ├── dataset-augmentation/   # 資料集擴增功能設計
+│       ├── document-to-dataset/    # 文件轉資料集功能設計
+│       └── web-interface/          # 網頁介面架構設計
 │
-├── docs/                       # 文件
+├── .vscode.example/            # VS Code 範例設定 (複製到 .vscode 使用)
+│   ├── README.md
+│   ├── settings.json
+│   └── extensions.json
+│
+├── docs/                       # 使用者文件
 │   ├── README.md               # 文件首頁
 │   ├── getting-started.md      # 快速開始指南
 │   └── web-interface.md        # 網頁介面文件
@@ -42,10 +47,15 @@ OllaForge/
 │   ├── __init__.py
 │   ├── __main__.py             # CLI 入口點
 │   ├── augmentor.py            # 資料集擴增邏輯
+│   ├── batch_processor.py      # 批次處理
+│   ├── chunk_splitter.py       # 文件分塊
 │   ├── cli.py                  # 命令列介面
 │   ├── client.py               # Ollama 客戶端
+│   ├── doc_generator.py        # 文件轉資料集生成器
+│   ├── doc_parser.py           # 文件解析器
 │   ├── file_manager.py         # 檔案管理
 │   ├── formats.py              # 格式轉換
+│   ├── hf_loader.py            # HuggingFace 資料集載入
 │   ├── interactive.py          # 互動模式
 │   ├── models.py               # 資料模型
 │   ├── processor.py            # 資料處理
@@ -75,76 +85,22 @@ OllaForge/
 ├── ollaforge-web/              # React 前端
 │   ├── src/
 │   │   ├── components/         # React 元件
-│   │   │   ├── AugmentationForm.tsx
-│   │   │   ├── DatasetPreview.tsx
-│   │   │   ├── ErrorBoundary.tsx
-│   │   │   ├── ErrorDisplay.tsx
-│   │   │   ├── FileUpload.tsx
-│   │   │   ├── GenerationForm.tsx
-│   │   │   ├── LoadingOverlay.tsx
-│   │   │   ├── OfflineIndicator.tsx
-│   │   │   └── ProgressDisplay.tsx
 │   │   ├── pages/              # 頁面元件
-│   │   │   ├── AugmentPage.tsx
-│   │   │   ├── ConfigPage.tsx
-│   │   │   └── GeneratePage.tsx
 │   │   ├── layouts/            # 版面配置
-│   │   │   └── MainLayout.tsx
 │   │   ├── services/           # API 服務
-│   │   │   ├── api.ts
-│   │   │   ├── operationQueue.ts
-│   │   │   └── websocket.ts
 │   │   ├── hooks/              # React Hooks
-│   │   │   └── useNetworkStatus.ts
 │   │   ├── i18n/               # 國際化
-│   │   │   ├── index.ts
-│   │   │   └── locales/
-│   │   │       ├── en.json
-│   │   │       └── zh-TW.json
-│   │   ├── router/             # 路由配置
-│   │   ├── theme/              # 主題配置
-│   │   ├── __tests__/          # 單元測試
-│   │   ├── App.tsx
-│   │   ├── App.css
-│   │   ├── main.tsx
-│   │   └── index.css
+│   │   └── ...
 │   ├── e2e/                    # E2E 測試
-│   │   ├── augmentation.spec.ts
-│   │   ├── configuration.spec.ts
-│   │   ├── error-scenarios.spec.ts
-│   │   ├── fixtures.ts
-│   │   ├── generation.spec.ts
-│   │   └── smoke.spec.ts
-│   ├── public/
 │   ├── Dockerfile
 │   ├── nginx.conf
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── vitest.config.ts
-│   ├── playwright.config.ts
-│   └── README.md
+│   └── package.json
 │
 ├── tests/                      # Python 測試
-│   ├── __init__.py
-│   ├── test_augmentor.py
-│   ├── test_cli.py
-│   ├── test_client.py
-│   ├── test_file_manager.py
-│   ├── test_formats.py
-│   ├── test_models.py
-│   ├── test_processor.py
-│   ├── test_progress.py
-│   ├── test_web_augmentation.py
-│   ├── test_web_formats.py
-│   ├── test_web_generation.py
-│   ├── test_web_models.py
-│   ├── test_web_server.py
-│   ├── test_web_setup.py
-│   ├── test_web_task_manager.py
-│   └── test_web_websocket.py
+│   ├── test_*.py               # 單元測試與屬性測試
+│   └── ...
 │
 ├── .gitignore
-├── .gitattributes
 ├── CHANGELOG.md                # 變更日誌
 ├── CODE_OF_CONDUCT.md          # 行為準則
 ├── CONTRIBUTING.md             # 貢獻指南
@@ -161,6 +117,16 @@ OllaForge/
 ├── requirements.txt            # Python 依賴
 └── SECURITY.md                 # 安全政策
 ```
+
+## 設計規格文件 (`.kiro/specs/`)
+
+內部設計文檔集中在 `.kiro/specs/` 目錄，每個功能模組包含：
+
+| 檔案 | 說明 |
+|------|------|
+| `requirements.md` | 使用者故事與驗收標準 |
+| `design.md` | 技術設計與架構 |
+| `tasks.md` | 實作任務與進度追蹤 |
 
 ## 主要模組說明
 

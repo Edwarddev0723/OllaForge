@@ -540,6 +540,35 @@ make format
 make check
 ```
 
+### Project Structure
+
+```
+ollaforge/
+├── ollaforge/           # Core Python package
+│   ├── web/             # Web API server
+│   └── ...
+├── ollaforge-web/       # React frontend (Web UI)
+├── tests/               # Test suite
+├── docs/                # User documentation
+├── examples/            # Example datasets and configs
+└── .kiro/specs/         # Internal design specifications
+```
+
+### Architecture & Specs
+
+Internal design documents and specifications are located in `.kiro/specs/`:
+
+| Spec | Description |
+|------|-------------|
+| `dataset-augmentation/` | Dataset augmentation feature design |
+| `document-to-dataset/` | Doc2Dataset conversion pipeline |
+| `web-interface/` | Web UI architecture and API design |
+
+Each spec directory contains:
+- `requirements.md` - User stories and acceptance criteria
+- `design.md` - Technical design and architecture
+- `tasks.md` - Implementation tasks and progress
+
 ---
 
 ## 🤝 Contributing
