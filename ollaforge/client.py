@@ -443,7 +443,8 @@ def _test_ollama_connection() -> None:
     try:
         # Try to list available models to test connection
         models = ollama.list()
-        if not isinstance(models, dict):
+        # Handle both dict (older versions) and ListResponse (newer versions)
+        if not (isinstance(models, dict) or hasattr(models, 'models')):
             raise OllamaConnectionError("Invalid response from Ollama API")
 
     except Exception as e:
@@ -737,23 +738,36 @@ def get_available_models() -> list[str]:
     """
     try:
         response = ollama.list()
-        if not isinstance(response, dict):
+        
+        # Handle both dict (older versions) and ListResponse (newer versions)
+        if hasattr(response, 'models'):
+            # Newer version returns ListResponse object
+            models = response.models
+            model_names = []
+            for model in models:
+                if hasattr(model, 'model'):
+                    model_names.append(model.model)
+                elif isinstance(model, dict) and "name" in model:
+                    model_names.append(model["name"])
+            return model_names
+        elif isinstance(response, dict):
+            # Older version returns dict
+            if "models" not in response:
+                raise OllamaConnectionError("Malformed response: missing 'models' key")
+
+            models = response["models"]
+            if not isinstance(models, list):
+                raise OllamaConnectionError("Malformed response: 'models' is not a list")
+
+            model_names = []
+            for model in models:
+                if isinstance(model, dict) and "name" in model:
+                    model_names.append(model["name"])
+                # Skip malformed model entries but don't fail completely
+
+            return model_names
+        else:
             raise OllamaConnectionError("Invalid response format from Ollama API")
-
-        if "models" not in response:
-            raise OllamaConnectionError("Malformed response: missing 'models' key")
-
-        models = response["models"]
-        if not isinstance(models, list):
-            raise OllamaConnectionError("Malformed response: 'models' is not a list")
-
-        model_names = []
-        for model in models:
-            if isinstance(model, dict) and "name" in model:
-                model_names.append(model["name"])
-            # Skip malformed model entries but don't fail completely
-
-        return model_names
 
     except OllamaConnectionError:
         # Re-raise our own exceptions

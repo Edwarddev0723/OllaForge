@@ -17,9 +17,9 @@ Usage:
     ollaforge -i  # Interactive mode
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 __author__ = "OllaForge Team"
-__description__ = "CLI tool for generating datasets using local Ollama models"
+__description__ = "AI-Powered Dataset Generator & Augmentor for LLM Fine-tuning with HuggingFace Integration"
 
 # Core models
 # Augmentation

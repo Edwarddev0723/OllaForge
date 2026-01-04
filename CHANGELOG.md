@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Document to Dataset conversion (`doc2dataset` command)
+  - Support for Markdown, PDF, HTML, TXT, JSON, and code files
+  - Smart chunking with semantic boundary awareness
+  - Batch processing with glob patterns
+  - Quality control and validation
+
+### Enhanced
+- Improved error handling and cross-platform compatibility
+- Enhanced test coverage with property-based testing
+- Better Unicode and NUL character handling in CSV files
+
+## [1.3.0] - 2024-12-19
+
+### Added
 - **Simplified Chinese (zh-cn) Language Support** - Full support for Simplified Chinese with cultural guidelines
   - New `zh-cn` language option for all generation modes
   - Vocabulary conversion from Taiwan to Mainland Chinese terms
@@ -25,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Augment command now accepts HuggingFace dataset identifiers (e.g., `username/dataset-name`)
 - Updated documentation with upgrade instructions and new feature examples
 - Web interface with HuggingFace dataset loading tab
+- Improved cross-platform compatibility (Windows, macOS, Linux)
+- Enhanced CSV handling with NUL character filtering
+- Better error handling for permission and file access issues
+
+### Fixed
+- Python 3.9 compatibility issues with type hints
+- Windows compatibility for disk space checking
+- CSV parsing errors with special characters
+- Permission error handling in CLI commands
+- Test suite reliability across different platforms
 
 ## [1.2.0] - 2024-12-18
 
@@ -113,12 +137,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 1.3.0 | TBD | Simplified Chinese support, HuggingFace integration |
+| 1.4.0 | TBD | Document to Dataset conversion, enhanced testing |
+| 1.3.0 | 2024-12-19 | Simplified Chinese support, HuggingFace integration |
 | 1.2.0 | 2024-12-18 | Multi-format support (CSV, JSON, TSV, Parquet) |
 | 1.1.0 | 2024-12-18 | Dataset augmentation, property-based testing |
 | 1.0.0 | 2024-12-16 | Initial release |
 
-[Unreleased]: https://github.com/ollaforge/ollaforge/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ollaforge/ollaforge/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/ollaforge/ollaforge/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ollaforge/ollaforge/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ollaforge/ollaforge/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ollaforge/ollaforge/releases/tag/v1.0.0

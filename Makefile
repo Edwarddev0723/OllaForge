@@ -29,6 +29,7 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Build & Release:$(RESET)"
 	@echo "  make build         Build package"
+	@echo "  make release       Create release (tag + build)"
 	@echo "  make clean         Clean build artifacts"
 	@echo "  make publish-test  Publish to TestPyPI"
 	@echo "  make publish       Publish to PyPI"
@@ -99,8 +100,11 @@ check: format-check lint typecheck test
 # ============================================================================
 
 build: clean
-	python -m build
+	./scripts/build.sh
 	@echo "$(GREEN)✓ Build complete! Check dist/ directory$(RESET)"
+
+release:
+	./scripts/release.sh
 
 clean:
 	rm -rf build/
