@@ -318,11 +318,9 @@ def check_disk_space(path: str, required_bytes: int = 1024 * 1024) -> bool:
         # Ensure directory exists
         dir_path.mkdir(parents=True, exist_ok=True)
 
-        # Get disk usage statistics
-        stat = os.statvfs(dir_path)
-
-        # Calculate available space in bytes
-        available_bytes = stat.f_bavail * stat.f_frsize
+        # Get disk usage statistics (cross-platform)
+        usage = shutil.disk_usage(dir_path)
+        available_bytes = usage.free
 
         if available_bytes < required_bytes:
             available_mb = available_bytes / (1024 * 1024)
