@@ -1188,8 +1188,20 @@ def validate_source_path(value: str) -> str:
     source_path = Path(value.strip())
     if not source_path.exists():
         raise typer.BadParameter(f"Source path not found: {value}")
+
+    # Check read permission
     if not os.access(source_path, os.R_OK):
-        raise typer.BadParameter(f"No read permission for: {value}")
+        raise typer.BadParameter(f"Permission denied: No read permission for: {value}")
+
+    # For files, also try to actually open and read to verify permission
+    if source_path.is_file():
+        try:
+            with open(source_path, "r", encoding="utf-8") as f:
+                f.read(1)  # Try to read at least 1 byte
+        except PermissionError:
+            raise typer.BadParameter(f"Permission denied: Cannot read file: {value}")
+        except Exception:
+            pass  # Other errors (like encoding) are fine, we just want to check permission
 
     return value.strip()
 

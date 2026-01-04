@@ -919,7 +919,12 @@ def test_doc2dataset_with_unsupported_file():
 def test_doc2dataset_with_permission_error():
     """Test doc2dataset with permission error - Requirements 5.2"""
     import os
+    import sys
     import tempfile
+
+    # Skip on Windows as chmod doesn't work the same way
+    if sys.platform.startswith("win"):
+        pytest.skip("Permission test not reliable on Windows")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a file and make it unreadable
