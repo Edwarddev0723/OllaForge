@@ -253,13 +253,16 @@ def _read_csv(
             field_names = reader.fieldnames or []
 
             for _row_num, row in enumerate(reader, 2):  # Start from 2 (header is row 1)
-                # Clean empty values
+                # Clean empty values and remove NUL characters
                 cleaned_row = {}
                 for k, v in row.items():
                     if v is not None:
                         # Handle case where v might be a list or other non-string type
-                        if isinstance(v, str) and v.strip():
-                            cleaned_row[k] = v
+                        if isinstance(v, str):
+                            # Remove NUL characters that CSV parser cannot handle
+                            v = v.replace("\x00", "")
+                            if v.strip():
+                                cleaned_row[k] = v
                         elif not isinstance(v, str) and v:
                             cleaned_row[k] = str(v)
                 if cleaned_row:  # Skip empty rows

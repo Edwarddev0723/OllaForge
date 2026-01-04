@@ -305,7 +305,8 @@ def test_timeouts_return_error_responses(timeout_seconds):
 class TestTaskManagerBasics:
     """Unit tests for basic task manager operations."""
 
-    def test_create_task_generation(self):
+    @pytest.mark.asyncio
+    async def test_create_task_generation(self):
         """Test creating a generation task."""
         manager = TaskManager()
         task_id = manager.create_task(TaskType.GENERATION)
@@ -318,7 +319,8 @@ class TestTaskManagerBasics:
         assert task["status"] == "pending"
         assert task["task_type"] == "generation"
 
-    def test_create_task_augmentation(self):
+    @pytest.mark.asyncio
+    async def test_create_task_augmentation(self):
         """Test creating an augmentation task."""
         manager = TaskManager()
         task_id = manager.create_task(TaskType.AUGMENTATION)
@@ -328,7 +330,8 @@ class TestTaskManagerBasics:
         task = manager.get_task(task_id)
         assert task["task_type"] == "augmentation"
 
-    def test_update_task(self):
+    @pytest.mark.asyncio
+    async def test_update_task(self):
         """Test updating task status."""
         manager = TaskManager()
         task_id = manager.create_task(TaskType.GENERATION)
@@ -340,13 +343,15 @@ class TestTaskManagerBasics:
         assert task["progress"] == 5
         assert task["total"] == 10
 
-    def test_get_nonexistent_task(self):
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_task(self):
         """Test getting a task that doesn't exist."""
         manager = TaskManager()
         task = manager.get_task("nonexistent_task_id")
         assert task is None
 
-    def test_delete_completed_task(self):
+    @pytest.mark.asyncio
+    async def test_delete_completed_task(self):
         """Test deleting a completed task."""
         manager = TaskManager()
         task_id = manager.create_task(TaskType.GENERATION)
@@ -359,7 +364,8 @@ class TestTaskManagerBasics:
         assert success is True
         assert manager.get_task(task_id) is None
 
-    def test_delete_running_task_fails(self):
+    @pytest.mark.asyncio
+    async def test_delete_running_task_fails(self):
         """Test that deleting a running task fails."""
         manager = TaskManager()
         task_id = manager.create_task(TaskType.GENERATION)
