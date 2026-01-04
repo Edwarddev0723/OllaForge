@@ -29,7 +29,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from rich.console import Console
 
@@ -191,7 +191,7 @@ def validate_jsonl_file(file_path: str) -> bool:
 
 def read_jsonl_file(
     file_path: str, return_field_names: bool = False
-) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], list[str]]:
+) -> Union[list[dict[str, Any]], tuple[list[dict[str, Any]], list[str]]]:
     """
     Read and parse a JSONL file.
 
