@@ -73,6 +73,17 @@ dev = [
     "mypy>=1.0.0",
     "httpx>=0.25.0",
     "pytest-asyncio>=0.21.0",
+    # Include formats dependencies for testing
+    "pandas>=1.5.0",
+    "pyarrow>=10.0.0",
+    # Include web dependencies for testing
+    "fastapi>=0.104.0",
+    "python-socketio>=5.10.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-multipart>=0.0.6",
+    # Include docs dependencies for testing
+    "PyPDF2>=3.0.0",
+    "beautifulsoup4>=4.12.0",
 ]
 all = [
     "ollaforge[qc,dev,formats,docs,web]",
