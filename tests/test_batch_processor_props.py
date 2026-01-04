@@ -102,7 +102,7 @@ def test_pattern_filtering_correctness_extension_patterns(data):
 
         for filename in all_files:
             file_path = tmpdir_path / filename
-            file_path.write_text(f"Content of {filename}")
+            file_path.write_text(f"Content of {filename}", encoding="utf-8")
             created_files.append(file_path)
 
         # Apply pattern filter
@@ -165,7 +165,7 @@ def test_pattern_filtering_correctness_prefix_patterns(data):
 
         for filename in all_files:
             file_path = tmpdir_path / filename
-            file_path.write_text(f"Content of {filename}")
+            file_path.write_text(f"Content of {filename}", encoding="utf-8")
             created_files.append(file_path)
 
         # Apply pattern filter
@@ -449,7 +449,7 @@ def test_collect_supported_files_returns_only_supported(data):
 
         for filename in all_files:
             file_path = tmpdir_path / filename
-            file_path.write_text(f"Content of {filename}")
+            file_path.write_text(f"Content of {filename}", encoding="utf-8")
 
         # Collect supported files
         collected = collect_supported_files(tmpdir_path)
@@ -494,7 +494,7 @@ def test_collect_with_pattern_filters_correctly(data):
 
         for filename in all_files:
             file_path = tmpdir_path / filename
-            file_path.write_text(f"Content of {filename}")
+            file_path.write_text(f"Content of {filename}", encoding="utf-8")
 
         # Collect with pattern
         collected = collect_supported_files(tmpdir_path, pattern=pattern)

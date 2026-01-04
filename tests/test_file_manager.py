@@ -172,13 +172,18 @@ def test_file_overwrite_handling(entries, filename):
 
 def test_edge_cases():
     """Test edge cases for file operations."""
+    import sys
+
     with tempfile.TemporaryDirectory() as temp_dir:
         # Test empty entries list
         with pytest.raises(FileOperationError, match="No entries provided"):
             write_jsonl_file([], os.path.join(temp_dir, "empty.jsonl"))
 
-        # Test invalid file path
-        invalid_path = "/invalid/path/that/does/not/exist/file.jsonl"
+        # Test invalid file path - use platform-appropriate path
+        if sys.platform.startswith("win"):
+            invalid_path = "Z:\\nonexistent\\path\\file.jsonl"
+        else:
+            invalid_path = "/invalid/path/that/does/not/exist/file.jsonl"
         entries = [DataEntry(instruction="test", input="test", output="test")]
 
         with pytest.raises(FileOperationError):
@@ -323,14 +328,14 @@ def test_interruption_handling_setup():
     assert is_interrupted() is False
 
 
-@patch("ollaforge.file_manager.os.statvfs")
-def test_disk_space_with_mocked_statvfs(mock_statvfs):
+@patch("ollaforge.file_manager.shutil.disk_usage")
+def test_disk_space_with_mocked_statvfs(mock_disk_usage):
     """Test disk space checking with mocked system calls."""
-    # Mock insufficient space
-    mock_stat = MagicMock()
-    mock_stat.f_bavail = 100  # 100 blocks available
-    mock_stat.f_frsize = 1024  # 1KB per block = 100KB available
-    mock_statvfs.return_value = mock_stat
+    from collections import namedtuple
+
+    # Create a named tuple like shutil.disk_usage returns
+    DiskUsage = namedtuple("usage", ["total", "used", "free"])
+    mock_disk_usage.return_value = DiskUsage(1024 * 1024, 900 * 1024, 100 * 1024)  # 100KB free
 
     with tempfile.TemporaryDirectory() as temp_dir:
         test_path = os.path.join(temp_dir, "test.jsonl")
@@ -406,9 +411,17 @@ def test_interruption_signal_handling():
 
 def test_create_partial_backup_error_handling():
     """Test partial backup creation with error conditions."""
+    import sys
+
     # Test with invalid output path
     entries = [DataEntry(instruction="test", input="test", output="test")]
-    invalid_path = "/invalid/path/that/cannot/be/created/test.jsonl"
+
+    # Use platform-appropriate invalid path
+    if sys.platform.startswith("win"):
+        # On Windows, use an invalid drive letter path
+        invalid_path = "Z:\\nonexistent\\path\\that\\cannot\\be\\created\\test.jsonl"
+    else:
+        invalid_path = "/invalid/path/that/cannot/be/created/test.jsonl"
 
     with pytest.raises(FileOperationError, match="Failed to create partial backup"):
         create_partial_backup(entries, invalid_path)
@@ -608,6 +621,8 @@ def test_file_validation_with_corrupted_content():
 
 def test_disk_space_monitoring_during_write():
     """Test disk space monitoring during file write operations - Requirements 6.3"""
+    from collections import namedtuple
+
     with tempfile.TemporaryDirectory() as temp_dir:
         output_path = os.path.join(temp_dir, "space_test.jsonl")
 
@@ -618,11 +633,10 @@ def test_disk_space_monitoring_during_write():
         ]
 
         # Test with mocked insufficient space during write
-        with patch("os.statvfs") as mock_statvfs:
-            mock_stat = MagicMock()
-            mock_stat.f_bavail = 1  # Only 1 block available
-            mock_stat.f_frsize = 1024  # 1KB per block
-            mock_statvfs.return_value = mock_stat
+        with patch("ollaforge.file_manager.shutil.disk_usage") as mock_disk_usage:
+            # Create a named tuple like shutil.disk_usage returns
+            DiskUsage = namedtuple("usage", ["total", "used", "free"])
+            mock_disk_usage.return_value = DiskUsage(1024 * 1024, 1024 * 1024 - 1024, 1024)  # 1KB free
 
             with pytest.raises(DiskSpaceError):
                 write_jsonl_file(large_entries, output_path)
@@ -630,6 +644,12 @@ def test_disk_space_monitoring_during_write():
 
 def test_file_operations_with_readonly_filesystem():
     """Test file operations on read-only filesystem - Requirements 6.3"""
+    import sys
+
+    # Skip on Windows as chmod doesn't work the same way
+    if sys.platform.startswith("win"):
+        pytest.skip("Read-only directory test not reliable on Windows")
+
     with tempfile.TemporaryDirectory() as temp_dir:
         readonly_dir = os.path.join(temp_dir, "readonly")
         os.makedirs(readonly_dir)
