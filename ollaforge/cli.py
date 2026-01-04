@@ -1196,7 +1196,7 @@ def validate_source_path(value: str) -> str:
     # For files, also try to actually open and read to verify permission
     if source_path.is_file():
         try:
-            with open(source_path, "r", encoding="utf-8") as f:
+            with open(source_path, encoding="utf-8") as f:
                 f.read(1)  # Try to read at least 1 byte
         except PermissionError:
             raise typer.BadParameter(f"Permission denied: Cannot read file: {value}")
