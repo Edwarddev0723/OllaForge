@@ -21,15 +21,13 @@ Requirements satisfied:
 - 2.5: Handles API timeouts and connection errors appropriately
 """
 
-import ollama
-import json
-import time
-import asyncio
 import concurrent.futures
-from typing import Dict, Any, Optional, List, Callable
+from typing import Any, Callable, Optional
+
+import ollama
 from rich.console import Console
 
-from .models import DataEntry, DatasetType, OutputLanguage
+from .models import DatasetType, OutputLanguage
 
 console = Console()
 
@@ -50,19 +48,19 @@ DEFAULT_BATCH_SIZE = 5
 def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) -> dict:
     """
     Get JSON schema for structured output based on dataset type.
-    
+
     Using Ollama's 'format' parameter with JSON schema forces the model
     to only output valid JSON tokens, achieving 0% format error rate.
-    
+
     Args:
         dataset_type: Type of dataset being generated
         batch_size: Number of items (for array schema)
-        
+
     Returns:
         JSON schema dict for Ollama format parameter
     """
     from .models import DatasetType
-    
+
     # Base schemas for each entry type
     sft_entry_schema = {
         "type": "object",
@@ -73,7 +71,7 @@ def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) 
         },
         "required": ["instruction", "input", "output"]
     }
-    
+
     pretrain_entry_schema = {
         "type": "object",
         "properties": {
@@ -81,7 +79,7 @@ def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) 
         },
         "required": ["text"]
     }
-    
+
     conversation_message_schema = {
         "type": "object",
         "properties": {
@@ -90,7 +88,7 @@ def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) 
         },
         "required": ["role", "content"]
     }
-    
+
     sft_conversation_entry_schema = {
         "type": "object",
         "properties": {
@@ -101,7 +99,7 @@ def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) 
         },
         "required": ["conversations"]
     }
-    
+
     dpo_entry_schema = {
         "type": "object",
         "properties": {
@@ -111,7 +109,7 @@ def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) 
         },
         "required": ["prompt", "chosen", "rejected"]
     }
-    
+
     # Select schema based on dataset type
     entry_schema = {
         DatasetType.SFT: sft_entry_schema,
@@ -119,14 +117,14 @@ def _get_json_schema_for_type(dataset_type: 'DatasetType', batch_size: int = 1) 
         DatasetType.SFT_CONVERSATION: sft_conversation_entry_schema,
         DatasetType.DPO: dpo_entry_schema
     }.get(dataset_type, sft_entry_schema)
-    
+
     # For batch generation, wrap in array
     if batch_size > 1:
         return {
             "type": "array",
             "items": entry_schema
         }
-    
+
     return entry_schema
 
 
@@ -140,13 +138,13 @@ class OllamaGenerationError(Exception):
     pass
 
 
-def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int, 
+def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int,
                     dataset_type: DatasetType = DatasetType.SFT,
                     language: OutputLanguage = OutputLanguage.EN,
-                    use_structured_output: bool = True) -> Dict[str, Any]:
+                    use_structured_output: bool = True) -> dict[str, Any]:
     """
     Generate a batch of entries in a single API call.
-    
+
     Args:
         topic: Topic for generation
         model: Ollama model name
@@ -155,14 +153,14 @@ def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int,
         dataset_type: Type of dataset
         language: Output language
         use_structured_output: Use JSON schema to force valid output (recommended)
-    
+
     Returns:
         Dict with 'raw_content' (JSON array string) or 'error'
     """
     try:
         system_prompt = _create_system_prompt_batch(topic, batch_size, dataset_type, language)
         user_prompt = _create_user_prompt_batch(topic, batch_size, batch_number, dataset_type, language)
-        
+
         # Build request parameters
         chat_params = {
             'model': model,
@@ -175,37 +173,37 @@ def _generate_batch(topic: str, model: str, batch_size: int, batch_number: int,
                 'top_p': 0.9,
             }
         }
-        
+
         # Add structured output (JSON schema) if enabled
         # This forces the model to only output valid JSON tokens
         if use_structured_output:
             json_schema = _get_json_schema_for_type(dataset_type, batch_size)
             chat_params['format'] = json_schema
-        
+
         response = ollama.chat(**chat_params)
-        
+
         if 'message' in response and 'content' in response['message']:
             return {
-                'raw_content': response['message']['content'], 
-                'batch_number': batch_number, 
+                'raw_content': response['message']['content'],
+                'batch_number': batch_number,
                 'is_batch': True,
                 'dataset_type': dataset_type.value
             }
         else:
             return {'error': 'Invalid response format', 'batch_number': batch_number}
-            
+
     except Exception as e:
         return {'error': str(e), 'batch_number': batch_number}
 
 
 def _generate_single_entry(topic: str, model: str, entry_number: int,
                            dataset_type: DatasetType = DatasetType.SFT,
-                           language: OutputLanguage = OutputLanguage.EN) -> Dict[str, Any]:
+                           language: OutputLanguage = OutputLanguage.EN) -> dict[str, Any]:
     """Generate a single data entry."""
     try:
         system_prompt = _create_system_prompt_single(topic, dataset_type, language)
         user_prompt = _create_user_prompt(topic, entry_number, dataset_type, language)
-        
+
         response = ollama.chat(
             model=model,
             messages=[
@@ -217,36 +215,36 @@ def _generate_single_entry(topic: str, model: str, entry_number: int,
                 'top_p': 0.9,
             }
         )
-        
+
         if 'message' in response and 'content' in response['message']:
             return {
-                'raw_content': response['message']['content'], 
+                'raw_content': response['message']['content'],
                 'entry_number': entry_number,
                 'dataset_type': dataset_type.value
             }
         else:
             return {'error': 'Invalid response format', 'entry_number': entry_number}
-            
+
     except Exception as e:
         error_msg = str(e).lower()
         if "model" in error_msg and "not found" in error_msg:
-            raise OllamaGenerationError("Model not found")
+            raise OllamaGenerationError("Model not found") from e
         elif "model loading timeout" in error_msg:
-            raise OllamaGenerationError("Model loading timeout")
+            raise OllamaGenerationError("Model loading timeout") from e
         elif "context length exceeded" in error_msg:
-            raise OllamaGenerationError("Context length exceeded")
+            raise OllamaGenerationError("Context length exceeded") from e
         elif "connection" in error_msg or "refused" in error_msg:
-            raise OllamaConnectionError(f"Failed to connect: {str(e)}")
+            raise OllamaConnectionError(f"Failed to connect: {str(e)}") from e
         else:
             return {'error': str(e), 'entry_number': entry_number}
 
 
 def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: int,
                         dataset_type: DatasetType = DatasetType.SFT,
-                        language: OutputLanguage = OutputLanguage.EN) -> List[Dict[str, Any]]:
+                        language: OutputLanguage = OutputLanguage.EN) -> list[dict[str, Any]]:
     """
     Generate multiple entries in a single API call (batch mode).
-    
+
     Args:
         topic: Topic description
         model: Ollama model name
@@ -254,30 +252,30 @@ def generate_data_batch(topic: str, model: str, batch_size: int, batch_number: i
         batch_number: Batch identifier for the prompt
         dataset_type: Type of dataset to generate
         language: Output language for generated content
-        
+
     Returns:
         List of dicts with 'raw_content' for each entry
     """
     result = _generate_batch(topic, model, batch_size, batch_number, dataset_type, language)
-    
+
     if 'error' in result:
         error_msg = result['error'].lower()
         if "model" in error_msg and "not found" in error_msg:
             raise OllamaGenerationError(f"Model not found: {result['error']}")
         return []
-    
+
     # Return the batch response for processing
     return [result]
 
 
-def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1, 
+def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
                   concurrency: int = DEFAULT_CONCURRENCY,
                   dataset_type: DatasetType = DatasetType.SFT,
-                  language: OutputLanguage = OutputLanguage.EN) -> List[Dict[str, Any]]:
+                  language: OutputLanguage = OutputLanguage.EN) -> list[dict[str, Any]]:
     """
     Generate structured data entries using Ollama API.
     Uses batch generation for efficiency.
-    
+
     Args:
         topic: Topic description for dataset generation
         model: Ollama model name to use
@@ -285,13 +283,13 @@ def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
         concurrency: Number of concurrent requests (for fallback single mode)
         dataset_type: Type of dataset to generate (SFT, PRETRAIN, SFT_CONVERSATION, DPO)
         language: Output language for generated content (EN, ZH_TW)
-        
+
     Returns:
         List[Dict[str, Any]]: List of generated data entries
     """
     try:
         _test_ollama_connection()
-        
+
         # For small counts, use single generation
         if count <= 3:
             generated_entries = []
@@ -300,11 +298,11 @@ def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
                 if 'raw_content' in result:
                     generated_entries.append(result)
             return generated_entries
-        
+
         # For larger counts, use batch generation
         # Each API call generates multiple entries
         return generate_data_batch(topic, model, count, 1, dataset_type, language)
-        
+
     except OllamaGenerationError:
         raise
     except OllamaConnectionError:
@@ -312,20 +310,20 @@ def generate_data(topic: str, model: str = "gpt-oss:20b", count: int = 1,
     except Exception as e:
         error_msg = str(e).lower()
         if "connection" in error_msg or "refused" in error_msg:
-            raise OllamaConnectionError(f"Failed to connect: {str(e)}")
+            raise OllamaConnectionError(f"Failed to connect: {str(e)}") from e
         elif "model" in error_msg and "not found" in error_msg:
-            raise OllamaGenerationError("Model not found")
+            raise OllamaGenerationError("Model not found") from e
         elif "model loading timeout" in error_msg:
-            raise OllamaGenerationError("Model loading timeout")
+            raise OllamaGenerationError("Model loading timeout") from e
         elif "context length exceeded" in error_msg:
-            raise OllamaGenerationError("Context length exceeded")
+            raise OllamaGenerationError("Context length exceeded") from e
         else:
-            raise OllamaGenerationError(f"Generation failed: {str(e)}")
+            raise OllamaGenerationError(f"Generation failed: {str(e)}") from e
 
 
 def generate_data_concurrent(
-    topic: str, 
-    model: str, 
+    topic: str,
+    model: str,
     total_count: int,
     batch_size: int = DEFAULT_BATCH_SIZE,  # Optimized: 5 instead of 10
     max_concurrent: int = MAX_CONCURRENT_BATCHES,
@@ -333,18 +331,18 @@ def generate_data_concurrent(
     language: OutputLanguage = OutputLanguage.EN,
     progress_callback: Optional[Callable[[int, int], None]] = None,
     use_structured_output: bool = True
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Generate data using concurrent batch requests (funnel architecture).
-    
+
     Sends multiple batch requests in parallel to maximize GPU utilization.
     This is the core of the "funnel" approach - over-request and filter.
-    
+
     Performance optimizations for Mac:
     - Smaller batch_size (5) reduces attention decay, improves quality
     - JSON schema structured output eliminates format errors (0% error rate)
     - BERT QC runs on CPU to keep MPS free for LLM
-    
+
     Args:
         topic: Topic description for dataset generation
         model: Ollama model name to use
@@ -355,41 +353,41 @@ def generate_data_concurrent(
         language: Output language for generated content
         progress_callback: Optional callback(completed_batches, total_batches)
         use_structured_output: Use JSON schema for guaranteed valid output
-        
+
     Returns:
         List of raw response dicts with 'raw_content'
     """
     _test_ollama_connection()
-    
+
     # Calculate number of batches needed
     num_batches = (total_count + batch_size - 1) // batch_size
-    
+
     # Limit concurrent requests
     actual_concurrent = min(max_concurrent, num_batches)
-    
+
     all_responses = []
     completed_batches = 0
-    
-    def generate_batch_wrapper(batch_num: int) -> Dict[str, Any]:
+
+    def generate_batch_wrapper(batch_num: int) -> dict[str, Any]:
         """Wrapper for batch generation with batch number."""
         # Calculate entries for this batch
         start_idx = batch_num * batch_size
         remaining = total_count - start_idx
         current_batch_size = min(batch_size, remaining)
-        
+
         return _generate_batch(
-            topic, model, current_batch_size, batch_num + 1, 
+            topic, model, current_batch_size, batch_num + 1,
             dataset_type, language, use_structured_output
         )
-    
+
     # Use ThreadPoolExecutor for concurrent requests
     with concurrent.futures.ThreadPoolExecutor(max_workers=actual_concurrent) as executor:
         # Submit all batch requests
         future_to_batch = {
-            executor.submit(generate_batch_wrapper, i): i 
+            executor.submit(generate_batch_wrapper, i): i
             for i in range(num_batches)
         }
-        
+
         # Collect results as they complete
         for future in concurrent.futures.as_completed(future_to_batch):
             batch_num = future_to_batch[future]
@@ -400,18 +398,18 @@ def generate_data_concurrent(
             except Exception as e:
                 # Log error but continue with other batches
                 console.print(f"[dim]Batch {batch_num + 1} failed: {e}[/dim]")
-            
+
             completed_batches += 1
             if progress_callback:
                 progress_callback(completed_batches, num_batches)
-    
+
     return all_responses
 
 
 def _test_ollama_connection() -> None:
     """
     Test connection to Ollama API on localhost:11434.
-    
+
     Raises:
         OllamaConnectionError: If connection fails
     """
@@ -420,7 +418,7 @@ def _test_ollama_connection() -> None:
         models = ollama.list()
         if not isinstance(models, dict):
             raise OllamaConnectionError("Invalid response from Ollama API")
-            
+
     except Exception as e:
         error_msg = str(e).lower()
         if "connection" in error_msg or "refused" in error_msg:
@@ -434,7 +432,7 @@ def _test_ollama_connection() -> None:
                 "Check if Ollama is responding properly"
             )
         else:
-            raise OllamaConnectionError(f"Ollama API test failed: {str(e)}")
+            raise OllamaConnectionError(f"Ollama API test failed: {str(e)}") from e
 
 
 def _get_language_instruction(language: OutputLanguage) -> str:
@@ -448,7 +446,7 @@ def _get_language_instruction(language: OutputLanguage) -> str:
 【正確範例】
 ❌「這個軟件的質量很好」→ ✅「這個軟體的品質很好」
 ❌「用戶可以通過網絡下載」→ ✅「使用者可以透過網路下載」"""
-    
+
     elif language == OutputLanguage.ZH_CN:
         return """
 
@@ -472,9 +470,9 @@ def _get_language_instruction(language: OutputLanguage) -> str:
 def _create_system_prompt_single(topic: str, dataset_type: DatasetType = DatasetType.SFT,
                                   language: OutputLanguage = OutputLanguage.EN) -> str:
     """Create system prompt for single JSON output based on dataset type."""
-    
+
     lang_instruction = _get_language_instruction(language)
-    
+
     if dataset_type == DatasetType.SFT:
         return f"""You are a data generator. Generate training data for: {topic}
 
@@ -529,13 +527,13 @@ No markdown, no explanation, just JSON.{lang_instruction}"""
     return _create_system_prompt_single(topic, DatasetType.SFT, language)
 
 
-def _create_system_prompt_batch(topic: str, batch_size: int, 
+def _create_system_prompt_batch(topic: str, batch_size: int,
                                  dataset_type: DatasetType = DatasetType.SFT,
                                  language: OutputLanguage = OutputLanguage.EN) -> str:
     """Create system prompt for batch JSON output based on dataset type."""
-    
+
     lang_instruction = _get_language_instruction(language)
-    
+
     if dataset_type == DatasetType.SFT:
         return f"""You are a data generator. Generate {batch_size} DIFFERENT training examples for: {topic}
 
@@ -586,16 +584,16 @@ Output a JSON array with {batch_size} objects (ShareGPT/ChatML format).
 
 3. 【ASSISTANT RESPONSE DIVERSITY - CRITICAL】
    Assistant must NOT always use the same confirmation pattern!
-   
+
    ✗ ROBOTIC (avoid): "好的，已為您準備一杯冰拿鐵。" (every time)
-   
+
    ✓ NATURAL VARIATIONS (mix these styles):
    - Casual: "沒問題～" / "OK！" / "好喔～"
    - Friendly: "馬上來！" / "稍等一下喔～"
    - Efficient: "冰拿鐵一杯。" (short, no fluff)
    - Playful: "冰拿鐵 get！還要什麼嗎？"
    - Professional: "為您準備冰拿鐵，請稍候。"
-   
+
    ✗ VERBOSE (avoid): "好的，您點的是一杯冰的拿鐵咖啡，不加濃縮咖啡，總共一杯，請問還需要其他的嗎？"
    ✓ CONCISE: "冰拿鐵～還要別的嗎？"
 
@@ -653,7 +651,7 @@ IMPORTANT:
     return _create_system_prompt_batch(topic, batch_size, DatasetType.SFT, language)
 
 
-def _create_user_prompt(topic: str, entry_number: int, 
+def _create_user_prompt(topic: str, entry_number: int,
                         dataset_type: DatasetType = DatasetType.SFT,
                         language: OutputLanguage = OutputLanguage.EN) -> str:
     """Create user prompt for single entry generation."""
@@ -663,7 +661,7 @@ def _create_user_prompt(topic: str, entry_number: int,
         DatasetType.SFT_CONVERSATION: "conversation",
         DatasetType.DPO: "prompt/chosen/rejected"
     }.get(dataset_type, "")
-    
+
     lang_hint = " 請用繁體中文（台灣用語）回答。" if language == OutputLanguage.ZH_TW else ""
     return f"Generate {type_hint} example #{entry_number} for: {topic}. JSON only.{lang_hint}"
 
@@ -678,18 +676,18 @@ def _create_user_prompt_batch(topic: str, batch_size: int, batch_number: int,
         DatasetType.SFT_CONVERSATION: "conversation",
         DatasetType.DPO: "prompt/chosen/rejected"
     }.get(dataset_type, "")
-    
+
     lang_hint = " 請用繁體中文（台灣用語）回答。" if language == OutputLanguage.ZH_TW else ""
     return f"Generate {batch_size} unique {type_hint} examples (batch {batch_number}) for: {topic}. JSON array only.{lang_hint}"
 
 
-def get_available_models() -> List[str]:
+def get_available_models() -> list[str]:
     """
     Get list of available Ollama models.
-    
+
     Returns:
         List[str]: List of available model names
-        
+
     Raises:
         OllamaConnectionError: If connection to Ollama API fails
     """
@@ -697,24 +695,24 @@ def get_available_models() -> List[str]:
         response = ollama.list()
         if not isinstance(response, dict):
             raise OllamaConnectionError("Invalid response format from Ollama API")
-            
+
         if 'models' not in response:
             raise OllamaConnectionError("Malformed response: missing 'models' key")
-            
+
         models = response['models']
         if not isinstance(models, list):
             raise OllamaConnectionError("Malformed response: 'models' is not a list")
-            
+
         model_names = []
         for model in models:
             if isinstance(model, dict) and 'name' in model:
                 model_names.append(model['name'])
             # Skip malformed model entries but don't fail completely
-            
+
         return model_names
-            
+
     except OllamaConnectionError:
         # Re-raise our own exceptions
         raise
     except Exception as e:
-        raise OllamaConnectionError(f"Failed to get available models: {str(e)}")
+        raise OllamaConnectionError(f"Failed to get available models: {str(e)}") from e

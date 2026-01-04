@@ -15,15 +15,12 @@ Requirements satisfied:
 """
 
 from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Query
 
 from ..models import ErrorResponse
-from ..services.task_manager import (
-    task_manager,
-    TaskStatus as TMTaskStatus,
-    TaskType
-)
-
+from ..services.task_manager import TaskStatus as TMTaskStatus
+from ..services.task_manager import TaskType, task_manager
 
 # Create router
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -53,12 +50,12 @@ async def list_tasks(
 ) -> dict:
     """
     List all tasks with optional filtering.
-    
+
     Args:
         task_type: Filter by task type (generation, augmentation)
         status: Filter by status
         limit: Maximum number of tasks to return
-        
+
     Returns:
         Dict with list of tasks
     """
@@ -66,7 +63,7 @@ async def list_tasks(
     type_filter = None
     if task_type:
         type_filter = TaskType.GENERATION if task_type == "generation" else TaskType.AUGMENTATION
-    
+
     status_filter = None
     if status:
         status_map = {
@@ -79,13 +76,13 @@ async def list_tasks(
             "cancelled": TMTaskStatus.CANCELLED
         }
         status_filter = status_map.get(status)
-    
+
     tasks = task_manager.list_tasks(
         task_type=type_filter,
         status=status_filter,
         limit=limit
     )
-    
+
     return {"tasks": tasks, "count": len(tasks)}
 
 
@@ -106,10 +103,10 @@ Returns statistics about the task queue and processing:
 async def get_stats() -> dict:
     """
     Get task manager statistics.
-    
+
     Returns:
         Dict with statistics about tasks and queue
-        
+
     Requirements satisfied:
     - 7.3: Queue requests when resources are limited (shows queue status)
     """
@@ -126,24 +123,24 @@ async def get_stats() -> dict:
 async def get_task(task_id: str) -> dict:
     """
     Get task status by ID.
-    
+
     Args:
         task_id: Task identifier
-        
+
     Returns:
         Task status dict
-        
+
     Raises:
         HTTPException 404: If task not found
     """
     task = task_manager.get_task(task_id)
-    
+
     if task is None:
         raise HTTPException(
             status_code=404,
             detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
         )
-    
+
     return task
 
 
@@ -163,27 +160,27 @@ Completed or failed tasks cannot be cancelled.
 async def cancel_task(task_id: str) -> dict:
     """
     Cancel a running or queued task.
-    
+
     Args:
         task_id: Task identifier
-        
+
     Returns:
         Cancellation result
-        
+
     Raises:
         HTTPException 404: If task not found
         HTTPException 400: If task cannot be cancelled
     """
     task = task_manager.get_task(task_id)
-    
+
     if task is None:
         raise HTTPException(
             status_code=404,
             detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
         )
-    
+
     success = await task_manager.cancel_task(task_id)
-    
+
     if not success:
         raise HTTPException(
             status_code=400,
@@ -192,7 +189,7 @@ async def cancel_task(task_id: str) -> dict:
                 "message": f"Task {task_id} cannot be cancelled (status: {task['status']})"
             }
         )
-    
+
     return {"task_id": task_id, "status": "cancelled", "message": "Task cancelled successfully"}
 
 
@@ -212,27 +209,27 @@ This removes the task from the task list and frees associated resources.
 async def delete_task(task_id: str) -> dict:
     """
     Delete a completed/failed task.
-    
+
     Args:
         task_id: Task identifier
-        
+
     Returns:
         Deletion result
-        
+
     Raises:
         HTTPException 404: If task not found
         HTTPException 400: If task cannot be deleted (still running)
     """
     task = task_manager.get_task(task_id)
-    
+
     if task is None:
         raise HTTPException(
             status_code=404,
             detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
         )
-    
+
     success = task_manager.delete_task(task_id)
-    
+
     if not success:
         raise HTTPException(
             status_code=400,
@@ -241,7 +238,7 @@ async def delete_task(task_id: str) -> dict:
                 "message": f"Task {task_id} cannot be deleted (status: {task['status']})"
             }
         )
-    
+
     return {"task_id": task_id, "message": "Task deleted successfully"}
 
 
@@ -261,16 +258,16 @@ async def cleanup_old_tasks(
 ) -> dict:
     """
     Clean up old completed/failed tasks.
-    
+
     Args:
         max_age_hours: Maximum age in hours (default 24)
-        
+
     Returns:
         Number of tasks cleaned up
     """
     max_age_seconds = max_age_hours * 3600
     count = await task_manager.cleanup_old_tasks(max_age_seconds)
-    
+
     return {
         "cleaned_up": count,
         "message": f"Cleaned up {count} old tasks"

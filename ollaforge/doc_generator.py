@@ -27,31 +27,31 @@ Requirements satisfied:
 - 7.6: Taiwan Chinese validation when QC enabled for zh-tw
 """
 
-from dataclasses import dataclass, field
-from typing import List, Optional, Callable, Dict, Any, Union, Tuple
-from enum import Enum
 import json
+from dataclasses import dataclass
+from typing import Any, Callable, Optional
+
 import ollama
 
+from .chunk_splitter import TextChunk
 from .models import (
-    DatasetType,
-    OutputLanguage,
+    ConversationMessage,
     DataEntry,
+    DatasetEntry,
+    DatasetType,
+    DPOEntry,
+    OutputLanguage,
     PretrainEntry,
     SFTConversationEntry,
-    DPOEntry,
-    ConversationMessage,
-    DatasetEntry,
 )
-from .chunk_splitter import TextChunk
-from .qc import QualityController, validate_entry_chinese
+from .qc import QualityController
 
 
 @dataclass
 class DocGenerationConfig:
     """
     Configuration for document-to-dataset generation.
-    
+
     Attributes:
         dataset_type: Type of dataset to generate (SFT, PRETRAIN, SFT_CONVERSATION, DPO)
         model: Ollama model name to use for generation
@@ -59,7 +59,7 @@ class DocGenerationConfig:
         entries_per_chunk: Number of dataset entries to generate per document chunk
         qc_enabled: Whether to enable quality control filtering
         qc_confidence: Confidence threshold for QC filtering (0.0-1.0)
-    
+
     Requirements satisfied:
     - 3.5: Configuration for Ollama model usage
     """
@@ -69,7 +69,7 @@ class DocGenerationConfig:
     entries_per_chunk: int = 3
     qc_enabled: bool = True
     qc_confidence: float = 0.9
-    
+
     def __post_init__(self):
         """Validate configuration values."""
         if self.entries_per_chunk < 1:
@@ -83,16 +83,16 @@ class DocGenerationConfig:
 class DocumentDatasetGenerator:
     """
     Generator for creating fine-tuning datasets from document chunks.
-    
+
     This class handles the generation of training data from document chunks
     using Ollama LLM. It supports multiple output formats and includes
     validation for generated entries.
-    
+
     Usage:
         config = DocGenerationConfig(dataset_type=DatasetType.SFT)
         generator = DocumentDatasetGenerator(config)
         entries = generator.generate_from_chunks(chunks)
-    
+
     Requirements satisfied:
     - 3.1: SFT format generation
     - 3.2: Pre-training format generation
@@ -103,16 +103,16 @@ class DocumentDatasetGenerator:
     - 7.5: QC flag for quality control filtering
     - 7.6: Taiwan Chinese validation when QC enabled for zh-tw
     """
-    
+
     def __init__(self, config: DocGenerationConfig):
         """
         Initialize the document dataset generator.
-        
+
         Args:
             config: Generation configuration
         """
         self.config = config
-        
+
         # Initialize QC controller if enabled and language is zh-tw
         self._qc_controller: Optional[QualityController] = None
         if config.qc_enabled and config.language == OutputLanguage.ZH_TW:
@@ -120,124 +120,122 @@ class DocumentDatasetGenerator:
                 enabled=True,
                 confidence_threshold=config.qc_confidence
             )
-    
+
     @property
     def qc_controller(self) -> Optional[QualityController]:
         """Get the QC controller instance."""
         return self._qc_controller
-    
+
     def generate_from_chunks(
         self,
-        chunks: List[TextChunk],
+        chunks: list[TextChunk],
         progress_callback: Optional[Callable[[int, int], None]] = None
-    ) -> List[DatasetEntry]:
+    ) -> list[DatasetEntry]:
         """
         Generate dataset entries from document chunks.
-        
+
         Args:
             chunks: List of text chunks to generate from
             progress_callback: Optional callback(completed, total) for progress updates
-            
+
         Returns:
             List of generated dataset entries
-            
+
         Requirements satisfied:
         - 3.5: Use Ollama model to generate content based on document context
         - 7.5: QC flag for quality control filtering
         - 7.6: Taiwan Chinese validation when QC enabled for zh-tw
         """
-        all_entries: List[DatasetEntry] = []
+        all_entries: list[DatasetEntry] = []
         total_chunks = len(chunks)
-        
+
         for i, chunk in enumerate(chunks):
             try:
                 # Generate entries for this chunk
                 chunk_entries = self._generate_entries_for_chunk(chunk)
-                
+
                 # Validate and filter entries
                 valid_entries = [
                     entry for entry in chunk_entries
                     if self._validate_entry(entry)
                 ]
-                
+
                 # Apply QC filtering if enabled for zh-tw
                 if self._qc_controller is not None:
                     valid_entries = self._apply_qc_filter(valid_entries)
-                
+
                 all_entries.extend(valid_entries)
-                
-            except Exception as e:
+
+            except Exception:
                 # Log error but continue with other chunks
                 pass
-            
+
             # Report progress
             if progress_callback:
                 progress_callback(i + 1, total_chunks)
-        
+
         return all_entries
-    
-    def _apply_qc_filter(self, entries: List[DatasetEntry]) -> List[DatasetEntry]:
+
+    def _apply_qc_filter(self, entries: list[DatasetEntry]) -> list[DatasetEntry]:
         """
         Apply QC filtering to entries for Taiwan Chinese validation.
-        
+
         Args:
             entries: List of entries to filter
-            
+
         Returns:
             List of entries that pass QC validation
-            
+
         Requirements satisfied:
         - 7.5: QC flag for quality control filtering
         - 7.6: Taiwan Chinese validation when QC enabled for zh-tw
         """
         if self._qc_controller is None:
             return entries
-        
-        filtered_entries: List[DatasetEntry] = []
-        
+
+        filtered_entries: list[DatasetEntry] = []
+
         for entry in entries:
             # Convert entry to dict for QC validation
             entry_dict = entry_to_dict(entry)
-            
+
             # Check if entry passes QC
             passed, failed_fields = self._qc_controller.check_entry(entry_dict)
-            
+
             if passed:
                 filtered_entries.append(entry)
-        
+
         return filtered_entries
-    
-    def get_qc_stats(self) -> Optional[Dict[str, Any]]:
+
+    def get_qc_stats(self) -> Optional[dict[str, Any]]:
         """
         Get QC statistics if QC is enabled.
-        
+
         Returns:
             QC statistics dict or None if QC is not enabled
         """
         if self._qc_controller is not None:
             return self._qc_controller.get_stats()
         return None
-        
-        return all_entries
-    
-    def _generate_entries_for_chunk(self, chunk: TextChunk) -> List[DatasetEntry]:
+
+    def _generate_entries_for_chunk(self, chunk: TextChunk) -> list[DatasetEntry]:
         """
         Generate dataset entries for a single chunk.
-        
+
         Args:
             chunk: The text chunk to generate from
-            
+
         Returns:
             List of generated entries
         """
-        entries: List[DatasetEntry] = []
-        
+        entries: list[DatasetEntry] = []
+
         # Create prompt for the chunk
         prompt = self._create_prompt_for_chunk(chunk)
-        
+
         # Get JSON schema for structured output
         json_schema = self._get_json_schema()
-        
+
         try:
             # Call Ollama API
             response = ollama.chat(
@@ -252,33 +250,33 @@ class DocumentDatasetGenerator:
                     'top_p': 0.9,
                 }
             )
-            
+
             if 'message' in response and 'content' in response['message']:
                 raw_content = response['message']['content']
                 entries = self._parse_response(raw_content)
-                
-        except Exception as e:
+
+        except Exception:
             # Return empty list on error
             pass
-        
+
         return entries
-    
+
     def _create_prompt_for_chunk(self, chunk: TextChunk) -> str:
         """
         Create generation prompt for a chunk based on dataset type.
-        
+
         Args:
             chunk: The text chunk to create prompt for
-            
+
         Returns:
             The prompt string
-            
+
         Requirements satisfied:
         - 3.1, 3.2, 3.3, 3.4: Format-specific prompts
         """
         lang_hint = " 請用繁體中文（台灣用語）回答。" if self.config.language == OutputLanguage.ZH_TW else ""
         count = self.config.entries_per_chunk
-        
+
         base_prompt = f"""Based on the following document content, generate {count} training examples.
 
 Document Content:
@@ -287,7 +285,7 @@ Document Content:
 ---
 
 """
-        
+
         if self.config.dataset_type == DatasetType.SFT:
             return base_prompt + f"""Generate {count} SFT (Supervised Fine-Tuning) examples in JSON array format.
 Each example should have:
@@ -296,14 +294,14 @@ Each example should have:
 - output: The expected answer or completion
 
 Output ONLY a JSON array with {count} objects.{lang_hint}"""
-        
+
         elif self.config.dataset_type == DatasetType.PRETRAIN:
             return base_prompt + f"""Generate {count} pre-training text samples in JSON array format.
 Each example should have:
 - text: A coherent, informative paragraph derived from or inspired by the document
 
 Output ONLY a JSON array with {count} objects.{lang_hint}"""
-        
+
         elif self.config.dataset_type == DatasetType.SFT_CONVERSATION:
             return base_prompt + f"""Generate {count} multi-turn conversation examples in JSON array format.
 Each example should have:
@@ -315,7 +313,7 @@ Requirements:
 - Include realistic dialogue patterns
 
 Output ONLY a JSON array with {count} objects.{lang_hint}"""
-        
+
         elif self.config.dataset_type == DatasetType.DPO:
             return base_prompt + f"""Generate {count} DPO (Direct Preference Optimization) examples in JSON array format.
 Each example should have:
@@ -328,17 +326,17 @@ Requirements:
 - Both responses should be different from each other
 
 Output ONLY a JSON array with {count} objects.{lang_hint}"""
-        
+
         return base_prompt
-    
+
     def _get_system_prompt(self) -> str:
         """Get the system prompt based on dataset type and language."""
         lang_instruction = self._get_language_instruction()
-        
+
         base = "You are a training data generator. Generate high-quality training examples based on document content."
-        
+
         return f"{base}{lang_instruction}"
-    
+
     def _get_language_instruction(self) -> str:
         """Get language-specific instruction for prompts."""
         if self.config.language == OutputLanguage.ZH_TW:
@@ -346,7 +344,7 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
 
 【語言規範】使用台灣繁體中文，禁止大陸用語：
 視頻→影片、軟件→軟體、交互→互動、質量→品質、信息→資訊、數據→資料、網絡→網路、程序→程式、服務器→伺服器、用戶→使用者、優化→最佳化、默認→預設"""
-        
+
         elif self.config.language == OutputLanguage.ZH_CN:
             return """
 
@@ -359,11 +357,11 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
 3. 使用符合中国国情的表述方式
 4. 货币使用人民币（元/￥），计量单位使用公制"""
         return ""
-    
+
     def _get_json_schema(self) -> dict:
         """
         Get JSON schema for structured output based on dataset type.
-        
+
         Returns:
             JSON schema dict for Ollama format parameter
         """
@@ -377,7 +375,7 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                 },
                 "required": ["instruction", "input", "output"]
             }
-        
+
         elif self.config.dataset_type == DatasetType.PRETRAIN:
             entry_schema = {
                 "type": "object",
@@ -386,7 +384,7 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                 },
                 "required": ["text"]
             }
-        
+
         elif self.config.dataset_type == DatasetType.SFT_CONVERSATION:
             message_schema = {
                 "type": "object",
@@ -406,7 +404,7 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                 },
                 "required": ["conversations"]
             }
-        
+
         elif self.config.dataset_type == DatasetType.DPO:
             entry_schema = {
                 "type": "object",
@@ -417,7 +415,7 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                 },
                 "required": ["prompt", "chosen", "rejected"]
             }
-        
+
         else:
             # Default to SFT schema
             entry_schema = {
@@ -429,55 +427,55 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                 },
                 "required": ["instruction", "input", "output"]
             }
-        
+
         # Return array schema for batch generation
         return {
             "type": "array",
             "items": entry_schema
         }
-    
-    def _parse_response(self, raw_content: str) -> List[DatasetEntry]:
+
+    def _parse_response(self, raw_content: str) -> list[DatasetEntry]:
         """
         Parse the raw response content into dataset entries.
-        
+
         Args:
             raw_content: Raw JSON string from Ollama
-            
+
         Returns:
             List of parsed dataset entries
         """
-        entries: List[DatasetEntry] = []
-        
+        entries: list[DatasetEntry] = []
+
         try:
             data = json.loads(raw_content)
-            
+
             # Handle both single object and array responses
             if isinstance(data, dict):
                 data = [data]
-            
+
             if not isinstance(data, list):
                 return entries
-            
+
             for item in data:
                 if not isinstance(item, dict):
                     continue
-                
+
                 entry = self._dict_to_entry(item)
                 if entry is not None:
                     entries.append(entry)
-                    
+
         except json.JSONDecodeError:
             pass
-        
+
         return entries
-    
+
     def _dict_to_entry(self, data: dict) -> Optional[DatasetEntry]:
         """
         Convert a dictionary to the appropriate dataset entry type.
-        
+
         Args:
             data: Dictionary with entry data
-            
+
         Returns:
             Dataset entry or None if conversion fails
         """
@@ -488,17 +486,17 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                     input=str(data.get('input', '')),
                     output=str(data.get('output', ''))
                 )
-            
+
             elif self.config.dataset_type == DatasetType.PRETRAIN:
                 return PretrainEntry(
                     text=str(data.get('text', ''))
                 )
-            
+
             elif self.config.dataset_type == DatasetType.SFT_CONVERSATION:
                 conversations_data = data.get('conversations', [])
                 if not isinstance(conversations_data, list):
                     return None
-                
+
                 conversations = []
                 for msg in conversations_data:
                     if isinstance(msg, dict) and 'role' in msg and 'content' in msg:
@@ -508,33 +506,33 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
                                 role=role,
                                 content=str(msg['content'])
                             ))
-                
+
                 if conversations:
                     return SFTConversationEntry(conversations=conversations)
                 return None
-            
+
             elif self.config.dataset_type == DatasetType.DPO:
                 return DPOEntry(
                     prompt=str(data.get('prompt', '')),
                     chosen=str(data.get('chosen', '')),
                     rejected=str(data.get('rejected', ''))
                 )
-            
+
         except Exception:
             pass
-        
+
         return None
-    
+
     def _validate_entry(self, entry: DatasetEntry) -> bool:
         """
         Validate a generated dataset entry.
-        
+
         Args:
             entry: The entry to validate
-            
+
         Returns:
             True if entry is valid, False otherwise
-            
+
         Requirements satisfied:
         - 7.1: Validate entries match expected format schema
         - 7.2: Ensure SFT fields are non-empty
@@ -551,14 +549,14 @@ Output ONLY a JSON array with {count} objects.{lang_hint}"""
 def validate_entry(entry: DatasetEntry, dataset_type: DatasetType) -> bool:
     """
     Validate a dataset entry against its format requirements.
-    
+
     Args:
         entry: The entry to validate
         dataset_type: The expected dataset type
-        
+
     Returns:
         True if entry is valid, False otherwise
-        
+
     Requirements satisfied:
     - 7.1: Validate entries match expected format schema
     - 7.2: Ensure SFT fields are non-empty
@@ -573,25 +571,25 @@ def validate_entry(entry: DatasetEntry, dataset_type: DatasetType) -> bool:
         return validate_conversation_entry(entry)
     elif dataset_type == DatasetType.DPO:
         return validate_dpo_entry(entry)
-    
+
     return False
 
 
 def validate_sft_entry(entry: DatasetEntry) -> bool:
     """
     Validate an SFT entry.
-    
+
     Requirements:
     - Must be a DataEntry instance
     - instruction, input, output must all be non-empty strings
-    
+
     Requirements satisfied:
     - 7.1: Schema validation
     - 7.2: Non-empty field validation
     """
     if not isinstance(entry, DataEntry):
         return False
-    
+
     # All fields must be non-empty
     if not entry.instruction or not entry.instruction.strip():
         return False
@@ -599,67 +597,67 @@ def validate_sft_entry(entry: DatasetEntry) -> bool:
         return False
     if not entry.output or not entry.output.strip():
         return False
-    
+
     return True
 
 
 def validate_pretrain_entry(entry: DatasetEntry) -> bool:
     """
     Validate a pre-training entry.
-    
+
     Requirements:
     - Must be a PretrainEntry instance
     - text must be non-empty
-    
+
     Requirements satisfied:
     - 7.1: Schema validation
     """
     if not isinstance(entry, PretrainEntry):
         return False
-    
+
     # Text must be non-empty
     if not entry.text or not entry.text.strip():
         return False
-    
+
     return True
 
 
 def validate_conversation_entry(entry: DatasetEntry) -> bool:
     """
     Validate a conversation entry.
-    
+
     Requirements:
     - Must be a SFTConversationEntry instance
     - conversations must be non-empty
     - Must have at least one user message
     - Must have at least one assistant message
-    
+
     Requirements satisfied:
     - 7.1: Schema validation
     - 7.3: User and assistant message validation
     """
     if not isinstance(entry, SFTConversationEntry):
         return False
-    
+
     # Must have conversations
     if not entry.conversations:
         return False
-    
+
     # Check for required roles
     has_user = False
     has_assistant = False
-    
+
     for msg in entry.conversations:
         if not isinstance(msg, ConversationMessage):
             return False
         if not msg.content or not msg.content.strip():
             return False
-        
+
         if msg.role == 'user':
             has_user = True
         elif msg.role == 'assistant':
             has_assistant = True
-    
+
     # Must have at least one user and one assistant message
     return has_user and has_assistant
 
@@ -667,19 +665,19 @@ def validate_conversation_entry(entry: DatasetEntry) -> bool:
 def validate_dpo_entry(entry: DatasetEntry) -> bool:
     """
     Validate a DPO entry.
-    
+
     Requirements:
     - Must be a DPOEntry instance
     - prompt, chosen, rejected must all be non-empty
     - chosen and rejected must be different
-    
+
     Requirements satisfied:
     - 7.1: Schema validation
     - 7.4: Chosen/rejected differentiation
     """
     if not isinstance(entry, DPOEntry):
         return False
-    
+
     # All fields must be non-empty
     if not entry.prompt or not entry.prompt.strip():
         return False
@@ -687,24 +685,24 @@ def validate_dpo_entry(entry: DatasetEntry) -> bool:
         return False
     if not entry.rejected or not entry.rejected.strip():
         return False
-    
+
     # Chosen and rejected must be different
     if entry.chosen.strip() == entry.rejected.strip():
         return False
-    
+
     return True
 
 
 def entry_to_dict(entry: DatasetEntry) -> dict:
     """
     Convert a dataset entry to a dictionary for serialization.
-    
+
     Args:
         entry: The dataset entry to convert
-        
+
     Returns:
         Dictionary representation of the entry
-        
+
     Requirements satisfied:
     - 3.6: Serialization support
     """
@@ -731,21 +729,21 @@ def entry_to_dict(entry: DatasetEntry) -> dict:
             'chosen': entry.chosen,
             'rejected': entry.rejected
         }
-    
+
     return {}
 
 
 def dict_to_entry(data: dict, dataset_type: DatasetType) -> Optional[DatasetEntry]:
     """
     Convert a dictionary to a dataset entry.
-    
+
     Args:
         data: Dictionary with entry data
         dataset_type: The type of entry to create
-        
+
     Returns:
         Dataset entry or None if conversion fails
-        
+
     Requirements satisfied:
     - 3.6: Deserialization support
     """
@@ -756,17 +754,17 @@ def dict_to_entry(data: dict, dataset_type: DatasetType) -> Optional[DatasetEntr
                 input=str(data.get('input', '')),
                 output=str(data.get('output', ''))
             )
-        
+
         elif dataset_type == DatasetType.PRETRAIN:
             return PretrainEntry(
                 text=str(data.get('text', ''))
             )
-        
+
         elif dataset_type == DatasetType.SFT_CONVERSATION:
             conversations_data = data.get('conversations', [])
             if not isinstance(conversations_data, list):
                 return None
-            
+
             conversations = []
             for msg in conversations_data:
                 if isinstance(msg, dict) and 'role' in msg and 'content' in msg:
@@ -776,19 +774,19 @@ def dict_to_entry(data: dict, dataset_type: DatasetType) -> Optional[DatasetEntr
                             role=role,
                             content=str(msg['content'])
                         ))
-            
+
             if conversations:
                 return SFTConversationEntry(conversations=conversations)
             return None
-        
+
         elif dataset_type == DatasetType.DPO:
             return DPOEntry(
                 prompt=str(data.get('prompt', '')),
                 chosen=str(data.get('chosen', '')),
                 rejected=str(data.get('rejected', ''))
             )
-        
+
     except Exception:
         pass
-    
+
     return None

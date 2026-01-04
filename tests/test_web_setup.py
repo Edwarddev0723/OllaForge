@@ -15,7 +15,7 @@ def test_web_module_imports():
 def test_web_services_module_imports():
     """Test that web services module can be imported."""
     try:
-        import ollaforge.web.services
+        import ollaforge.web.services  # noqa: F401
     except ImportError as e:
         pytest.fail(f"Failed to import ollaforge.web.services: {e}")
 
@@ -23,7 +23,7 @@ def test_web_services_module_imports():
 def test_web_routes_module_imports():
     """Test that web routes module can be imported."""
     try:
-        import ollaforge.web.routes
+        import ollaforge.web.routes  # noqa: F401
     except ImportError as e:
         pytest.fail(f"Failed to import ollaforge.web.routes: {e}")
 
@@ -58,6 +58,6 @@ def test_uvicorn_dependency():
 def test_multipart_dependency():
     """Test that python-multipart is installed."""
     try:
-        import multipart
+        import multipart  # noqa: F401
     except ImportError as e:
         pytest.fail(f"Failed to import multipart: {e}")

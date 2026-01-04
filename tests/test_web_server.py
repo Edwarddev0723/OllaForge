@@ -6,8 +6,10 @@ CORS headers and basic endpoint functionality.
 """
 
 import pytest
-from hypothesis import given, strategies as st, settings
 from fastapi.testclient import TestClient
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
 from ollaforge.web.server import app
 
 
@@ -24,16 +26,16 @@ def client():
 def test_cors_headers_in_responses(client):
     """
     Test that CORS headers are present in API responses.
-    
+
     Requirements satisfied:
     - 9.3: CORS headers for cross-origin requests
     """
     # Make a request to the health endpoint
     response = client.get("/health")
-    
+
     # Verify response is successful
     assert response.status_code == 200
-    
+
     # Verify CORS headers are present
     # Note: TestClient doesn't automatically add Origin header, so we need to check
     # that the middleware is configured (headers will be added when Origin is present)
@@ -42,7 +44,7 @@ def test_cors_headers_in_responses(client):
         "/health",
         headers={"Origin": "http://localhost:3000"}
     )
-    
+
     assert response_with_origin.status_code == 200
     # The CORS middleware should add these headers when Origin is present
     assert "access-control-allow-origin" in response_with_origin.headers
@@ -51,7 +53,7 @@ def test_cors_headers_in_responses(client):
 def test_cors_allowed_origins_configuration(client):
     """
     Test that allowed origins are properly configured.
-    
+
     Requirements satisfied:
     - 9.3: CORS configuration for development and production
     """
@@ -63,10 +65,10 @@ def test_cors_allowed_origins_configuration(client):
             "Access-Control-Request-Method": "GET",
         }
     )
-    
+
     # Should return 200 for preflight request
     assert response.status_code == 200
-    
+
     # Should have CORS headers
     assert "access-control-allow-origin" in response.headers
     assert "access-control-allow-methods" in response.headers
@@ -75,7 +77,7 @@ def test_cors_allowed_origins_configuration(client):
 def test_cors_allows_credentials(client):
     """
     Test that CORS is configured to allow credentials.
-    
+
     Requirements satisfied:
     - 9.3: CORS configuration with credentials support
     """
@@ -86,7 +88,7 @@ def test_cors_allows_credentials(client):
             "Access-Control-Request-Method": "GET",
         }
     )
-    
+
     # Should allow credentials
     assert response.headers.get("access-control-allow-credentials") == "true"
 
@@ -94,7 +96,7 @@ def test_cors_allows_credentials(client):
 def test_cors_allows_all_methods(client):
     """
     Test that CORS allows all HTTP methods.
-    
+
     Requirements satisfied:
     - 9.3: CORS configuration for all methods
     """
@@ -105,7 +107,7 @@ def test_cors_allows_all_methods(client):
             "Access-Control-Request-Method": "POST",
         }
     )
-    
+
     # Should allow the requested method
     assert response.status_code == 200
     allowed_methods = response.headers.get("access-control-allow-methods", "")
@@ -116,7 +118,7 @@ def test_cors_allows_all_methods(client):
 def test_cors_allows_all_headers(client):
     """
     Test that CORS allows all headers.
-    
+
     Requirements satisfied:
     - 9.3: CORS configuration for all headers
     """
@@ -128,7 +130,7 @@ def test_cors_allows_all_headers(client):
             "Access-Control-Request-Headers": "Content-Type,Authorization",
         }
     )
-    
+
     # Should allow the requested headers
     assert response.status_code == 200
     allowed_headers = response.headers.get("access-control-allow-headers", "")
@@ -143,7 +145,7 @@ def test_cors_allows_all_headers(client):
 def test_health_endpoint(client):
     """Test that the health check endpoint works."""
     response = client.get("/health")
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
@@ -153,7 +155,7 @@ def test_health_endpoint(client):
 def test_root_endpoint(client):
     """Test that the root endpoint returns API information."""
     response = client.get("/")
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "OllaForge API"
@@ -164,10 +166,10 @@ def test_root_endpoint(client):
 def test_api_returns_json(client):
     """Test that API endpoints return JSON responses."""
     response = client.get("/health")
-    
+
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
-    
+
     # Verify it's valid JSON
     data = response.json()
     assert isinstance(data, dict)
@@ -200,7 +202,7 @@ def test_cors_headers_are_present(origin, method):
     """
     **Feature: web-interface, Property 31: CORS headers are present**
     **Validates: Requirements 9.3**
-    
+
     For any valid HTTP origin and method, when making a CORS preflight request,
     the API should return appropriate CORS headers including:
     - access-control-allow-origin
@@ -208,7 +210,7 @@ def test_cors_headers_are_present(origin, method):
     - access-control-allow-credentials
     """
     client = TestClient(app)
-    
+
     # Make a CORS preflight request (OPTIONS)
     response = client.options(
         "/health",
@@ -217,23 +219,23 @@ def test_cors_headers_are_present(origin, method):
             "Access-Control-Request-Method": method,
         }
     )
-    
+
     # Should return 200 for preflight
     assert response.status_code == 200, \
         f"Preflight request should return 200, got {response.status_code}"
-    
+
     # Verify CORS headers are present
     headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    
+
     assert "access-control-allow-origin" in headers_lower, \
         f"Missing access-control-allow-origin header for origin {origin}"
-    
+
     assert "access-control-allow-methods" in headers_lower, \
         f"Missing access-control-allow-methods header for method {method}"
-    
+
     assert "access-control-allow-credentials" in headers_lower, \
-        f"Missing access-control-allow-credentials header"
-    
+        "Missing access-control-allow-credentials header"
+
     # Verify credentials are allowed
     assert headers_lower["access-control-allow-credentials"] == "true", \
         "CORS should allow credentials"
@@ -245,24 +247,24 @@ def test_cors_headers_on_actual_requests(endpoint):
     """
     **Feature: web-interface, Property 31: CORS headers are present**
     **Validates: Requirements 9.3**
-    
+
     For any API endpoint, when making an actual request with an Origin header,
     the response should include the access-control-allow-origin header.
     """
     client = TestClient(app)
-    
+
     # Make a request with Origin header
     response = client.get(
         endpoint,
         headers={"Origin": "http://localhost:3000"}
     )
-    
+
     # Should be successful
     assert response.status_code == 200, \
         f"Request to {endpoint} should return 200, got {response.status_code}"
-    
+
     # Verify CORS header is present
     headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    
+
     assert "access-control-allow-origin" in headers_lower, \
         f"Missing access-control-allow-origin header for endpoint {endpoint}"

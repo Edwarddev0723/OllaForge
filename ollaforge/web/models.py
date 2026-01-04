@@ -9,13 +9,13 @@ Requirements satisfied:
 - 9.2: JSON format for request and response bodies
 """
 
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any, Literal
 from enum import Enum
+from typing import Any, Literal, Optional
+
+from pydantic import BaseModel, Field
 
 # Import core models from ollaforge
 from ..models import DatasetType, OutputLanguage
-
 
 # ============================================================================
 # Generation Models
@@ -24,7 +24,7 @@ from ..models import DatasetType, OutputLanguage
 class GenerationRequest(BaseModel):
     """
     Request model for dataset generation.
-    
+
     Requirements satisfied:
     - 1.1: Form fields for topic, count, model, dataset type
     - 1.5: QC filtering options for Traditional Chinese
@@ -36,7 +36,7 @@ class GenerationRequest(BaseModel):
     language: OutputLanguage = Field(OutputLanguage.EN, description="Output language for generated content")
     qc_enabled: bool = Field(True, description="Enable QC for Traditional Chinese (Taiwan)")
     qc_confidence: float = Field(0.9, ge=0.0, le=1.0, description="QC confidence threshold for Taiwan Chinese")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -54,14 +54,14 @@ class GenerationRequest(BaseModel):
 class GenerationResponse(BaseModel):
     """
     Response model for generation start.
-    
+
     Requirements satisfied:
     - 1.2: Initiate dataset generation
     """
     task_id: str = Field(..., description="Unique identifier for the generation task")
     status: str = Field(..., description="Current status of the task")
     message: str = Field(..., description="Human-readable status message")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -79,17 +79,17 @@ class GenerationResponse(BaseModel):
 class AugmentUploadResponse(BaseModel):
     """
     Response after dataset upload.
-    
+
     Requirements satisfied:
     - 2.1: Display available fields after upload
     - 5.3: Display first 3 entries
     """
     file_id: str = Field(..., description="Unique identifier for the uploaded file")
     entry_count: int = Field(..., description="Total number of entries in the dataset")
-    fields: List[str] = Field(..., description="List of available field names")
-    preview: List[Dict[str, Any]] = Field(..., description="Preview of first few entries")
+    fields: list[str] = Field(..., description="List of available field names")
+    preview: list[dict[str, Any]] = Field(..., description="Preview of first few entries")
     source_type: str = Field("file", description="Source type: 'file' or 'huggingface'")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -112,7 +112,7 @@ class HuggingFaceLoadRequest(BaseModel):
     config_name: Optional[str] = Field(None, description="Dataset configuration name")
     split: str = Field("train", description="Dataset split to load")
     max_entries: Optional[int] = Field(None, ge=1, le=100000, description="Maximum number of entries to load")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -127,7 +127,7 @@ class HuggingFaceLoadRequest(BaseModel):
 class AugmentPreviewRequest(BaseModel):
     """
     Request for augmentation preview.
-    
+
     Requirements satisfied:
     - 2.3: Preview mode before full processing
     """
@@ -136,9 +136,9 @@ class AugmentPreviewRequest(BaseModel):
     instruction: str = Field(..., description="Augmentation instruction")
     model: str = Field("llama3.2", description="Ollama model to use")
     create_new_field: bool = Field(False, description="Whether to create a new field")
-    context_fields: List[str] = Field(default_factory=list, description="Additional fields to include as context")
+    context_fields: list[str] = Field(default_factory=list, description="Additional fields to include as context")
     preview_count: int = Field(3, ge=1, le=10, description="Number of entries to preview")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -156,15 +156,15 @@ class AugmentPreviewRequest(BaseModel):
 class AugmentPreviewResponse(BaseModel):
     """
     Response with augmentation preview.
-    
+
     Requirements satisfied:
     - 5.2: Show before and after comparison
     """
-    previews: List[Dict[str, Any]] = Field(
+    previews: list[dict[str, Any]] = Field(
         ...,
         description="List of preview entries with original and augmented versions"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -181,7 +181,7 @@ class AugmentPreviewResponse(BaseModel):
 class AugmentationRequest(BaseModel):
     """
     Request for full augmentation.
-    
+
     Requirements satisfied:
     - 2.2: Augmentation parameters specification
     """
@@ -191,9 +191,9 @@ class AugmentationRequest(BaseModel):
     model: str = Field("llama3.2", description="Ollama model to use")
     language: OutputLanguage = Field(OutputLanguage.EN, description="Output language")
     create_new_field: bool = Field(False, description="Whether to create a new field")
-    context_fields: List[str] = Field(default_factory=list, description="Additional fields to include as context")
+    context_fields: list[str] = Field(default_factory=list, description="Additional fields to include as context")
     concurrency: int = Field(5, ge=1, le=20, description="Number of concurrent requests")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -224,7 +224,7 @@ class TaskStatusEnum(str, Enum):
 class TaskStatus(BaseModel):
     """
     Task status model.
-    
+
     Requirements satisfied:
     - 3.1: Progress bar showing completion percentage
     - 3.3: Total duration and success statistics
@@ -233,10 +233,10 @@ class TaskStatus(BaseModel):
     status: TaskStatusEnum = Field(..., description="Current task status")
     progress: int = Field(0, ge=0, description="Number of completed items")
     total: int = Field(0, ge=0, description="Total number of items")
-    result: Optional[Dict[str, Any]] = Field(None, description="Task result data")
+    result: Optional[dict[str, Any]] = Field(None, description="Task result data")
     error: Optional[str] = Field(None, description="Error message if task failed")
     duration: Optional[float] = Field(None, ge=0, description="Task duration in seconds")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -258,14 +258,14 @@ class TaskStatus(BaseModel):
 class ModelInfo(BaseModel):
     """
     Ollama model information.
-    
+
     Requirements satisfied:
     - 10.2: Model names with size information
     """
     name: str = Field(..., description="Model name")
     size: Optional[str] = Field(None, description="Model size (e.g., '7B', '13B')")
     modified_at: Optional[str] = Field(None, description="Last modified timestamp")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -278,8 +278,8 @@ class ModelInfo(BaseModel):
 
 class ModelListResponse(BaseModel):
     """Response containing list of available models."""
-    models: List[ModelInfo] = Field(..., description="List of available Ollama models")
-    
+    models: list[ModelInfo] = Field(..., description="List of available Ollama models")
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -298,15 +298,15 @@ class ModelListResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """
     Standard error response.
-    
+
     Requirements satisfied:
     - 1.4: Clear error messages
     - 7.5: Clear error message for Ollama unavailability
     """
     error: str = Field(..., description="Error type or code")
     message: str = Field(..., description="Human-readable error message")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
-    
+    details: Optional[dict[str, Any]] = Field(None, description="Additional error details")
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -327,7 +327,7 @@ class DownloadRequest(BaseModel):
         "jsonl",
         description="Output format for the dataset"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {

@@ -2,14 +2,14 @@
 Tests for OllaForge progress tracking functionality.
 """
 
-import pytest
-import time
 from io import StringIO
-from hypothesis import given, strategies as st
+
+from hypothesis import given
+from hypothesis import strategies as st
 from rich.console import Console
 
-from ollaforge.progress import ProgressTracker
 from ollaforge.models import GenerationResult
+from ollaforge.progress import ProgressTracker
 
 
 @given(
@@ -20,30 +20,30 @@ def test_progress_tracking_updates(total_count, advance_steps):
     """
     **Feature: ollama-cli-generator, Property 12: Progress tracking updates**
     **Validates: Requirements 4.2**
-    
-    For any generation process, progress indicators should update at appropriate 
+
+    For any generation process, progress indicators should update at appropriate
     intervals showing current and total counts.
     """
     # Create a string buffer to capture console output
     output_buffer = StringIO()
     console = Console(file=output_buffer, width=80)
-    
+
     # Initialize progress tracker
     tracker = ProgressTracker(console)
-    
+
     # Start progress tracking
     tracker.start_progress(total_count, "Testing progress")
-    
+
     # Verify progress is active
     assert tracker.is_active()
-    
+
     # Track progress updates
     total_advanced = 0
     for advance in advance_steps:
         if total_advanced + advance <= total_count:
             tracker.update_progress(advance)
             total_advanced += advance
-            
+
             # Check current progress
             current, total = tracker.get_current_progress()
             assert current == total_advanced
@@ -51,16 +51,16 @@ def test_progress_tracking_updates(total_count, advance_steps):
         else:
             # Don't advance beyond total
             break
-    
+
     # Stop progress tracking
     elapsed_time = tracker.stop_progress()
-    
+
     # Verify progress is no longer active
     assert not tracker.is_active()
-    
+
     # Verify elapsed time is reasonable
     assert elapsed_time >= 0
-    
+
     # Verify output contains progress information
     output = output_buffer.getvalue()
     assert "Testing progress" in output or len(output) > 0  # Progress bar was displayed
@@ -77,20 +77,20 @@ def test_summary_information_completeness(success_count, total_requested, durati
     """
     **Feature: ollama-cli-generator, Property 13: Summary information completeness**
     **Validates: Requirements 4.3**
-    
-    For any completed generation, the summary should include total time, 
+
+    For any completed generation, the summary should include total time,
     successful entry count, and output file path.
     """
     # Ensure success_count doesn't exceed total_requested
     success_count = min(success_count, total_requested)
-    
+
     # Create a string buffer to capture console output
     output_buffer = StringIO()
     console = Console(file=output_buffer, width=120)
-    
+
     # Initialize progress tracker
     tracker = ProgressTracker(console)
-    
+
     # Create generation result with test data
     errors = [f"Error {i+1}" for i in range(error_count)]
     result = GenerationResult(
@@ -100,23 +100,23 @@ def test_summary_information_completeness(success_count, total_requested, durati
         duration=duration,
         errors=errors
     )
-    
+
     # Display summary
     tracker.display_summary(result)
-    
+
     # Capture output
     output = output_buffer.getvalue()
-    
+
     # Verify all required information is present in the summary
     assert str(total_requested) in output  # Total requested count
     assert str(success_count) in output    # Successful entry count
     assert f"{duration:.2f}s" in output    # Duration with proper formatting
     assert output_file.strip() in output   # Output file path
-    
+
     # Verify success rate is displayed
     expected_rate = (success_count / total_requested) * 100 if total_requested > 0 else 0
     assert f"{expected_rate:.1f}%" in output
-    
+
     # If there are errors, verify error count is displayed
     if error_count > 0:
         assert str(error_count) in output or "Error" in output
@@ -128,7 +128,7 @@ def test_progress_tracker_initialization():
     tracker1 = ProgressTracker()
     assert tracker1.console is not None
     assert not tracker1.is_active()
-    
+
     # Test with custom console
     custom_console = Console()
     tracker2 = ProgressTracker(custom_console)
@@ -141,11 +141,11 @@ def test_error_handling():
     output_buffer = StringIO()
     console = Console(file=output_buffer, width=80)
     tracker = ProgressTracker(console)
-    
+
     # Add errors
     tracker.add_error("Test error 1")
     tracker.display_error("Test error 2", show_immediately=False)
-    
+
     # Verify errors are recorded
     assert len(tracker.errors) == 2
     assert "Test error 1" in tracker.errors
@@ -157,26 +157,26 @@ def test_progress_lifecycle():
     output_buffer = StringIO()
     console = Console(file=output_buffer, width=80)
     tracker = ProgressTracker(console)
-    
+
     # Initially not active
     assert not tracker.is_active()
-    
+
     # Start progress
     tracker.start_progress(10, "Test task")
     assert tracker.is_active()
-    
+
     # Update progress
     tracker.update_progress(3)
     current, total = tracker.get_current_progress()
     assert current == 3
     assert total == 10
-    
+
     # Update with description
     tracker.update_progress(2, "Updated description")
     current, total = tracker.get_current_progress()
     assert current == 5
     assert total == 10
-    
+
     # Stop progress
     elapsed = tracker.stop_progress()
     assert not tracker.is_active()

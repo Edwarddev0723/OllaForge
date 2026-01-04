@@ -2,23 +2,25 @@
 Tests for OllaForge data processing and cleaning utilities.
 """
 
-import pytest
 import json
-from hypothesis import given, strategies as st
+
+import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+
+from ollaforge.models import DataEntry
 from ollaforge.processor import (
-    clean_json, 
-    validate_entry, 
+    _fix_common_json_issues,
+    clean_json,
     process_model_response,
     process_responses,
-    _fix_common_json_issues
+    validate_entry,
 )
-from ollaforge.models import DataEntry
-
 
 # Strategy for generating valid JSON data entries
 valid_data_entry = st.fixed_dictionaries({
     'instruction': st.text(min_size=1),
-    'input': st.text(min_size=1), 
+    'input': st.text(min_size=1),
     'output': st.text(min_size=1)
 })
 
@@ -28,13 +30,13 @@ def test_json_extraction_from_responses(data):
     """
     **Feature: ollama-cli-generator, Property 8: JSON extraction from responses**
     **Validates: Requirements 3.1**
-    
-    For any model response containing JSON within markdown or noise, 
+
+    For any model response containing JSON within markdown or noise,
     the clean_json function should extract valid JSON.
     """
     # Create valid JSON string
     json_str = json.dumps(data)
-    
+
     # Test cases with various markdown and noise patterns
     test_cases = [
         # Plain JSON
@@ -53,7 +55,7 @@ def test_json_extraction_from_responses(data):
         # Mixed markdown and prefixes
         f"Here is the JSON:\n```json\n{json_str}\n```",
     ]
-    
+
     for test_case in test_cases:
         result = clean_json(test_case)
         assert result is not None, f"Failed to extract JSON from: {test_case}"
@@ -65,8 +67,8 @@ def test_malformed_response_recovery(responses):
     """
     **Feature: ollama-cli-generator, Property 16: Malformed response recovery**
     **Validates: Requirements 6.4**
-    
-    For any malformed response from the model, the system should continue 
+
+    For any malformed response from the model, the system should continue
     processing remaining entries without termination.
     """
     # Process the responses - should not raise exceptions
@@ -98,23 +100,23 @@ def test_invalid_json_recovery(valid_data, invalid_responses):
     """
     **Feature: ollama-cli-generator, Property 10: Invalid JSON recovery**
     **Validates: Requirements 3.3**
-    
-    For any invalid JSON encountered during processing, the system should 
+
+    For any invalid JSON encountered during processing, the system should
     skip that entry and continue with remaining entries.
     """
     # Create a mix of valid and invalid responses
     valid_json = json.dumps(valid_data)
     all_responses = invalid_responses + [valid_json]
-    
+
     # Process all responses
     result = process_responses(all_responses)
-    
+
     # Should return a list
     assert isinstance(result, list)
-    
+
     # Should contain at least one valid entry (from valid_json)
     assert len(result) >= 1
-    
+
     # All returned entries should be valid DataEntry instances
     for entry in result:
         assert isinstance(entry, DataEntry)
@@ -129,11 +131,11 @@ def test_clean_json_edge_cases():
     assert clean_json("") is None
     assert clean_json("   ") is None
     assert clean_json(None) is None
-    
+
     # Invalid JSON
     assert clean_json("not json at all") is None
     assert clean_json("{ invalid json }") is None
-    
+
     # Valid simple JSON
     result = clean_json('{"key": "value"}')
     assert result == {"key": "value"}
@@ -145,7 +147,7 @@ def test_validate_entry_edge_cases():
     assert validate_entry({}) is None
     assert validate_entry({"instruction": "test"}) is None
     assert validate_entry({"instruction": "test", "input": "test"}) is None
-    
+
     # Valid entry
     valid_data = {"instruction": "test", "input": "test", "output": "test"}
     result = validate_entry(valid_data)
@@ -159,7 +161,7 @@ def test_fix_common_json_issues():
     # Trailing comma
     fixed = _fix_common_json_issues('{"key": "value",}')
     assert '"key": "value"' in fixed
-    
+
     # Single quotes (simple case)
     fixed = _fix_common_json_issues("{'key': 'value'}")
     assert '"key": "value"' in fixed
@@ -175,7 +177,7 @@ def test_process_model_response_with_unicode_content():
         '{"instruction": "Ñoño", "input": "café", "output": "naïve"}',
         '{"instruction": "Русский", "input": "тест", "output": "результат"}',
     ]
-    
+
     for response in unicode_responses:
         result = process_model_response(response)
         assert result is not None
@@ -191,7 +193,7 @@ def test_process_model_response_with_extremely_large_content():
         "input": "small input",
         "output": "small output"
     })
-    
+
     # Should handle large content without issues
     result = process_model_response(large_response)
     assert result is not None
@@ -206,7 +208,7 @@ def test_process_model_response_with_nested_json():
         '{"instruction": "test", "input": "[1, 2, 3]", "output": "array result"}',
         '{"instruction": "test", "input": "normal", "output": "{\\"complex\\": {\\"nested\\": \\"output\\"}}"}',
     ]
-    
+
     for response in nested_responses:
         result = process_model_response(response)
         assert result is not None
@@ -221,7 +223,7 @@ def test_process_model_response_with_special_characters():
         '{"instruction": "test/forward/slashes", "input": "test\\\\back\\\\slashes", "output": "test|pipes|"}',
         '{"instruction": "test<>brackets", "input": "test[]square", "output": "test{}curly"}',
     ]
-    
+
     for response in special_responses:
         result = process_model_response(response)
         assert result is not None
@@ -239,7 +241,7 @@ def test_clean_json_with_malformed_markdown():
         # Multiple code blocks
         '```json\n{"invalid": "json"}\n```\n```json\n{"instruction": "test", "input": "test", "output": "test"}\n```',
     ]
-    
+
     for case in malformed_cases:
         result = clean_json(case)
         # Should either extract valid JSON or return None gracefully
@@ -254,7 +256,7 @@ def test_clean_json_with_multiple_json_objects():
         '{"instruction": "test", "input": "test", "output": "test"} {"second": "object"}',
         '[{"array": "object"}] {"instruction": "test", "input": "test", "output": "test"}',
     ]
-    
+
     for case in multiple_json_cases:
         result = clean_json(case)
         # Should extract the valid DataEntry JSON or handle gracefully
@@ -273,7 +275,7 @@ def test_process_responses_with_memory_pressure():
             "output": f"output_{i}"
         })
         large_response_list.append(response)
-    
+
     # Should handle large lists without memory issues
     result = process_responses(large_response_list)
     assert isinstance(result, list)
@@ -289,7 +291,7 @@ def test_process_model_response_with_corrupted_encoding():
         # JSON with escaped unicode
         '{"instruction": "test\\u0020space", "input": "test\\u0009tab", "output": "test\\u000Anewline"}',
     ]
-    
+
     for case in corrupted_cases:
         result = process_model_response(case)
         # Should handle encoding issues gracefully
@@ -311,7 +313,7 @@ def test_validate_entry_with_edge_case_values():
         # Unicode
         {"instruction": "测试", "input": "🚀", "output": "ñ"},
     ]
-    
+
     for case in edge_cases:
         result = validate_entry(case)
         # Should either validate successfully or fail gracefully
@@ -328,7 +330,7 @@ def test_clean_json_with_performance_stress():
         "output": "z" * 50000
     }
     large_json = json.dumps(large_data)
-    
+
     # Wrap in markdown with lots of noise
     noisy_response = f"""
     Here's a lot of text before the JSON that should be ignored.
@@ -338,7 +340,7 @@ def test_clean_json_with_performance_stress():
     ```
     {'more noise ' * 1000}
     """
-    
+
     # Should handle large, noisy responses efficiently
     result = clean_json(noisy_response)
     assert result is not None
@@ -360,12 +362,12 @@ def test_process_responses_with_mixed_valid_invalid():
         # More valid responses
         '{"instruction": "test3", "input": "input3", "output": "output3"}',
     ]
-    
+
     # Should process valid responses and skip invalid ones
     result = process_responses(mixed_responses)
     assert isinstance(result, list)
     assert len(result) == 3  # Only the 3 valid responses
-    
+
     for entry in result:
         assert isinstance(entry, DataEntry)
 
@@ -384,14 +386,14 @@ def test_fix_common_json_issues_comprehensive():
         # Extra whitespace
         ('{ "key" : "value" , }', 'extra whitespace'),
     ]
-    
-    for broken_json, description in json_issues:
+
+    for broken_json, _description in json_issues:
         try:
             fixed = _fix_common_json_issues(broken_json)
             # Should produce a string that's closer to valid JSON
             assert isinstance(fixed, str)
             assert len(fixed) > 0
-        except Exception as e:
+        except Exception:
             # If fixing fails, that's also acceptable - graceful handling
             pass
 
@@ -399,22 +401,22 @@ def test_fix_common_json_issues_comprehensive():
 def test_process_model_response_with_timeout_simulation():
     """Test processing responses under timeout pressure - Requirements 6.5"""
     import time
-    
+
     # Create response that might take time to process
     complex_response = json.dumps({
         "instruction": "complex " * 10000,
         "input": "processing " * 10000,
         "output": "task " * 10000
     })
-    
+
     # Should complete processing within reasonable time
     start_time = time.time()
     result = process_model_response(complex_response)
     end_time = time.time()
-    
+
     # Should not take excessively long (more than 5 seconds would be concerning)
     assert (end_time - start_time) < 5.0
-    
+
     if result is not None:
         assert isinstance(result, DataEntry)
 
@@ -423,12 +425,12 @@ def test_clean_json_with_recursive_structures():
     """Test JSON cleaning with deeply nested structures - Requirements 6.4"""
     # Create deeply nested JSON (but still valid for our use case)
     nested_content = '{"instruction": "test", "input": "nested", "output": "result"}'
-    
+
     # Wrap in multiple layers of markdown and text
     deeply_wrapped = nested_content
     for i in range(10):
         deeply_wrapped = f"Layer {i}:\n```json\n{deeply_wrapped}\n```\nEnd layer {i}"
-    
+
     # Should handle deep nesting
     result = clean_json(deeply_wrapped)
     if result is not None:
@@ -445,7 +447,7 @@ def test_process_responses_error_recovery():
         '{"instruction": 123, "input": "input3", "output": "output3"}',  # Wrong type
         '{"instruction": "test4", "input": "input4", "output": "output4"}',  # Valid
     ]
-    
+
     # Should recover from errors and continue processing
     result = process_responses(problematic_responses)
     assert isinstance(result, list)

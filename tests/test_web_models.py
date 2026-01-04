@@ -14,16 +14,17 @@ Requirements satisfied:
 - 10.4: Validate model exists before starting generation
 """
 
-import pytest
 import asyncio
-from hypothesis import given, strategies as st, settings, assume
-import httpx
-from httpx._transports.asgi import ASGITransport
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import httpx
+import pytest
+from httpx._transports.asgi import ASGITransport
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
+
+from ollaforge.web.routes.models import _format_size
 from ollaforge.web.server import app
-from ollaforge.web.routes.models import _format_size, _get_model_details
-from ollaforge.client import OllamaConnectionError
 
 
 def create_test_client():
@@ -79,11 +80,11 @@ def create_mock_ollama_response(models: list) -> dict:
 
 class TestFormatSize:
     """Tests for the _format_size helper function."""
-    
+
     def test_format_size_none(self):
         """Test that None input returns None."""
         assert _format_size(None) is None
-    
+
     def test_format_size_gigabytes(self):
         """Test formatting sizes in gigabytes."""
         # 1 GB
@@ -92,7 +93,7 @@ class TestFormatSize:
         assert _format_size(int(3.2 * 1024 ** 3)) == "3.2GB"
         # 7 GB
         assert _format_size(7 * 1024 ** 3) == "7.0GB"
-    
+
     def test_format_size_megabytes(self):
         """Test formatting sizes in megabytes."""
         # 500 MB
@@ -124,13 +125,13 @@ def test_model_information_includes_size(mock_get_client, model_names, model_siz
     """
     **Feature: web-interface, Property 33: Model information includes size**
     **Validates: Requirements 10.2**
-    
+
     For any Ollama model displayed when the service is running, the system
     should show the model name with size information.
     """
     # Ensure we have matching sizes for names
     assume(len(model_sizes) >= len(model_names))
-    
+
     async def run_test():
         transport = ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -142,27 +143,27 @@ def test_model_information_includes_size(mock_get_client, model_names, model_siz
             mock_client = MagicMock()
             mock_client.list.return_value = create_mock_ollama_response(mock_models)
             mock_get_client.return_value = mock_client
-            
+
             # Request model list
             response = await client.get("/api/models")
-            
+
             assert response.status_code == 200, \
                 f"Model list should return 200, got {response.status_code}"
-            
+
             data = response.json()
             assert "models" in data
-            
+
             # Each model should have name and size
             for model in data["models"]:
                 assert "name" in model, "Model should have name"
                 assert "size" in model, "Model should have size"
-                
+
                 # Size should be formatted (e.g., "3.2GB", "500MB")
                 size = model["size"]
                 if size is not None:
                     assert "GB" in size or "MB" in size, \
                         f"Size should be formatted with GB or MB, got {size}"
-    
+
     asyncio.run(run_test())
 
 
@@ -191,12 +192,12 @@ def test_model_validation_before_generation(
     """
     **Feature: web-interface, Property 34: Model validation before generation**
     **Validates: Requirements 10.4**
-    
+
     For any model selected by the user, the system should validate that
     the model exists before starting generation.
     """
     assume(model_index < len(existing_models))
-    
+
     async def run_test():
         transport = ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -206,25 +207,25 @@ def test_model_validation_before_generation(
             mock_client.list.return_value = create_mock_ollama_response(mock_models)
             mock_get_client.return_value = mock_client
             mock_get_models.return_value = existing_models
-            
+
             valid_model = existing_models[model_index]
-            
+
             # Test validation of existing model
             response = await client.get(f"/api/models/{valid_model}/validate")
-            
+
             assert response.status_code == 200, \
                 f"Valid model should return 200, got {response.status_code}"
-            
+
             data = response.json()
             assert data["valid"] is True
             assert data["model"] == valid_model
-            
+
             # Test validation of non-existing model
             response = await client.get("/api/models/nonexistent_model_xyz/validate")
-            
+
             assert response.status_code == 404, \
                 f"Non-existent model should return 404, got {response.status_code}"
-    
+
     asyncio.run(run_test())
 
 
@@ -241,7 +242,7 @@ def test_ollama_unavailability_shows_clear_error(mock_get_client, error_message)
     """
     **Feature: web-interface, Property 25: Ollama unavailability shows clear error**
     **Validates: Requirements 7.5**
-    
+
     For any situation where the Ollama service is unavailable, the system
     should return a clear error message.
     """
@@ -252,25 +253,25 @@ def test_ollama_unavailability_shows_clear_error(mock_get_client, error_message)
             mock_client = MagicMock()
             mock_client.list.side_effect = Exception(f"Connection refused: {error_message}")
             mock_get_client.return_value = mock_client
-            
+
             # Request model list
             response = await client.get("/api/models")
-            
+
             assert response.status_code == 503, \
                 f"Ollama unavailable should return 503, got {response.status_code}"
-            
+
             data = response.json()
             assert "detail" in data
-            
+
             detail = data["detail"]
             assert "error" in detail
             assert "message" in detail
-            
+
             # Error message should be clear and helpful
             message = detail["message"].lower()
             assert "ollama" in message or "connect" in message, \
                 f"Error should mention Ollama or connection, got: {detail['message']}"
-    
+
     asyncio.run(run_test())
 
 
@@ -283,7 +284,7 @@ def test_ollama_unavailability_shows_clear_error(mock_get_client, error_message)
 async def test_list_models_success(mock_get_client):
     """
     Test successful model listing.
-    
+
     Requirements satisfied:
     - 10.1: Fetch and display available Ollama models
     """
@@ -294,17 +295,17 @@ async def test_list_models_success(mock_get_client):
     mock_client = MagicMock()
     mock_client.list.return_value = create_mock_ollama_response(mock_models)
     mock_get_client.return_value = mock_client
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "models" in data
         assert len(data["models"]) == 2
-        
+
         # Check first model
         model1 = data["models"][0]
         assert model1["name"] == "llama3.2"
@@ -317,21 +318,21 @@ async def test_list_models_success(mock_get_client):
 async def test_list_models_empty(mock_get_client):
     """
     Test listing when no models are available.
-    
+
     Requirements satisfied:
     - 10.5: Display instructions for installing Ollama models
     """
     mock_client = MagicMock()
     mock_client.list.return_value = create_mock_ollama_response([])
     mock_get_client.return_value = mock_client
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "models" in data
         assert len(data["models"]) == 0
 
@@ -341,21 +342,21 @@ async def test_list_models_empty(mock_get_client):
 async def test_list_models_connection_error(mock_get_client):
     """
     Test model listing when Ollama is unavailable.
-    
+
     Requirements satisfied:
     - 10.3: Display warning when Ollama service is not available
     """
     mock_client = MagicMock()
     mock_client.list.side_effect = Exception("Connection refused")
     mock_get_client.return_value = mock_client
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models")
-        
+
         assert response.status_code == 503
         data = response.json()
-        
+
         assert "detail" in data
         assert "OllamaConnectionError" in str(data["detail"]) or "OllamaError" in str(data["detail"])
 
@@ -365,7 +366,7 @@ async def test_list_models_connection_error(mock_get_client):
 async def test_get_model_info_success(mock_get_client):
     """
     Test getting info for a specific model.
-    
+
     Requirements satisfied:
     - 10.2: Show model names with size information
     """
@@ -375,14 +376,14 @@ async def test_get_model_info_success(mock_get_client):
     mock_client = MagicMock()
     mock_client.list.return_value = create_mock_ollama_response(mock_models)
     mock_get_client.return_value = mock_client
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models/llama3.2")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert data["name"] == "llama3.2"
         assert data["size"] == "3.0GB"
         assert data["modified_at"] == "2024-01-15T10:30:00Z"
@@ -394,7 +395,7 @@ async def test_get_model_info_success(mock_get_client):
 async def test_get_model_info_not_found(mock_get_models, mock_get_client):
     """
     Test getting info for a non-existent model.
-    
+
     Requirements satisfied:
     - 10.4: Validate model exists
     """
@@ -405,14 +406,14 @@ async def test_get_model_info_not_found(mock_get_models, mock_get_client):
     mock_client.list.return_value = create_mock_ollama_response(mock_models)
     mock_get_client.return_value = mock_client
     mock_get_models.return_value = ["llama3.2"]
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models/nonexistent_model")
-        
+
         assert response.status_code == 404
         data = response.json()
-        
+
         assert "detail" in data
         assert "ModelNotFound" in str(data["detail"])
 
@@ -422,18 +423,18 @@ async def test_get_model_info_not_found(mock_get_models, mock_get_client):
 async def test_get_model_info_connection_error(mock_get_client):
     """
     Test getting model info when Ollama is unavailable.
-    
+
     Requirements satisfied:
     - 10.3: Display warning when Ollama service is not available
     """
     mock_client = MagicMock()
     mock_client.list.side_effect = Exception("Connection refused")
     mock_get_client.return_value = mock_client
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models/llama3.2")
-        
+
         assert response.status_code == 503
 
 
@@ -442,7 +443,7 @@ async def test_get_model_info_connection_error(mock_get_client):
 async def test_validate_model_success(mock_get_client):
     """
     Test validating an existing model.
-    
+
     Requirements satisfied:
     - 10.4: Validate model exists before starting generation
     """
@@ -452,14 +453,14 @@ async def test_validate_model_success(mock_get_client):
     mock_client = MagicMock()
     mock_client.list.return_value = create_mock_ollama_response(mock_models)
     mock_get_client.return_value = mock_client
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models/llama3.2/validate")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert data["valid"] is True
         assert data["model"] == "llama3.2"
 
@@ -470,7 +471,7 @@ async def test_validate_model_success(mock_get_client):
 async def test_validate_model_not_found(mock_get_models, mock_get_client):
     """
     Test validating a non-existent model.
-    
+
     Requirements satisfied:
     - 10.4: Validate model exists before starting generation
     """
@@ -481,11 +482,11 @@ async def test_validate_model_not_found(mock_get_models, mock_get_client):
     mock_client.list.return_value = create_mock_ollama_response(mock_models)
     mock_get_client.return_value = mock_client
     mock_get_models.return_value = ["llama3.2"]
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models/nonexistent/validate")
-        
+
         assert response.status_code == 404
 
 
@@ -502,19 +503,19 @@ async def test_list_models_with_missing_size(mock_get_client):
     mock_client = MagicMock()
     mock_client.list.return_value = create_mock_ollama_response(mock_models)
     mock_get_client.return_value = mock_client
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert len(data["models"]) == 2
-        
+
         # First model has size
         assert data["models"][0]["size"] == "3.0GB"
-        
+
         # Second model has no size
         assert data["models"][1]["size"] is None
 
@@ -528,9 +529,9 @@ async def test_list_models_invalid_response(mock_get_client):
     mock_client = MagicMock()
     mock_client.list.return_value = "invalid response"
     mock_get_client.return_value = mock_client
-    
+
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/models")
-        
+
         assert response.status_code == 503

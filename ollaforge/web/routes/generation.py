@@ -15,25 +15,23 @@ Requirements satisfied:
 """
 
 import asyncio
-import os
-from typing import Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
-from fastapi.responses import StreamingResponse, JSONResponse
 import io
+import os
 
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi.responses import StreamingResponse
+
+from ...client import OllamaConnectionError, OllamaGenerationError
+from ...formats import FileFormat, write_file
 from ..models import (
+    ErrorResponse,
     GenerationRequest,
     GenerationResponse,
     TaskStatus,
     TaskStatusEnum,
-    ErrorResponse
 )
 from ..services.generation import GenerationService
 from .websocket import ws_manager
-from ...client import OllamaConnectionError, OllamaGenerationError
-from ...formats import write_file, FileFormat
-from ...models import DatasetType, OutputLanguage
-
 
 # Create router
 router = APIRouter(prefix="/api/generate", tags=["generation"])
@@ -73,35 +71,35 @@ async def start_generation(
 ) -> GenerationResponse:
     """
     Start a new dataset generation task.
-    
+
     This endpoint initiates dataset generation in the background and returns
     a task ID that can be used to track progress and download results.
-    
+
     Requirements satisfied:
     - 1.2: Initiate dataset generation with valid parameters
     - 3.1: Display progress bar during generation
-    
+
     Args:
         request: Generation configuration
         background_tasks: FastAPI background tasks
-        
+
     Returns:
         GenerationResponse with task_id and status
-        
+
     Raises:
         HTTPException 503: If Ollama service is unavailable
         HTTPException 400: If request parameters are invalid
     """
     # Create task
     task_id = generation_service.create_task()
-    
+
     # Start generation in background
     background_tasks.add_task(
         _run_generation_task,
         task_id,
         request
     )
-    
+
     return GenerationResponse(
         task_id=task_id,
         status="pending",
@@ -112,7 +110,7 @@ async def start_generation(
 async def _run_generation_task(task_id: str, request: GenerationRequest):
     """
     Run generation task in background.
-    
+
     Args:
         task_id: Task identifier
         request: Generation configuration
@@ -124,7 +122,7 @@ async def _run_generation_task(task_id: str, request: GenerationRequest):
             status="running",
             total=request.count
         )
-        
+
         # Emit initial progress via WebSocket
         await ws_manager.emit_progress(
             task_id=task_id,
@@ -133,7 +131,7 @@ async def _run_generation_task(task_id: str, request: GenerationRequest):
             status="running",
             message="Starting generation..."
         )
-        
+
         # Progress callback that updates both task state and WebSocket
         async def async_progress_callback(completed: int, total: int):
             generation_service.update_task(
@@ -148,7 +146,7 @@ async def _run_generation_task(task_id: str, request: GenerationRequest):
                 status="running",
                 message=f"Generated {completed}/{total} entries"
             )
-        
+
         # Sync wrapper for progress callback
         def progress_callback(completed: int, total: int):
             generation_service.update_task(
@@ -164,7 +162,7 @@ async def _run_generation_task(task_id: str, request: GenerationRequest):
                 status="running",
                 message=f"Generated {completed}/{total} entries"
             ))
-        
+
         # Run generation
         result = await generation_service.generate_dataset(
             topic=request.topic,
@@ -176,7 +174,7 @@ async def _run_generation_task(task_id: str, request: GenerationRequest):
             qc_confidence=request.qc_confidence,
             progress_callback=progress_callback
         )
-        
+
         # Update task with result
         generation_service.update_task(
             task_id,
@@ -185,7 +183,7 @@ async def _run_generation_task(task_id: str, request: GenerationRequest):
             total=result["total"],
             result=result
         )
-        
+
         # Emit completion via WebSocket
         await ws_manager.emit_completed(
             task_id=task_id,
@@ -195,7 +193,7 @@ async def _run_generation_task(task_id: str, request: GenerationRequest):
             duration=result.get("duration", 0),
             message="Generation completed successfully"
         )
-        
+
     except OllamaConnectionError as e:
         # Ollama connection error
         error_msg = f"Ollama service unavailable: {str(e)}"
@@ -257,33 +255,33 @@ Use this endpoint to poll for task status, or use WebSocket for real-time update
 async def get_generation_status(task_id: str) -> TaskStatus:
     """
     Get the status of a generation task.
-    
+
     Requirements satisfied:
     - 3.1: Display progress bar showing completion percentage
     - 3.3: Display total duration and success statistics
-    
+
     Args:
         task_id: Task identifier
-        
+
     Returns:
         TaskStatus with current progress and status
-        
+
     Raises:
         HTTPException 404: If task not found
     """
     task = generation_service.get_task(task_id)
-    
+
     if task is None:
         raise HTTPException(
             status_code=404,
             detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
         )
-    
+
     # Calculate duration if task is completed
     duration = None
     if task["status"] == "completed" and task.get("result"):
         duration = task["result"].get("duration")
-    
+
     return TaskStatus(
         task_id=task_id,
         status=TaskStatusEnum(task["status"]),
@@ -321,30 +319,30 @@ async def download_generated_dataset(
 ) -> StreamingResponse:
     """
     Download the generated dataset.
-    
+
     Requirements satisfied:
     - 1.3: Provide download link for generated dataset
     - 4.2: Format selection options for download
-    
+
     Args:
         task_id: Task identifier
         format: Output format (jsonl, json, csv, tsv, parquet)
-        
+
     Returns:
         StreamingResponse with dataset file
-        
+
     Raises:
         HTTPException 404: If task not found or not completed
         HTTPException 400: If format is invalid
     """
     task = generation_service.get_task(task_id)
-    
+
     if task is None:
         raise HTTPException(
             status_code=404,
             detail={"error": "TaskNotFound", "message": f"Task {task_id} not found"}
         )
-    
+
     if task["status"] != "completed":
         raise HTTPException(
             status_code=404,
@@ -353,7 +351,7 @@ async def download_generated_dataset(
                 "message": f"Task {task_id} is not completed yet"
             }
         )
-    
+
     if not task.get("result") or not task["result"].get("entries"):
         raise HTTPException(
             status_code=404,
@@ -362,18 +360,18 @@ async def download_generated_dataset(
                 "message": "No data available for download"
             }
         )
-    
+
     # Get entries
     entries = task["result"]["entries"]
-    
+
     # Convert entries to dictionaries
     entries_dict = [entry.model_dump() if hasattr(entry, 'model_dump') else entry for entry in entries]
-    
+
     # Convert to requested format
     try:
         # Create temporary file in memory
         output = io.BytesIO()
-        
+
         # Map format string to FileFormat enum
         format_map = {
             "jsonl": FileFormat.JSONL,
@@ -382,7 +380,7 @@ async def download_generated_dataset(
             "tsv": FileFormat.TSV,
             "parquet": FileFormat.PARQUET
         }
-        
+
         if format not in format_map:
             raise HTTPException(
                 status_code=400,
@@ -391,17 +389,17 @@ async def download_generated_dataset(
                     "message": f"Unsupported format: {format}"
                 }
             )
-        
+
         # Write to BytesIO using formats module
         # For text formats, write to string first then encode
         file_format = format_map[format]
-        
+
         if format in ["jsonl", "json", "csv", "tsv"]:
             # Text formats - write to string buffer first
             import tempfile
             with tempfile.NamedTemporaryFile(mode='w+', suffix=f'.{format}', delete=False) as tmp:
                 tmp_path = tmp.name
-            
+
             try:
                 write_file(entries_dict, tmp_path, file_format)
                 with open(tmp_path, 'rb') as f:
@@ -413,17 +411,17 @@ async def download_generated_dataset(
             import tempfile
             with tempfile.NamedTemporaryFile(mode='wb', suffix='.parquet', delete=False) as tmp:
                 tmp_path = tmp.name
-            
+
             try:
                 write_file(entries_dict, tmp_path, file_format)
                 with open(tmp_path, 'rb') as f:
                     output.write(f.read())
             finally:
                 os.unlink(tmp_path)
-        
+
         # Reset buffer position
         output.seek(0)
-        
+
         # Determine media type
         media_types = {
             "jsonl": "application/x-ndjson",
@@ -432,7 +430,7 @@ async def download_generated_dataset(
             "tsv": "text/tab-separated-values",
             "parquet": "application/octet-stream"
         }
-        
+
         # Return streaming response
         return StreamingResponse(
             output,
@@ -441,7 +439,7 @@ async def download_generated_dataset(
                 "Content-Disposition": f"attachment; filename=dataset_{task_id}.{format}"
             }
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,

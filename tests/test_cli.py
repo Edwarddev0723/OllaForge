@@ -2,16 +2,19 @@
 Tests for OllaForge CLI interface.
 """
 
+
 import pytest
-import tempfile
-import os
-from pathlib import Path
-from hypothesis import given, strategies as st
-from typer.testing import CliRunner
+from hypothesis import given
+from hypothesis import strategies as st
 from pydantic import ValidationError
+from typer.testing import CliRunner
 
-from ollaforge.cli import app, validate_parameters, validate_count_range, validate_output_path
-
+from ollaforge.cli import (
+    app,
+    validate_count_range,
+    validate_output_path,
+    validate_parameters,
+)
 
 runner = CliRunner()
 
@@ -26,8 +29,8 @@ def test_parameter_validation_error_handling(topic, count, model, output):
     """
     **Feature: ollama-cli-generator, Property 14: Parameter validation error handling**
     **Validates: Requirements 6.1**
-    
-    For any invalid CLI parameters provided, the system should display helpful 
+
+    For any invalid CLI parameters provided, the system should display helpful
     error messages and usage information.
     """
     # Test with invalid count values (outside valid range)
@@ -53,16 +56,16 @@ def test_count_range_validation():
     assert validate_count_range(1) == 1
     assert validate_count_range(100) == 100
     assert validate_count_range(10000) == 10000
-    
+
     # Invalid counts should raise BadParameter
     from typer import BadParameter
-    
+
     with pytest.raises(BadParameter):
         validate_count_range(0)
-    
+
     with pytest.raises(BadParameter):
         validate_count_range(-1)
-    
+
     with pytest.raises(BadParameter):
         validate_count_range(10001)
 
@@ -72,13 +75,13 @@ def test_output_path_validation():
     # Valid paths should pass
     assert validate_output_path("test.jsonl") == "test.jsonl"
     assert validate_output_path("  test.jsonl  ") == "test.jsonl"
-    
+
     # Invalid paths should raise BadParameter
     from typer import BadParameter
-    
+
     with pytest.raises(BadParameter):
         validate_output_path("")
-    
+
     with pytest.raises(BadParameter):
         validate_output_path("   ")
 
@@ -90,7 +93,7 @@ def test_cli_help_display():
     assert "Generate and augment datasets using local Ollama models" in result.stdout
     assert "generate" in result.stdout
     assert "augment" in result.stdout
-    
+
     # Test generate subcommand help
     result = runner.invoke(app, ["generate", "--help"])
     assert result.exit_code == 0
@@ -148,14 +151,14 @@ def test_model_parameter_selection(topic, model, count, output):
     """
     **Feature: ollama-cli-generator, Property 3: Model parameter selection**
     **Validates: Requirements 1.3**
-    
-    For any valid Ollama model name provided, the system should use that specific 
+
+    For any valid Ollama model name provided, the system should use that specific
     model for generation requests.
     """
     # Test that the model parameter is properly accepted and stored
     config = validate_parameters(topic.strip(), count, model.strip(), output.strip(), raise_on_error=False)
     assert config.model == model.strip()
-    
+
     # Test CLI integration - the model should be displayed in output
     result = runner.invoke(app, [
         "generate",
@@ -164,11 +167,11 @@ def test_model_parameter_selection(topic, model, count, output):
         "--model", model.strip(),
         "--output", output.strip()
     ])
-    
+
     # Strip ANSI color codes for comparison
     import re
     clean_output = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
-    
+
     # Should display the specified model (with emoji prefix)
     assert f"🤖 Model: {model.strip()}" in clean_output
 
@@ -182,14 +185,14 @@ def test_output_filename_specification(topic, output, count):
     """
     **Feature: ollama-cli-generator, Property 4: Output filename specification**
     **Validates: Requirements 1.4**
-    
-    For any valid filename provided as output parameter, the results should be 
+
+    For any valid filename provided as output parameter, the results should be
     written to that exact file location.
     """
     # Test that the output parameter is properly accepted and stored
     config = validate_parameters(topic.strip(), count, "llama3", output.strip(), raise_on_error=False)
     assert config.output == output.strip()
-    
+
     # Test CLI integration - the output filename should be displayed
     result = runner.invoke(app, [
         "generate",
@@ -197,11 +200,11 @@ def test_output_filename_specification(topic, output, count):
         "--count", str(count),
         "--output", output.strip()
     ])
-    
+
     # Strip ANSI color codes for comparison
     import re
     clean_output = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
-    
+
     # Should display the specified output filename (with emoji prefix)
     assert f"📄 Output: {output.strip()}" in clean_output
 
@@ -211,17 +214,17 @@ def test_output_filename_specification(topic, output, count):
 def test_cli_with_insufficient_disk_space():
     """Test CLI behavior when disk space is insufficient - Requirements 6.3"""
     from unittest.mock import patch
-    
+
     with patch('ollaforge.file_manager.check_disk_space') as mock_check:
         from ollaforge.file_manager import DiskSpaceError
         mock_check.side_effect = DiskSpaceError("Insufficient disk space. Available: 10.0MB, Required: 100.0MB")
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--count", "5"
         ])
-        
+
         # Should exit with error code
         assert result.exit_code == 1
         assert "Insufficient disk space" in result.stdout
@@ -229,27 +232,28 @@ def test_cli_with_insufficient_disk_space():
 
 def test_cli_with_disk_space_check_during_write():
     """Test CLI behavior when disk space becomes insufficient during file write - Requirements 6.3"""
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import patch
+
     from ollaforge.models import DataEntry
-    
+
     with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
          patch('ollaforge.processor.process_model_response') as mock_process, \
          patch('ollaforge.file_manager.write_jsonl_file') as mock_write:
-        
+
         # Mock successful generation
         mock_generate.return_value = [{'raw_content': '{"instruction": "test", "input": "test", "output": "test"}', 'is_batch': False}]
         mock_process.return_value = [DataEntry(instruction="test", input="test", output="test")]
-        
+
         # Mock disk space error during write
         from ollaforge.file_manager import DiskSpaceError
         mock_write.side_effect = DiskSpaceError("Insufficient disk space during write")
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--count", "1"
         ])
-        
+
         # Should exit with error code and show disk space error
         assert result.exit_code == 1
         assert "Insufficient disk space" in result.stdout
@@ -257,27 +261,28 @@ def test_cli_with_disk_space_check_during_write():
 
 def test_cli_with_file_permission_error():
     """Test CLI behavior with file permission errors - Requirements 6.3"""
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import patch
+
     from ollaforge.models import DataEntry
-    
+
     with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
          patch('ollaforge.processor.process_model_response') as mock_process, \
          patch('ollaforge.file_manager.write_jsonl_file') as mock_write:
-        
+
         # Mock successful generation
         mock_generate.return_value = [{'raw_content': '{"instruction": "test", "input": "test", "output": "test"}', 'is_batch': False}]
         mock_process.return_value = [DataEntry(instruction="test", input="test", output="test")]
-        
+
         # Mock file permission error
         from ollaforge.file_manager import FileOperationError
         mock_write.side_effect = FileOperationError("Permission denied: /readonly/test.jsonl")
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--count", "1"
         ])
-        
+
         # Should exit with error code and show file error
         assert result.exit_code == 1
         assert "Permission denied" in result.stdout
@@ -286,19 +291,19 @@ def test_cli_with_file_permission_error():
 def test_cli_with_network_interruption_during_generation():
     """Test CLI behavior with network interruption during generation - Requirements 6.5"""
     from unittest.mock import patch
-    
+
     with patch('ollaforge.client.generate_data_concurrent') as mock_generate:
         from ollaforge.client import OllamaConnectionError
-        
+
         # Mock network interruption
         mock_generate.side_effect = OllamaConnectionError("Connection lost during generation")
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--count", "3"
         ])
-        
+
         # Should handle error gracefully and exit with error code
         assert result.exit_code == 1
         assert "Connection failed" in result.stdout
@@ -307,28 +312,28 @@ def test_cli_with_network_interruption_during_generation():
 
 def test_cli_with_partial_generation_failure():
     """Test CLI behavior when some generations fail but others succeed - Requirements 6.5"""
-    from unittest.mock import patch, MagicMock
-    
+    from unittest.mock import MagicMock, patch
+
     with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
          patch('ollaforge.processor.process_model_response') as mock_process, \
          patch('ollaforge.file_manager.write_jsonl_file') as mock_write:
-        
+
         # Mock mixed success/failure responses
         mock_generate.return_value = [
             {'raw_content': '{"instruction": "test1", "input": "test1", "output": "test1"}'},
             {'raw_content': '{"instruction": "test3", "input": "test3", "output": "test3"}'}
         ]
-        
+
         # Mock successful processing
         mock_process.return_value = MagicMock()
         mock_write.return_value = None
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--count", "3"
         ])
-        
+
         # Should complete with partial results
         # The exact behavior depends on implementation, but should not crash
         assert result.exit_code is not None
@@ -336,29 +341,29 @@ def test_cli_with_partial_generation_failure():
 
 def test_cli_with_malformed_model_responses():
     """Test CLI behavior with malformed model responses - Requirements 6.4"""
-    from unittest.mock import patch, MagicMock
-    
+    from unittest.mock import MagicMock, patch
+
     with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
          patch('ollaforge.processor.process_model_response') as mock_process, \
          patch('ollaforge.file_manager.write_jsonl_file') as mock_write:
-        
+
         # Mock malformed responses
         mock_generate.return_value = [
             {'raw_content': 'invalid json content'},
             {'raw_content': '{"incomplete": "json"'},
             {'raw_content': '{"valid": "json", "instruction": "test", "input": "test", "output": "test"}'}
         ]
-        
+
         # Mock processing that handles malformed responses
         mock_process.side_effect = [None, None, MagicMock()]  # First two fail, third succeeds
         mock_write.return_value = None
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--count", "3"
         ])
-        
+
         # Should handle malformed responses gracefully
         # Should not crash and should process valid responses
         assert result.exit_code is not None
@@ -366,28 +371,28 @@ def test_cli_with_malformed_model_responses():
 
 def test_cli_with_empty_model_responses():
     """Test CLI behavior with empty model responses - Requirements 6.4"""
-    from unittest.mock import patch, MagicMock
-    
+    from unittest.mock import patch
+
     with patch('ollaforge.client.generate_data_concurrent') as mock_generate, \
          patch('ollaforge.processor.process_model_response') as mock_process, \
-         patch('ollaforge.file_manager.write_jsonl_file') as mock_write:
-        
+         patch('ollaforge.file_manager.write_jsonl_file'):
+
         # Mock empty responses
         mock_generate.return_value = [
             {'raw_content': ''},
             {'raw_content': '   '},
             {'raw_content': None}
         ]
-        
+
         # Mock processing that handles empty responses
         mock_process.return_value = None
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--count", "3"
         ])
-        
+
         # Should handle empty responses without crashing
         # May show warning about no valid entries generated
         assert result.exit_code is not None
@@ -396,17 +401,17 @@ def test_cli_with_empty_model_responses():
 def test_cli_with_unexpected_exception_during_generation():
     """Test CLI behavior with unexpected exceptions - Requirements 6.5"""
     from unittest.mock import patch
-    
+
     with patch('ollaforge.client.generate_data_concurrent') as mock_generate:
         # Mock unexpected exception
         mock_generate.side_effect = RuntimeError("Unexpected system error")
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--count", "1"
         ])
-        
+
         # Should handle unexpected errors gracefully
         assert result.exit_code == 1
         assert "Unexpected error" in result.stdout
@@ -414,18 +419,18 @@ def test_cli_with_unexpected_exception_during_generation():
 
 def test_cli_with_memory_pressure():
     """Test CLI behavior under memory pressure - Requirements 6.3"""
-    from unittest.mock import patch, MagicMock
-    
+    from unittest.mock import patch
+
     with patch('ollaforge.client.generate_data_concurrent') as mock_generate:
         # Mock memory error
         mock_generate.side_effect = MemoryError("Out of memory")
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--count", "1000"  # Large count that might cause memory issues
         ])
-        
+
         # Should handle memory errors gracefully
         assert result.exit_code == 1
         assert "Unexpected error" in result.stdout
@@ -433,21 +438,21 @@ def test_cli_with_memory_pressure():
 
 def test_cli_with_corrupted_output_directory():
     """Test CLI behavior with corrupted or inaccessible output directory - Requirements 6.3"""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a file where we expect a directory
         fake_dir = os.path.join(temp_dir, "fake_dir")
         with open(fake_dir, 'w') as f:
             f.write("this is a file, not a directory")
-        
+
         result = runner.invoke(app, [
             "generate",
             "test topic",
             "--output", os.path.join(fake_dir, "test.jsonl")  # Try to write inside a file
         ])
-        
+
         # Should detect the invalid path
         assert result.exit_code != 0
 
@@ -456,22 +461,22 @@ def test_cli_with_extremely_long_paths():
     """Test CLI behavior with extremely long file paths - Requirements 6.3"""
     # Create an extremely long path
     long_path = "a" * 1000 + ".jsonl"
-    
+
     result = runner.invoke(app, [
         "generate",
         "test topic",
         "--output", long_path
     ])
-    
+
     # Should handle long paths (may succeed or fail gracefully depending on OS)
     assert result.exit_code is not None
 
 
 def test_cli_with_special_characters_in_output_path():
     """Test CLI behavior with special characters in output path - Requirements 6.3"""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.TemporaryDirectory() as temp_dir:
         # Test various special characters that might cause issues
         special_paths = [
@@ -480,7 +485,7 @@ def test_cli_with_special_characters_in_output_path():
             os.path.join(temp_dir, "file_with_underscores.jsonl"),
             os.path.join(temp_dir, "file.with.dots.jsonl"),
         ]
-        
+
         for special_path in special_paths:
             result = runner.invoke(app, [
                 "generate",
@@ -488,7 +493,7 @@ def test_cli_with_special_characters_in_output_path():
                 "--count", "1",
                 "--output", special_path
             ])
-            
+
             # Should handle special characters in paths
             # The exact behavior depends on the OS and implementation
             assert result.exit_code is not None
@@ -502,7 +507,7 @@ def test_cli_interruption_handling():
         "test topic",
         "--count", "1"
     ])
-    
+
     # The command should start properly (even if it fails due to no Ollama)
     # The important thing is that interruption handling is set up
     assert "Topic: test topic" in result.stdout
@@ -515,31 +520,31 @@ def test_cli_with_invalid_output_directory():
         "test topic",
         "--output", "/invalid/path/that/does/not/exist/test.jsonl"
     ])
-    
+
     # Should handle the error gracefully
     assert result.exit_code != 0
 
 
 def test_cli_with_readonly_output_directory():
     """Test CLI with read-only output directory."""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.TemporaryDirectory() as temp_dir:
         readonly_dir = os.path.join(temp_dir, "readonly")
         os.makedirs(readonly_dir)
         os.chmod(readonly_dir, 0o444)  # Read-only
-        
+
         try:
             result = runner.invoke(app, [
                 "generate",
                 "test topic",
                 "--output", os.path.join(readonly_dir, "test.jsonl")
             ])
-            
+
             # Should detect permission issues
             assert result.exit_code != 0
-            
+
         finally:
             # Restore permissions for cleanup
             os.chmod(readonly_dir, 0o755)
@@ -551,7 +556,7 @@ def test_cli_parameter_validation_edge_cases():
     long_topic = "a" * 10000
     result = runner.invoke(app, ["generate", long_topic, "--count", "1"])
     # Should handle long topics (may succeed or fail gracefully)
-    
+
     # Test with special characters in topic
     special_topic = "test with special chars: !@#$%^&*()"
     result = runner.invoke(app, ["generate", special_topic, "--count", "1"])
@@ -566,7 +571,7 @@ def test_cli_with_zero_count_edge_case():
         "test topic",
         "--count", "0"
     ])
-    
+
     assert result.exit_code != 0
     output = result.stdout + (result.output if hasattr(result, 'output') else '')
     assert "Count must be at least 1" in output
@@ -576,10 +581,10 @@ def test_cli_with_negative_count():
     """Test CLI with negative count."""
     result = runner.invoke(app, [
         "generate",
-        "test topic", 
+        "test topic",
         "--count", "-5"
     ])
-    
+
     assert result.exit_code != 0
     output = result.stdout + (result.output if hasattr(result, 'output') else '')
     assert "Count must be at least 1" in output
@@ -592,7 +597,7 @@ def test_cli_with_extremely_large_count():
         "test topic",
         "--count", "50000"
     ])
-    
+
     assert result.exit_code != 0
     output = result.stdout + (result.output if hasattr(result, 'output') else '')
     assert "Count cannot exceed 10,000" in output
@@ -605,7 +610,7 @@ def test_cli_with_empty_model_name():
         "test topic",
         "--model", ""
     ])
-    
+
     # Should handle empty model name
     # The exact behavior depends on validation, but shouldn't crash
     assert result.exit_code is not None
@@ -618,7 +623,7 @@ def test_cli_with_whitespace_only_topic():
         "   ",  # Only whitespace
         "--count", "1"
     ])
-    
+
     # Should handle whitespace-only topics appropriately
     # May succeed with trimmed topic or fail with validation error
     assert result.exit_code is not None
@@ -658,13 +663,13 @@ def test_doc2dataset_with_nonexistent_source():
 
 def test_doc2dataset_with_invalid_chunk_size():
     """Test doc2dataset with invalid chunk size parameter."""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
-    
+
     try:
         # Test chunk size too small
         result = runner.invoke(app, [
@@ -675,7 +680,7 @@ def test_doc2dataset_with_invalid_chunk_size():
         assert result.exit_code != 0
         output = result.stdout + (result.output if hasattr(result, 'output') else '')
         assert "Chunk size must be at least 500" in output
-        
+
         # Test chunk size too large
         result = runner.invoke(app, [
             "doc2dataset",
@@ -691,13 +696,13 @@ def test_doc2dataset_with_invalid_chunk_size():
 
 def test_doc2dataset_with_invalid_chunk_overlap():
     """Test doc2dataset with invalid chunk overlap parameter."""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
-    
+
     try:
         # Test negative overlap
         result = runner.invoke(app, [
@@ -708,7 +713,7 @@ def test_doc2dataset_with_invalid_chunk_overlap():
         assert result.exit_code != 0
         output = result.stdout + (result.output if hasattr(result, 'output') else '')
         assert "Chunk overlap cannot be negative" in output
-        
+
         # Test overlap too large
         result = runner.invoke(app, [
             "doc2dataset",
@@ -724,13 +729,13 @@ def test_doc2dataset_with_invalid_chunk_overlap():
 
 def test_doc2dataset_with_invalid_entries_per_chunk():
     """Test doc2dataset with invalid entries per chunk parameter."""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
-    
+
     try:
         # Test count too small
         result = runner.invoke(app, [
@@ -741,7 +746,7 @@ def test_doc2dataset_with_invalid_entries_per_chunk():
         assert result.exit_code != 0
         output = result.stdout + (result.output if hasattr(result, 'output') else '')
         assert "Entries per chunk must be at least 1" in output
-        
+
         # Test count too large
         result = runner.invoke(app, [
             "doc2dataset",
@@ -757,13 +762,13 @@ def test_doc2dataset_with_invalid_entries_per_chunk():
 
 def test_doc2dataset_with_overlap_greater_than_chunk_size():
     """Test doc2dataset with overlap >= chunk size."""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
-    
+
     try:
         result = runner.invoke(app, [
             "doc2dataset",
@@ -780,13 +785,13 @@ def test_doc2dataset_with_overlap_greater_than_chunk_size():
 
 def test_doc2dataset_with_invalid_dataset_type():
     """Test doc2dataset with invalid dataset type."""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
-    
+
     try:
         result = runner.invoke(app, [
             "doc2dataset",
@@ -802,13 +807,13 @@ def test_doc2dataset_with_invalid_dataset_type():
 
 def test_doc2dataset_with_invalid_language():
     """Test doc2dataset with invalid language."""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write("# Test\nSome content")
         temp_file = f.name
-    
+
     try:
         result = runner.invoke(app, [
             "doc2dataset",
@@ -824,14 +829,14 @@ def test_doc2dataset_with_invalid_language():
 
 def test_doc2dataset_displays_config():
     """Test that doc2dataset displays configuration correctly."""
-    import tempfile
     import os
+    import tempfile
     from unittest.mock import patch
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write("# Test Document\n\nThis is test content for the document.")
         temp_file = f.name
-    
+
     try:
         # Mock the Ollama client to avoid actual API calls
         with patch('ollaforge.doc_generator.ollama') as mock_ollama:
@@ -840,7 +845,7 @@ def test_doc2dataset_displays_config():
                     'content': '[{"instruction": "test", "input": "test", "output": "test"}]'
                 }
             }
-            
+
             result = runner.invoke(app, [
                 "doc2dataset",
                 temp_file,
@@ -851,11 +856,11 @@ def test_doc2dataset_displays_config():
                 "--count", "2",
                 "--lang", "en"
             ])
-            
+
             # Strip ANSI color codes for comparison
             import re
             clean_output = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
-            
+
             # Check that configuration is displayed
             assert "Document to Dataset" in clean_output
             assert "Source:" in clean_output
@@ -871,14 +876,13 @@ def test_doc2dataset_displays_config():
 def test_doc2dataset_with_empty_directory():
     """Test doc2dataset with empty directory."""
     import tempfile
-    import os
-    
+
     with tempfile.TemporaryDirectory() as temp_dir:
         result = runner.invoke(app, [
             "doc2dataset",
             temp_dir
         ])
-        
+
         # Should exit gracefully with message about no files found
         output = result.stdout + (result.output if hasattr(result, 'output') else '')
         assert "No supported files found" in output or result.exit_code == 0
@@ -886,19 +890,19 @@ def test_doc2dataset_with_empty_directory():
 
 def test_doc2dataset_with_unsupported_file():
     """Test doc2dataset with unsupported file format."""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.xyz', delete=False) as f:
         f.write("Some content")
         temp_file = f.name
-    
+
     try:
         result = runner.invoke(app, [
             "doc2dataset",
             temp_file
         ])
-        
+
         # Should show unsupported format error
         output = result.stdout + (result.output if hasattr(result, 'output') else '')
         assert "Unsupported format" in output or "No supported files found" in output
@@ -908,24 +912,24 @@ def test_doc2dataset_with_unsupported_file():
 
 def test_doc2dataset_with_permission_error():
     """Test doc2dataset with permission error - Requirements 5.2"""
-    import tempfile
     import os
-    
+    import tempfile
+
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a file and make it unreadable
         temp_file = os.path.join(temp_dir, "test.md")
         with open(temp_file, 'w') as f:
             f.write("# Test\nContent")
-        
+
         # Make file unreadable
         os.chmod(temp_file, 0o000)
-        
+
         try:
             result = runner.invoke(app, [
                 "doc2dataset",
                 temp_file
             ])
-            
+
             # Should show permission error
             assert result.exit_code != 0
             output = result.stdout + (result.output if hasattr(result, 'output') else '')
@@ -937,24 +941,23 @@ def test_doc2dataset_with_permission_error():
 
 def test_doc2dataset_ollama_connection_error():
     """Test doc2dataset with Ollama connection error - Requirements 5.3"""
-    import tempfile
     import os
+    import tempfile
     from unittest.mock import patch
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write("# Test Document\n\nThis is test content.")
         temp_file = f.name
-    
+
     try:
         with patch('ollaforge.doc_generator.ollama') as mock_ollama:
-            from ollaforge.client import OllamaConnectionError
             mock_ollama.chat.side_effect = Exception("Connection refused")
-            
+
             result = runner.invoke(app, [
                 "doc2dataset",
                 temp_file
             ])
-            
+
             # The command should handle the error gracefully
             # It may show an error or generate no entries
             assert result.exit_code is not None
@@ -964,54 +967,55 @@ def test_doc2dataset_ollama_connection_error():
 
 def test_doc2dataset_parameter_validation():
     """Test doc2dataset parameter validation callbacks."""
+    from typer import BadParameter
+
     from ollaforge.cli import (
-        validate_chunk_size,
         validate_chunk_overlap,
+        validate_chunk_size,
         validate_entries_per_chunk,
         validate_source_path,
     )
-    from typer import BadParameter
-    
+
     # Test validate_chunk_size
     assert validate_chunk_size(500) == 500
     assert validate_chunk_size(2000) == 2000
     assert validate_chunk_size(10000) == 10000
-    
+
     with pytest.raises(BadParameter):
         validate_chunk_size(499)
-    
+
     with pytest.raises(BadParameter):
         validate_chunk_size(10001)
-    
+
     # Test validate_chunk_overlap
     assert validate_chunk_overlap(0) == 0
     assert validate_chunk_overlap(200) == 200
     assert validate_chunk_overlap(1000) == 1000
-    
+
     with pytest.raises(BadParameter):
         validate_chunk_overlap(-1)
-    
+
     with pytest.raises(BadParameter):
         validate_chunk_overlap(1001)
-    
+
     # Test validate_entries_per_chunk
     assert validate_entries_per_chunk(1) == 1
     assert validate_entries_per_chunk(5) == 5
     assert validate_entries_per_chunk(10) == 10
-    
+
     with pytest.raises(BadParameter):
         validate_entries_per_chunk(0)
-    
+
     with pytest.raises(BadParameter):
         validate_entries_per_chunk(11)
-    
+
     # Test validate_source_path with non-existent path
     with pytest.raises(BadParameter):
         validate_source_path("/nonexistent/path")
-    
+
     with pytest.raises(BadParameter):
         validate_source_path("")
-    
+
     with pytest.raises(BadParameter):
         validate_source_path("   ")
 
@@ -1023,148 +1027,149 @@ def test_doc2dataset_parameter_validation():
 
 class TestDoc2DatasetInterruptHandler:
     """Tests for Doc2DatasetInterruptHandler class - Requirements 5.5"""
-    
+
     def test_interrupt_handler_initialization(self):
         """Test that interrupt handler initializes correctly."""
         from ollaforge.cli import Doc2DatasetInterruptHandler
-        
+
         handler = Doc2DatasetInterruptHandler("test_output.jsonl")
-        
-        assert handler.interrupted == False
+
+        assert handler.interrupted is False
         assert handler.get_entries() == []
         assert handler._output_file == "test_output.jsonl"
-    
+
     def test_interrupt_handler_set_entries(self):
         """Test setting entries in the interrupt handler."""
         from ollaforge.cli import Doc2DatasetInterruptHandler
-        
+
         handler = Doc2DatasetInterruptHandler("test_output.jsonl")
-        
+
         entries = [
             {"instruction": "test1", "input": "input1", "output": "output1"},
             {"instruction": "test2", "input": "input2", "output": "output2"},
         ]
-        
+
         handler.set_entries(entries)
-        
+
         assert handler.get_entries() == entries
         assert len(handler.get_entries()) == 2
-    
+
     def test_interrupt_handler_add_entries(self):
         """Test adding entries to the interrupt handler."""
         from ollaforge.cli import Doc2DatasetInterruptHandler
-        
+
         handler = Doc2DatasetInterruptHandler("test_output.jsonl")
-        
+
         # Add first batch
         handler.add_entries([{"instruction": "test1", "input": "input1", "output": "output1"}])
         assert len(handler.get_entries()) == 1
-        
+
         # Add second batch
         handler.add_entries([
             {"instruction": "test2", "input": "input2", "output": "output2"},
             {"instruction": "test3", "input": "input3", "output": "output3"},
         ])
         assert len(handler.get_entries()) == 3
-        
+
         # Adding empty list should not change anything
         handler.add_entries([])
         assert len(handler.get_entries()) == 3
-        
+
         # Adding None should not change anything
         handler.add_entries(None)
         assert len(handler.get_entries()) == 3
-    
+
     def test_interrupt_handler_save_partial_results_empty(self):
         """Test saving partial results when no entries exist."""
         from ollaforge.cli import Doc2DatasetInterruptHandler
-        
+
         handler = Doc2DatasetInterruptHandler("test_output.jsonl")
-        
+
         # Should return None when no entries
         result = handler.save_partial_results()
         assert result is None
-    
+
     def test_interrupt_handler_save_partial_results_with_entries(self):
         """Test saving partial results with entries - Requirements 5.5"""
-        import tempfile
-        import os
         import json
+        import os
+        import tempfile
+
         from ollaforge.cli import Doc2DatasetInterruptHandler
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             output_file = os.path.join(temp_dir, "test_output.jsonl")
             handler = Doc2DatasetInterruptHandler(output_file)
-            
+
             entries = [
                 {"instruction": "test1", "input": "input1", "output": "output1"},
                 {"instruction": "test2", "input": "input2", "output": "output2"},
             ]
             handler.set_entries(entries)
-            
+
             # Save partial results
             result = handler.save_partial_results()
-            
+
             # Should return the path to the partial file
             assert result is not None
             assert "partial" in result
             assert result.endswith(".jsonl")
-            
+
             # Verify the file was created and contains the entries
             assert os.path.exists(result)
-            
-            with open(result, 'r', encoding='utf-8') as f:
+
+            with open(result, encoding='utf-8') as f:
                 lines = f.readlines()
                 assert len(lines) == 2
-                
+
                 # Verify content
                 entry1 = json.loads(lines[0])
                 assert entry1["instruction"] == "test1"
-                
+
                 entry2 = json.loads(lines[1])
                 assert entry2["instruction"] == "test2"
-    
+
     def test_interrupt_handler_save_partial_results_with_pydantic_models(self):
         """Test saving partial results with Pydantic model entries."""
-        import tempfile
         import os
-        import json
+        import tempfile
+
         from ollaforge.cli import Doc2DatasetInterruptHandler
         from ollaforge.models import DataEntry
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             output_file = os.path.join(temp_dir, "test_output.jsonl")
             handler = Doc2DatasetInterruptHandler(output_file)
-            
+
             # Create Pydantic model entries
             entries = [
                 DataEntry(instruction="test1", input="input1", output="output1"),
                 DataEntry(instruction="test2", input="input2", output="output2"),
             ]
             handler.set_entries(entries)
-            
+
             # Save partial results
             result = handler.save_partial_results()
-            
+
             # Should successfully save Pydantic models
             assert result is not None
             assert os.path.exists(result)
-            
-            with open(result, 'r', encoding='utf-8') as f:
+
+            with open(result, encoding='utf-8') as f:
                 lines = f.readlines()
                 assert len(lines) == 2
-    
+
     def test_interrupt_handler_save_partial_results_filters_none(self):
         """Test that save_partial_results filters out None entries."""
-        import tempfile
         import os
-        import json
+        import tempfile
+
         from ollaforge.cli import Doc2DatasetInterruptHandler
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             output_file = os.path.join(temp_dir, "test_output.jsonl")
             handler = Doc2DatasetInterruptHandler(output_file)
-            
+
             # Mix of valid entries and None
             entries = [
                 {"instruction": "test1", "input": "input1", "output": "output1"},
@@ -1173,83 +1178,85 @@ class TestDoc2DatasetInterruptHandler:
                 None,
             ]
             handler.set_entries(entries)
-            
+
             # Save partial results
             result = handler.save_partial_results()
-            
+
             # Should only save valid entries
             assert result is not None
-            
-            with open(result, 'r', encoding='utf-8') as f:
+
+            with open(result, encoding='utf-8') as f:
                 lines = f.readlines()
                 assert len(lines) == 2  # Only 2 valid entries
-    
+
     def test_interrupt_handler_setup_and_cleanup(self):
         """Test signal handler setup and cleanup."""
         import signal
+
         from ollaforge.cli import Doc2DatasetInterruptHandler
-        
+
         handler = Doc2DatasetInterruptHandler("test_output.jsonl")
-        
+
         # Get original handler
         original = signal.getsignal(signal.SIGINT)
-        
+
         # Setup should change the handler
         handler.setup()
         current = signal.getsignal(signal.SIGINT)
         assert current != original
-        
+
         # Cleanup should restore the original handler
         handler.cleanup()
         restored = signal.getsignal(signal.SIGINT)
         assert restored == original
-    
+
     def test_interrupt_handler_interrupted_state(self):
         """Test that interrupted state is properly tracked."""
         from ollaforge.cli import Doc2DatasetInterruptHandler
-        
+
         handler = Doc2DatasetInterruptHandler("test_output.jsonl")
-        
+
         # Initially not interrupted
-        assert handler.interrupted == False
-        
+        assert handler.interrupted is False
+
         # Simulate interrupt by calling the handler directly
         handler._handle_interrupt(None, None)
-        
+
         # Should now be interrupted
-        assert handler.interrupted == True
-    
+        assert handler.interrupted is True
+
     def test_interrupt_handler_creates_parent_directory(self):
         """Test that save_partial_results creates parent directory if needed."""
-        import tempfile
         import os
+        import tempfile
+
         from ollaforge.cli import Doc2DatasetInterruptHandler
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Use a nested path that doesn't exist
             output_file = os.path.join(temp_dir, "nested", "dir", "test_output.jsonl")
             handler = Doc2DatasetInterruptHandler(output_file)
-            
+
             entries = [{"instruction": "test", "input": "input", "output": "output"}]
             handler.set_entries(entries)
-            
+
             # Save should create the nested directory
             result = handler.save_partial_results()
-            
+
             assert result is not None
             assert os.path.exists(result)
 
 
 def test_doc2dataset_interrupt_handling_integration():
     """Integration test for doc2dataset interrupt handling - Requirements 5.5"""
-    import tempfile
     import os
-    from unittest.mock import patch, MagicMock
-    
+    import tempfile
+    from unittest.mock import patch
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write("# Test Document\n\nThis is test content for the document.")
         temp_file = f.name
-    
+
     try:
         # Mock the generator to simulate partial processing
         with patch('ollaforge.doc_generator.ollama') as mock_ollama:
@@ -1258,14 +1265,14 @@ def test_doc2dataset_interrupt_handling_integration():
                     'content': '[{"instruction": "test", "input": "test", "output": "test"}]'
                 }
             }
-            
+
             result = runner.invoke(app, [
                 "doc2dataset",
                 temp_file,
                 "--type", "sft",
                 "--count", "1"
             ])
-            
+
             # The command should complete (or fail gracefully)
             # The important thing is that interrupt handling is set up
             assert result.exit_code is not None
@@ -1275,28 +1282,28 @@ def test_doc2dataset_interrupt_handling_integration():
 
 def test_doc2dataset_partial_save_on_error():
     """Test that partial results are saved when an error occurs during processing."""
-    import tempfile
     import os
+    import tempfile
     from unittest.mock import patch
-    
+
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a test file
         test_file = os.path.join(temp_dir, "test.md")
         with open(test_file, 'w') as f:
             f.write("# Test\n\nContent")
-        
+
         output_file = os.path.join(temp_dir, "output.jsonl")
-        
+
         # Mock to simulate an error after some processing
         with patch('ollaforge.doc_generator.ollama') as mock_ollama:
             mock_ollama.chat.side_effect = Exception("Simulated error")
-            
+
             result = runner.invoke(app, [
                 "doc2dataset",
                 test_file,
                 "--output", output_file,
                 "--type", "sft"
             ])
-            
+
             # Should handle the error gracefully
             assert result.exit_code is not None

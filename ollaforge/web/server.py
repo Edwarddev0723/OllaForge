@@ -14,17 +14,16 @@ Requirements satisfied:
 - 3.2: Update progress in real-time during processing
 """
 
-import os
 import logging
+import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
+import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import socketio
 
 from .routes.websocket import ws_manager
-
 
 # ============================================================================
 # Logging Configuration
@@ -37,7 +36,7 @@ def setup_logging():
         "LOG_FORMAT",
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    
+
     # Configure root logger
     logging.basicConfig(
         level=getattr(logging, log_level, logging.INFO),
@@ -46,13 +45,13 @@ def setup_logging():
             logging.StreamHandler()
         ]
     )
-    
+
     # Set specific loggers
     logging.getLogger("uvicorn").setLevel(log_level)
     logging.getLogger("uvicorn.access").setLevel(log_level)
     logging.getLogger("socketio").setLevel(logging.WARNING)
     logging.getLogger("engineio").setLevel(logging.WARNING)
-    
+
     return logging.getLogger("ollaforge.web")
 
 
@@ -109,7 +108,7 @@ ws_manager.set_sio(sio)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Lifespan context manager for FastAPI application.
-    
+
     Handles startup and shutdown events.
     """
     # Startup
@@ -219,7 +218,12 @@ app.add_middleware(
 # ============================================================================
 
 # Import and register routes
-from .routes import generation_router, augmentation_router, models_router, tasks_router
+from .routes import (  # noqa: E402
+    augmentation_router,
+    generation_router,
+    models_router,
+    tasks_router,
+)
 
 app.include_router(generation_router)
 app.include_router(augmentation_router)
@@ -237,7 +241,7 @@ app.include_router(tasks_router)
 async def health_check():
     """
     Health check endpoint.
-    
+
     Returns the current health status of the API server.
     Use this endpoint for load balancer health checks or monitoring.
     """
@@ -253,7 +257,7 @@ async def health_check():
 async def root():
     """
     Root endpoint with API information.
-    
+
     Returns basic information about the API including version and documentation URL.
     """
     return {
@@ -299,7 +303,7 @@ async def disconnect(sid: str):
 async def subscribe(sid: str, data: dict):
     """
     Handle task subscription request.
-    
+
     Args:
         sid: Session ID
         data: Dict containing 'task_id' to subscribe to
@@ -318,7 +322,7 @@ async def subscribe(sid: str, data: dict):
 async def unsubscribe(sid: str, data: dict):
     """
     Handle task unsubscription request.
-    
+
     Args:
         sid: Session ID
         data: Dict containing 'task_id' to unsubscribe from
@@ -339,10 +343,10 @@ async def unsubscribe(sid: str, data: dict):
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     # Determine log level
     log_level = os.getenv("LOG_LEVEL", "info").lower()
-    
+
     # Run the server
     uvicorn.run(
         "ollaforge.web.server:socket_app",
