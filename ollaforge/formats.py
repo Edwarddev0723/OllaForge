@@ -241,32 +241,41 @@ def _read_csv(
     try:
         entries = []
 
-        with open(file_path, encoding="utf-8", newline="") as f:
-            # Use explicit dialect configuration for better reliability
-            reader = csv.DictReader(
-                f,
-                delimiter=delimiter,
-                quotechar='"',
-                quoting=csv.QUOTE_MINIMAL,
-                skipinitialspace=True,
-            )
-            field_names = reader.fieldnames or []
+        # Read file content and remove NUL characters before CSV parsing
+        with open(file_path, encoding="utf-8", errors="replace") as f:
+            content = f.read().replace("\x00", "")
 
-            for _row_num, row in enumerate(reader, 2):  # Start from 2 (header is row 1)
-                # Clean empty values and remove NUL characters
-                cleaned_row = {}
-                for k, v in row.items():
-                    if v is not None:
-                        # Handle case where v might be a list or other non-string type
-                        if isinstance(v, str):
-                            # Remove NUL characters that CSV parser cannot handle
-                            v = v.replace("\x00", "")
-                            if v.strip():
-                                cleaned_row[k] = v
-                        elif not isinstance(v, str) and v:
-                            cleaned_row[k] = str(v)
-                if cleaned_row:  # Skip empty rows
-                    entries.append(cleaned_row)
+        # Parse CSV from sanitized content
+        import io
+
+        reader = csv.DictReader(
+            io.StringIO(content),
+            delimiter=delimiter,
+            quotechar='"',
+            quoting=csv.QUOTE_MINIMAL,
+            skipinitialspace=True,
+        )
+        field_names = reader.fieldnames or []
+        # Sanitize field names as well
+        field_names = [fn.replace("\x00", "") if fn else fn for fn in field_names]
+
+        for _row_num, row in enumerate(reader, 2):  # Start from 2 (header is row 1)
+            # Clean empty values and remove NUL characters
+            cleaned_row = {}
+            for k, v in row.items():
+                # Sanitize key
+                k = k.replace("\x00", "") if k else k
+                if v is not None:
+                    # Handle case where v might be a list or other non-string type
+                    if isinstance(v, str):
+                        # Remove NUL characters that CSV parser cannot handle
+                        v = v.replace("\x00", "")
+                        if v.strip():
+                            cleaned_row[k] = v
+                    elif not isinstance(v, str) and v:
+                        cleaned_row[k] = str(v)
+            if cleaned_row:  # Skip empty rows
+                entries.append(cleaned_row)
 
         return entries, field_names
 
@@ -322,12 +331,19 @@ def _write_csv(
     if not entries:
         return
 
+    def sanitize(value: Any) -> str:
+        """Sanitize value by removing NUL characters."""
+        if value is None:
+            return ""
+        s = str(value)
+        return s.replace("\x00", "")
+
     try:
-        # Get all field names
+        # Get all field names and sanitize them
         field_names = set()
         for entry in entries:
             field_names.update(entry.keys())
-        field_names = sorted(field_names)
+        field_names = sorted([sanitize(fn) for fn in field_names])
 
         with open(file_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(
@@ -341,14 +357,20 @@ def _write_csv(
             writer.writeheader()
 
             for entry in entries:
-                # Handle complex values (convert to JSON strings)
+                # Handle complex values (convert to JSON strings) and sanitize
                 row = {}
                 for field in field_names:
-                    value = entry.get(field, "")
+                    # Find original key (may have been sanitized)
+                    original_key = None
+                    for k in entry.keys():
+                        if sanitize(k) == field:
+                            original_key = k
+                            break
+                    value = entry.get(original_key, "") if original_key else ""
                     if isinstance(value, (dict, list)):
-                        row[field] = json.dumps(value, ensure_ascii=False)
+                        row[field] = sanitize(json.dumps(value, ensure_ascii=False))
                     else:
-                        row[field] = str(value) if value is not None else ""
+                        row[field] = sanitize(value)
                 writer.writerow(row)
 
     except Exception as e:

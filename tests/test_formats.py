@@ -22,14 +22,21 @@ from ollaforge.formats import (
 )
 
 
+# Safe text strategy that excludes NUL characters and ensures non-whitespace content
+safe_text = st.text(min_size=0, max_size=100).filter(lambda s: "\x00" not in s)
+safe_text_nonempty = st.text(min_size=1, max_size=100).filter(
+    lambda s: "\x00" not in s and s.strip()
+)
+
+
 # Test data generators
 @st.composite
 def sample_entry(draw):
     """Generate a sample dataset entry."""
     return {
-        "instruction": draw(st.text(min_size=1, max_size=100)),
-        "input": draw(st.text(min_size=0, max_size=100)),
-        "output": draw(st.text(min_size=1, max_size=100)),
+        "instruction": draw(safe_text_nonempty),
+        "input": draw(safe_text),
+        "output": draw(safe_text_nonempty),
     }
 
 
