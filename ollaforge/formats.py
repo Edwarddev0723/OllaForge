@@ -333,6 +333,7 @@ def _write_csv(
                 delimiter=delimiter,
                 quoting=csv.QUOTE_MINIMAL,
                 quotechar='"',
+                escapechar="\\",
             )
             writer.writeheader()
 

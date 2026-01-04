@@ -93,18 +93,23 @@ def test_output_path_validation():
 
 def test_cli_help_display():
     """Test that CLI displays help information correctly."""
+    import re
+
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "Generate and augment datasets using local Ollama models" in result.stdout
-    assert "generate" in result.stdout
-    assert "augment" in result.stdout
+    # Strip ANSI color codes for comparison
+    clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+    assert "Generate and augment datasets using local Ollama models" in clean_output
+    assert "generate" in clean_output
+    assert "augment" in clean_output
 
     # Test generate subcommand help
     result = runner.invoke(app, ["generate", "--help"])
     assert result.exit_code == 0
-    assert "--count" in result.stdout
-    assert "--model" in result.stdout
-    assert "--output" in result.stdout
+    clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+    assert "--count" in clean_output
+    assert "--model" in clean_output
+    assert "--output" in clean_output
 
 
 def test_cli_with_valid_parameters():
@@ -651,18 +656,22 @@ def test_cli_with_whitespace_only_topic():
 
 def test_doc2dataset_help_display():
     """Test that doc2dataset command displays help information correctly."""
+    import re
+
     result = runner.invoke(app, ["doc2dataset", "--help"])
     assert result.exit_code == 0
-    assert "Convert documents to fine-tuning datasets" in result.stdout
-    assert "--output" in result.stdout
-    assert "--type" in result.stdout
-    assert "--model" in result.stdout
-    assert "--chunk-size" in result.stdout
-    assert "--chunk-overlap" in result.stdout
-    assert "--count" in result.stdout
-    assert "--lang" in result.stdout
-    assert "--pattern" in result.stdout
-    assert "--recursive" in result.stdout
+    # Strip ANSI color codes for comparison
+    clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+    assert "Convert documents to fine-tuning datasets" in clean_output
+    assert "--output" in clean_output
+    assert "--type" in clean_output
+    assert "--model" in clean_output
+    assert "--chunk-size" in clean_output
+    assert "--chunk-overlap" in clean_output
+    assert "--count" in clean_output
+    assert "--lang" in clean_output
+    assert "--pattern" in clean_output
+    assert "--recursive" in clean_output
 
 
 def test_doc2dataset_with_nonexistent_source():
