@@ -62,6 +62,6 @@ def test_uvicorn_dependency():
 def test_multipart_dependency():
     """Test that python-multipart is installed."""
     try:
-        import multipart  # noqa: F401
+        import python_multipart  # noqa: F401
     except ImportError as e:
-        pytest.fail(f"Failed to import multipart: {e}")
+        pytest.fail(f"Failed to import python_multipart: {e}")
