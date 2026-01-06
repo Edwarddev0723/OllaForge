@@ -290,7 +290,7 @@ async def download_generated_dataset(
     task_id: str,
     format: str = Query(
         "jsonl",
-        regex="^(jsonl|json|csv|tsv|parquet)$",
+        pattern="^(jsonl|json|csv|tsv|parquet)$",
         description="Output format for the dataset",
     ),
 ) -> StreamingResponse:

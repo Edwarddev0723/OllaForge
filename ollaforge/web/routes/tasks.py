@@ -45,11 +45,11 @@ filtered by type and/or status.
 )
 async def list_tasks(
     task_type: Optional[str] = Query(
-        None, regex="^(generation|augmentation)$", description="Filter by task type"
+        None, pattern="^(generation|augmentation)$", description="Filter by task type"
     ),
     status: Optional[str] = Query(
         None,
-        regex="^(pending|queued|running|completed|failed|timeout|cancelled)$",
+        pattern="^(pending|queued|running|completed|failed|timeout|cancelled)$",
         description="Filter by status",
     ),
     limit: int = Query(

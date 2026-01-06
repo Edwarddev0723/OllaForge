@@ -444,7 +444,7 @@ def _test_ollama_connection() -> None:
         # Try to list available models to test connection
         models = ollama.list()
         # Handle both dict (older versions) and ListResponse (newer versions)
-        if not (isinstance(models, dict) or hasattr(models, 'models')):
+        if not (isinstance(models, dict) or hasattr(models, "models")):
             raise OllamaConnectionError("Invalid response from Ollama API")
 
     except Exception as e:
@@ -738,14 +738,14 @@ def get_available_models() -> list[str]:
     """
     try:
         response = ollama.list()
-        
+
         # Handle both dict (older versions) and ListResponse (newer versions)
-        if hasattr(response, 'models'):
+        if hasattr(response, "models"):
             # Newer version returns ListResponse object
             models = response.models
             model_names = []
             for model in models:
-                if hasattr(model, 'model'):
+                if hasattr(model, "model"):
                     model_names.append(model.model)
                 elif isinstance(model, dict) and "name" in model:
                     model_names.append(model["name"])
@@ -757,7 +757,9 @@ def get_available_models() -> list[str]:
 
             models = response["models"]
             if not isinstance(models, list):
-                raise OllamaConnectionError("Malformed response: 'models' is not a list")
+                raise OllamaConnectionError(
+                    "Malformed response: 'models' is not a list"
+                )
 
             model_names = []
             for model in models:
